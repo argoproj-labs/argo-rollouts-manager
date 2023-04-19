@@ -6,7 +6,7 @@ metadata:
       [
         {
           "apiVersion": "argoproj.io/v1alpha1",
-          "kind": "ArgoRollouts",
+          "kind": "ArgoRollout",
           "metadata": {
             "labels": {
               "app.kubernetes.io/created-by": "argo-rollouts-operator",
@@ -17,11 +17,11 @@ metadata:
             },
             "name": "argorollouts-sample"
           },
-          "spec": null
+          "spec": {}
         }
       ]
     capabilities: Basic Install
-    createdAt: "2023-04-19T10:40:53Z"
+    createdAt: "2023-04-19T17:58:26Z"
     operators.operatorframework.io/builder: operator-sdk-v1.28.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: argo-rollouts-operator.v0.0.1
@@ -30,9 +30,7 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: ArgoRollouts is the Schema for the argorollouts API
-      displayName: Argo Rollouts
-      kind: ArgoRollouts
+    - kind: ArgoRollout
       name: argorollouts.argoproj.io
       version: v1alpha1
   description: Kubernetes operator for Argo Rollouts

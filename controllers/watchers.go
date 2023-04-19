@@ -11,7 +11,7 @@ import (
 // setResourceWatches will register Watches for each of the supported Resources.
 func setResourceWatches(bld *builder.Builder) *builder.Builder {
 	// Watch for changes to primary resource ArgoRollouts
-	bld.For(&rolloutsApi.ArgoRollouts{})
+	bld.For(&rolloutsApi.ArgoRollout{})
 
 	// Watch for changes to ConfigMap sub-resources owned by ArgoRollouts.
 	bld.Owns(&corev1.ConfigMap{})

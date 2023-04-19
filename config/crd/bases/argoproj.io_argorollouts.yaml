@@ -9,16 +9,16 @@ metadata:
 spec:
   group: argoproj.io
   names:
-    kind: ArgoRollouts
-    listKind: ArgoRolloutsList
+    kind: ArgoRollout
+    listKind: ArgoRolloutList
     plural: argorollouts
-    singular: argorollouts
+    singular: argorollout
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ArgoRollouts is the Schema for the argorollouts API
+        description: ArgoRollout is the Schema for the argorollouts API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -33,7 +33,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: ArgoRolloutsSpec defines the desired state of ArgoRollouts
+            description: ArgoRolloutSpec defines the desired state of ArgoRollout
             properties:
               env:
                 description: Env lets you specify environment for Rollouts pods
@@ -207,57 +207,12 @@ spec:
                       type: object
                     type: array
                 type: object
-              resources:
-                description: Resources defines the Compute Resources required by the
-                  container for Rollouts.
-                properties:
-                  claims:
-                    description: "Claims lists the names of resources, defined in
-                      spec.resourceClaims, that are used by this container. \n This
-                      is an alpha field and requires enabling the DynamicResourceAllocation
-                      feature gate. \n This field is immutable."
-                    items:
-                      description: ResourceClaim references one entry in PodSpec.ResourceClaims.
-                      properties:
-                        name:
-                          description: Name must match the name of one entry in pod.spec.resourceClaims
-                            of the Pod where this field is used. It makes that resource
-                            available inside a container.
-                          type: string
-                      required:
-                      - name
-                      type: object
-                    type: array
-                    x-kubernetes-list-type: set
-                  limits:
-                    additionalProperties:
-                      anyOf:
-                      - type: integer
-                      - type: string
-                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                      x-kubernetes-int-or-string: true
-                    description: 'Limits describes the maximum amount of compute resources
-                      allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
-                    type: object
-                  requests:
-                    additionalProperties:
-                      anyOf:
-                      - type: integer
-                      - type: string
-                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                      x-kubernetes-int-or-string: true
-                    description: 'Requests describes the minimum amount of compute
-                      resources required. If Requests is omitted for a container,
-                      it defaults to Limits if that is explicitly specified, otherwise
-                      to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
-                    type: object
-                type: object
               version:
                 description: Version defines Argo Rollouts controller tag (optional)
                 type: string
             type: object
           status:
-            description: ArgoRolloutsStatus defines the observed state of ArgoRollouts
+            description: ArgoRolloutStatus defines the observed state of ArgoRollout
             properties:
               phase:
                 description: 'Phase is a simple, high-level summary of where the ArgoRollouts

@@ -16,7 +16,7 @@ import (
 )
 
 // Reconcile the Rollouts controller deployment.
-func (r *ArgoRolloutsReconciler) reconcileRolloutsDeployment(cr *rolloutsApi.ArgoRollouts, sa *corev1.ServiceAccount) error {
+func (r *ArgoRolloutsReconciler) reconcileRolloutsDeployment(cr *rolloutsApi.ArgoRollout, sa *corev1.ServiceAccount) error {
 	// Configuration for the desired deployment
 	desiredDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -103,7 +103,7 @@ func (r *ArgoRolloutsReconciler) reconcileRolloutsDeployment(cr *rolloutsApi.Arg
 	return nil
 }
 
-func rolloutsContainer(cr *rolloutsApi.ArgoRollouts) corev1.Container {
+func rolloutsContainer(cr *rolloutsApi.ArgoRollout) corev1.Container {
 
 	// Global proxy env vars go firstArgoRollouts
 	rolloutsEnv := cr.Spec.Env
@@ -129,8 +129,7 @@ func rolloutsContainer(cr *rolloutsApi.ArgoRollouts) corev1.Container {
 			SuccessThreshold:    int32(1),
 			TimeoutSeconds:      int32(10),
 		},
-		Name:      "argo-rollouts",
-		Resources: getRolloutsControllerResources(cr),
+		Name: "argo-rollouts",
 		Ports: []corev1.ContainerPort{
 			{
 				ContainerPort: 8080,
@@ -173,7 +172,7 @@ func boolPtr(val bool) *bool {
 }
 
 // Returns the container image for rollouts controller.
-func getRolloutsContainerImage(cr *rolloutsApi.ArgoRollouts) string {
+func getRolloutsContainerImage(cr *rolloutsApi.ArgoRollout) string {
 	defaultImg, defaultTag := false, false
 
 	img := cr.Spec.Image
@@ -197,7 +196,7 @@ func getRolloutsContainerImage(cr *rolloutsApi.ArgoRollouts) string {
 }
 
 // getRolloutsCommand will return the command for the Rollouts controller component.
-func getRolloutsCommandArgs(cr *rolloutsApi.ArgoRollouts) []string {
+func getRolloutsCommandArgs(cr *rolloutsApi.ArgoRollout) []string {
 	args := make([]string, 0)
 
 	args = append(args, "--namespaced")
@@ -210,16 +209,4 @@ func getRolloutsCommandArgs(cr *rolloutsApi.ArgoRollouts) []string {
 
 	args = append(args, extraArgs...)
 	return args
-}
-
-// getRolloutsControllerResources will return the ResourceRequirements for the rollouts container.
-func getRolloutsControllerResources(cr *rolloutsApi.ArgoRollouts) corev1.ResourceRequirements {
-	resources := corev1.ResourceRequirements{}
-
-	// Allow override of resource requirements from CR
-	if cr.Spec.Resources != nil {
-		resources = *cr.Spec.Resources
-	}
-
-	return resources
 }

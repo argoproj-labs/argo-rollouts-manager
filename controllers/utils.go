@@ -17,6 +17,7 @@ import (
 )
 
 func setRolloutsLabels(obj *metav1.ObjectMeta) {
+	obj.Labels = map[string]string{}
 	obj.Labels["app.kubernetes.io/name"] = "argo-rollouts"
 	obj.Labels["app.kubernetes.io/part-of"] = "argo-rollouts"
 	obj.Labels["app.kubernetes.io/component"] = "rollouts-controller"

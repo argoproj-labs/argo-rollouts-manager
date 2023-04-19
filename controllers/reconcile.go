@@ -15,7 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (r *ArgoRolloutsReconciler) reconcileRolloutsController(cr *rolloutsApi.ArgoRollouts) error {
+func (r *ArgoRolloutsReconciler) reconcileRolloutsController(cr *rolloutsApi.ArgoRollout) error {
 
 	log.Info("reconciling rollouts serviceaccount")
 	sa, err := r.reconcileRolloutsServiceAccount(cr)
@@ -53,7 +53,7 @@ func (r *ArgoRolloutsReconciler) reconcileRolloutsController(cr *rolloutsApi.Arg
 }
 
 // Reconciles rollouts serviceaccount.
-func (r *ArgoRolloutsReconciler) reconcileRolloutsServiceAccount(cr *rolloutsApi.ArgoRollouts) (*corev1.ServiceAccount, error) {
+func (r *ArgoRolloutsReconciler) reconcileRolloutsServiceAccount(cr *rolloutsApi.ArgoRollout) (*corev1.ServiceAccount, error) {
 
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
@@ -83,7 +83,7 @@ func (r *ArgoRolloutsReconciler) reconcileRolloutsServiceAccount(cr *rolloutsApi
 }
 
 // Reconciles rollouts role.
-func (r *ArgoRolloutsReconciler) reconcileRolloutsRole(cr *rolloutsApi.ArgoRollouts) (*v1.Role, error) {
+func (r *ArgoRolloutsReconciler) reconcileRolloutsRole(cr *rolloutsApi.ArgoRollout) (*v1.Role, error) {
 
 	expectedPolicyRules := getPolicyRules()
 
@@ -119,7 +119,7 @@ func (r *ArgoRolloutsReconciler) reconcileRolloutsRole(cr *rolloutsApi.ArgoRollo
 }
 
 // Reconcile rollouts rolebinding.
-func (r *ArgoRolloutsReconciler) reconcileRolloutsRoleBinding(cr *rolloutsApi.ArgoRollouts, role *v1.Role, sa *corev1.ServiceAccount) error {
+func (r *ArgoRolloutsReconciler) reconcileRolloutsRoleBinding(cr *rolloutsApi.ArgoRollout, role *v1.Role, sa *corev1.ServiceAccount) error {
 
 	expectedRoleBinding := &v1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
@@ -169,7 +169,7 @@ func (r *ArgoRolloutsReconciler) reconcileRolloutsRoleBinding(cr *rolloutsApi.Ar
 }
 
 // Reconcile rollouts service.
-func (r *ArgoRolloutsReconciler) reconcileRolloutsService(cr *rolloutsApi.ArgoRollouts) error {
+func (r *ArgoRolloutsReconciler) reconcileRolloutsService(cr *rolloutsApi.ArgoRollout) error {
 
 	expectedSvc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -217,7 +217,7 @@ func (r *ArgoRolloutsReconciler) reconcileRolloutsService(cr *rolloutsApi.ArgoRo
 }
 
 // Reconciles secrets for rollouts controller
-func (r *ArgoRolloutsReconciler) reconcileRolloutsSecrets(cr *rolloutsApi.ArgoRollouts) error {
+func (r *ArgoRolloutsReconciler) reconcileRolloutsSecrets(cr *rolloutsApi.ArgoRollout) error {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultRolloutsNotificationSecretName,

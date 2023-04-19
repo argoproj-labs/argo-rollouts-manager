@@ -24,8 +24,8 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// ArgoRolloutsSpec defines the desired state of ArgoRollouts
-type ArgoRolloutsSpec struct {
+// ArgoRolloutSpec defines the desired state of ArgoRollout
+type ArgoRolloutSpec struct {
 
 	// Env lets you specify environment for Rollouts pods
 	Env []corev1.EnvVar `json:"env,omitempty"`
@@ -43,9 +43,6 @@ type ArgoRolloutsSpec struct {
 
 	// Version defines Argo Rollouts controller tag (optional)
 	Version string `json:"version,omitempty"`
-
-	// Resources defines the Compute Resources required by the container for Rollouts.
-	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 // ArgoRolloutsNodePlacementSpec is used to specify NodeSelector and Tolerations for Rollouts workloads
@@ -56,8 +53,8 @@ type ArgoRolloutsNodePlacementSpec struct {
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 }
 
-// ArgoRolloutsStatus defines the observed state of ArgoRollouts
-type ArgoRolloutsStatus struct {
+// ArgoRolloutStatus defines the observed state of ArgoRollout
+type ArgoRolloutStatus struct {
 	// Phase is a simple, high-level summary of where the ArgoRollouts is in its lifecycle.
 	// There are five possible phase values:
 	// Pending: The ArgoRollouts has been accepted by the Kubernetes system, but one or more of the required resources have not been created.
@@ -71,24 +68,24 @@ type ArgoRolloutsStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// ArgoRollouts is the Schema for the argorollouts API
-type ArgoRollouts struct {
+// ArgoRollout is the Schema for the argorollouts API
+type ArgoRollout struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ArgoRolloutsSpec   `json:"spec,omitempty"`
-	Status ArgoRolloutsStatus `json:"status,omitempty"`
+	Spec   ArgoRolloutSpec   `json:"spec,omitempty"`
+	Status ArgoRolloutStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// ArgoRolloutsList contains a list of ArgoRollouts
-type ArgoRolloutsList struct {
+// ArgoRolloutList contains a list of ArgoRollouts
+type ArgoRolloutList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ArgoRollouts `json:"items"`
+	Items           []ArgoRollout `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&ArgoRollouts{}, &ArgoRolloutsList{})
+	SchemeBuilder.Register(&ArgoRollout{}, &ArgoRolloutList{})
 }

@@ -57,7 +57,7 @@ func (r *ArgoRolloutsReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	reqLogger.Info("Reconciling ArgoRollouts")
 
 	// Fetch the ArgoRollouts instance
-	rollouts := &rolloutsApi.ArgoRollouts{}
+	rollouts := &rolloutsApi.ArgoRollout{}
 	err := r.Client.Get(ctx, req.NamespacedName, rollouts)
 	if err != nil {
 		if errors.IsNotFound(err) {
