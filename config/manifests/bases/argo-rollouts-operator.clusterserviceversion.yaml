@@ -1,0 +1,50 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[]'
+    capabilities: Basic Install
+  name: argo-rollouts-operator.v0.0.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: ArgoRollouts is the Schema for the argorollouts API
+      displayName: Argo Rollouts
+      kind: ArgoRollouts
+      name: argorollouts.argoproj.io
+      version: v1alpha1
+  description: Kubernetes operator for Argo Rollouts
+  displayName: argo-rollouts-operator
+  icon:
+  - base64data: ""
+    mediatype: ""
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - rollouts
+  - argo-rollouts
+  - progressive delivery
+  links:
+  - name: Argo Rollouts Operator
+    url: https://argo-rollouts-operator.domain
+  maintainers:
+  - email: aveerama@redhat.com
+    name: Abhishek.Veeramalla
+  maturity: alpha
+  provider:
+    name: argo-rollouts-operator
+    url: https://github.com/argoproj/argo-rolloutsv
+  version: 0.0.0

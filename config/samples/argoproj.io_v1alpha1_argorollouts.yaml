@@ -1,0 +1,12 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ArgoRollouts
+metadata:
+  labels:
+    app.kubernetes.io/name: argorollouts
+    app.kubernetes.io/instance: argorollouts-sample
+    app.kubernetes.io/part-of: argo-rollouts-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: argo-rollouts-operator
+  name: argorollouts-sample
+spec:
+  # TODO(user): Add fields here
