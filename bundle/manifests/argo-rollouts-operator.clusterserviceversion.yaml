@@ -21,7 +21,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2023-04-25T04:12:39Z"
+    createdAt: "2023-04-26T10:42:47Z"
     operators.operatorframework.io/builder: operator-sdk-v1.28.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: argo-rollouts-operator.v0.0.1
@@ -30,8 +30,23 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
+    - kind: AnalysisRun
+      name: analysisruns.argoproj.io
+      version: v1alpha1
+    - kind: AnalysisTemplate
+      name: analysistemplates.argoproj.io
+      version: v1alpha1
     - kind: ArgoRollout
       name: argorollouts.argoproj.io
+      version: v1alpha1
+    - kind: ClusterAnalysisTemplate
+      name: clusteranalysistemplates.argoproj.io
+      version: v1alpha1
+    - kind: Experiment
+      name: experiments.argoproj.io
+      version: v1alpha1
+    - kind: Rollout
+      name: rollouts.argoproj.io
       version: v1alpha1
   description: Kubernetes operator for Argo Rollouts
   displayName: argo-rollouts-operator

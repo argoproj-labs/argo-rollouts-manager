@@ -215,23 +215,21 @@ spec:
             properties:
               phase:
                 description: 'Phase is a simple, high-level summary of where the ArgoRollout
-                  is in its lifecycle. There are four possible phase values: Pending:
+                  is in its lifecycle. There are three possible phase values: Pending:
                   The ArgoRollout has been accepted by the Kubernetes system, but
                   one or more of the required resources have not been created. Available:
-                  All of the resources for the ArgoRollout are ready. Failed: At least
-                  one resource has experienced a failure. Unknown: The state of the
-                  ArgoRollout phase could not be obtained.'
+                  All of the resources for the ArgoRollout are ready. Unknown: The
+                  state of the ArgoRollout phase could not be obtained.'
                 type: string
               rolloutController:
                 description: 'RolloutController is a simple, high-level summary of
                   where the RolloutController component is in its lifecycle. There
-                  are four possible RolloutController values: Pending: The RolloutController
+                  are three possible RolloutController values: Pending: The RolloutController
                   component has been accepted by the Kubernetes system, but one or
                   more of the required resources have not been created. Running: All
                   of the required Pods for the RolloutController component are in
-                  a Ready state. Failed: At least one of the RolloutController component
-                  Pods had a failure. Unknown: The state of the RolloutController
-                  component could not be obtained.'
+                  a Ready state. Unknown: The state of the RolloutController component
+                  could not be obtained.'
                 type: string
             type: object
         type: object
