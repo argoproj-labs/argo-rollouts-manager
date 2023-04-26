@@ -71,7 +71,7 @@ func (r *ArgoRolloutsReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	if err := r.reconcileRolloutsController(rollouts); err != nil {
-		// Error reconciling ArgoCDExport sub-resources - requeue the request.
+		// Error reconciling ArgoRollout sub-resources - requeue the request.
 		return reconcile.Result{}, err
 	}
 

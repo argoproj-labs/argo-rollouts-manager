@@ -18,9 +18,9 @@ const (
 	testArgoRolloutName = "rollouts"
 )
 
-type argoCDOpt func(*rolloutsApi.ArgoRollout)
+type argoRolloutOpt func(*rolloutsApi.ArgoRollout)
 
-func makeTestArgoRollout(opts ...argoCDOpt) *rolloutsApi.ArgoRollout {
+func makeTestArgoRollout(opts ...argoRolloutOpt) *rolloutsApi.ArgoRollout {
 	a := &rolloutsApi.ArgoRollout{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      testArgoRolloutName,

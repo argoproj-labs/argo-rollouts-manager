@@ -1,0 +1,8 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ArgoRollout
+metadata:
+  name: argo-rollout
+  labels:
+    example: basic
+spec: {}

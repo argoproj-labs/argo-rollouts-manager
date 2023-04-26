@@ -8,7 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
-// reconcileStatus will ensure that all of the Status properties are updated for the given ArgoCD.
+// reconcileStatus will ensure that all of the Status properties are updated for the given ArgoRollout.
 func (r *ArgoRolloutsReconciler) reconcileStatus(cr *rolloutsApi.ArgoRollout) error {
 
 	if err := r.reconcileRolloutControllerStatus(cr); err != nil {

@@ -1,0 +1,16 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ArgoRollout
+metadata:
+  name: argo-rollout
+  labels:
+    example: with-properties
+spec:
+  env:
+   - name: "foo"
+     value: "bar"
+  extraCommandArgs:
+   - --foo
+   - bar
+  image: "quay.io/random/my-rollout-image"
+  version: "sha256:...."
