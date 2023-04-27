@@ -20,18 +20,4 @@ Read more about the Argo Rollout CRD specification here.
 
 ## Where to start ?
 
-We have a getting started [guide](docs/usage/getting_started.md) which provides information on how to start using the operator.
-
-### Development
-
-Instructions to run the operator locally or create your own version of the operator Image are provided in the development [section](docs/developer-guide/developer_guide.md) of the docs.
-
-### Contributions
-
-[WIP]
-
-
-
-
-
-
+We have a getting started [guide](usage/getting_started.md) which provides information on how to start using the operator.

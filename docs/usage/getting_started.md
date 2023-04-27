@@ -1,4 +1,4 @@
-# Beginners Guide
+# Getting Started
 
 ## Install the Operator
 
@@ -7,7 +7,7 @@ Install the operator using one of the two steps mentioned below.
 - [Install using kustomize](../install/kustomize.md)
 - [Install using OLM](../install/olm.md)
 
-Alternatively, if you are a developer looking to run operator locally or build a new version of operator for your changes, please follow the steps mentioned in developer [guide](../developer-guide/development.md).
+Alternatively, if you are a developer looking to run operator locally or build a new version of operator for your changes, please follow the steps mentioned in developer [guide](../developer-guide/developer_guide.md).
 
 ## Deploy ArgoRollout
 
