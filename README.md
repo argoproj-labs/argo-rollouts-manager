@@ -10,6 +10,10 @@ A Kubernetes operator for managing [Argo Rollouts](https://github.com/argoproj/a
 
 This operator is built using `operator-sdk`, version - `v1.28.0`.
 
+## Documentation
+
+The complete documentation for the operator can be found [here](https://argo-rollouts-operator.readthedocs.io/en/latest/).
+
 ## What exactly the operator does ?
 
 When Installed, this operator creates a Custom Resource Definition called ArgoRollout. 
