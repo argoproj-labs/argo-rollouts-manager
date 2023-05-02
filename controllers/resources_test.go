@@ -16,8 +16,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func TestReconcileArgoRollouts_verifyRolloutsResources(t *testing.T) {
-	a := makeTestArgoRollout()
+func TestReconcileRolloutManager_verifyRolloutsResources(t *testing.T) {
+	a := makeTestRolloutManager()
 
 	r := makeTestReconciler(t, a)
 	assert.NoError(t, createNamespace(r, a.Namespace))
@@ -76,9 +76,9 @@ func TestReconcileArgoRollouts_verifyRolloutsResources(t *testing.T) {
 	}
 }
 
-func TestReconcileArgoRollouts_CleanUp(t *testing.T) {
+func TestReconcileRolloutManager_CleanUp(t *testing.T) {
 
-	a := makeTestArgoRollout()
+	a := makeTestRolloutManager()
 
 	resources := []runtime.Object{a}
 

@@ -1,10 +1,10 @@
 package rollouts
 
 import (
-	rolloutsApi "github.com/iam-veeramalla/argo-rollouts-operator/api/v1alpha1"
+	rolloutsApi "github.com/iam-veeramalla/argo-rollouts-manager/api/v1alpha1"
 )
 
-func (r *ArgoRolloutsReconciler) reconcileRolloutsController(cr *rolloutsApi.ArgoRollout) error {
+func (r *RolloutManagerReconciler) reconcileRolloutsController(cr *rolloutsApi.RolloutManager) error {
 
 	log.Info("reconciling rollouts serviceaccount")
 	sa, err := r.reconcileRolloutsServiceAccount(cr)

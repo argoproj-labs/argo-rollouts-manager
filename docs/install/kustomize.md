@@ -7,7 +7,7 @@ The following steps can be used to manually install the operator on any Kubernet
 
 ## Namespace
 
-By default, the operator is installed into the `argo-rollouts-operator-system` namespace. To modify this, update the
+By default, the operator is installed into the `argo-rollouts-manager-system` namespace. To modify this, update the
 value of the `namespace` specified in the `config/default/kustomization.yaml` file. 
 
 ## Deploy Operator
@@ -19,23 +19,23 @@ make deploy
 If you want to use your own custom operator container image, you can specify the image name using the `IMG` variable.
 
 ```bash
-make deploy IMG=quay.io/my-org/argo-rollouts-operator:latest
+make deploy IMG=quay.io/my-org/rollouts-manager:latest
 ```
 
 The operator pod should start and enter a `Running` state after a few seconds.
 
 ```bash
-kubectl get pods -n argo-rollouts-operator-system
+kubectl get pods -n argo-rollouts-manager-system
 ```
 
 ```bash
 NAME                                                  READY   STATUS    RESTARTS   AGE
-argo-rollouts-operator-controller-manager-65777cf998-pr9fg   2/2     Running   0          69s
+argo-rollouts-manager-controller-manager-65777cf998-pr9fg   2/2     Running   0          69s
 ```
     
 ## Usage 
 
-Once the operator is installed and running, new ArgoRollout resources can be created. See the getting started [guide](../usage/getting_started.md) to learn how to create new `ArgoRollout` resources.
+Once the operator is installed and running, new RolloutManager resources can be created. See the getting started [guide](../usage/getting_started.md) to learn how to create new `RolloutManager` resources.
 
 ## Cleanup 
 

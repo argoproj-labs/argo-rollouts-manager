@@ -1,4 +1,4 @@
-# ArgoRollout Custom Resource
+# RolloutManager Custom Resource
 
 This page provides the information about Argo Rollout Custom Resource specification.
 
@@ -19,11 +19,11 @@ Name | Default | Description
 NodeSelector | [Empty] | A map of key value pairs for node selection.
 Tolerations | [Empty] | Tolerations allow pods to schedule on nodes with matching taints.
 
-### Basic ArgoRollout example
+### Basic RolloutManager example
 
 ``` yaml
 apiVersion: argoproj.io/v1alpha1
-kind: ArgoRollout
+kind: RolloutManager
 metadata:
   name: argo-rollout
   labels:
@@ -31,11 +31,11 @@ metadata:
 spec: {}
 ```
 
-### ArgoRollout example with properties
+### RolloutManager example with properties
 
 ``` yaml
 apiVersion: argoproj.io/v1alpha1
-kind: ArgoRollout
+kind: RolloutManager
 metadata:
   name: argo-rollout
   labels:
@@ -51,13 +51,13 @@ spec:
   version: "sha256:...."
 ```
 
-### ArgoRollout with NodePlacement Example
+### RolloutManager with NodePlacement Example
 
-The following example sets a NodeSelector and tolerations using NodePlacement property in the ArgoRollout CR.
+The following example sets a NodeSelector and tolerations using NodePlacement property in the RolloutManager CR.
 
 ``` yaml
 apiVersion: argoproj.io/v1alpha1
-kind: ArgoRollout
+kind: RolloutManager
 metadata:
   name: argo-rollout
   labels:

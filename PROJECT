@@ -7,15 +7,15 @@ layout:
 plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
-projectName: argo-rollouts-operator
-repo: github.com/iam-veeramalla/argo-rollouts-operator
+projectName: argo-rollouts-manager
+repo: github.com/iam-veeramalla/argo-rollouts-manager
 resources:
 - api:
     crdVersion: v1
     namespaced: true
   controller: true
   group: argoproj.io
-  kind: ArgoRollouts
-  path: github.com/iam-veeramalla/argo-rollouts-operator/api/v1alpha1
+  kind: RolloutManager
+  path: github.com/iam-veeramalla/argo-rollouts-manager/api/v1alpha1
   version: v1alpha1
 version: "3"

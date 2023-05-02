@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	rolloutsApi "github.com/iam-veeramalla/argo-rollouts-operator/api/v1alpha1"
+	rolloutsApi "github.com/iam-veeramalla/argo-rollouts-manager/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,16 +14,16 @@ import (
 )
 
 const (
-	testNamespace       = "rollouts"
-	testArgoRolloutName = "rollouts"
+	testNamespace          = "rollouts"
+	testRolloutManagerName = "rollouts"
 )
 
-type argoRolloutOpt func(*rolloutsApi.ArgoRollout)
+type rolloutManagerOpt func(*rolloutsApi.RolloutManager)
 
-func makeTestArgoRollout(opts ...argoRolloutOpt) *rolloutsApi.ArgoRollout {
-	a := &rolloutsApi.ArgoRollout{
+func makeTestRolloutManager(opts ...rolloutManagerOpt) *rolloutsApi.RolloutManager {
+	a := &rolloutsApi.RolloutManager{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      testArgoRolloutName,
+			Name:      testRolloutManagerName,
 			Namespace: testNamespace,
 		},
 	}
@@ -33,18 +33,18 @@ func makeTestArgoRollout(opts ...argoRolloutOpt) *rolloutsApi.ArgoRollout {
 	return a
 }
 
-func makeTestReconciler(t *testing.T, objs ...runtime.Object) *ArgoRolloutsReconciler {
+func makeTestReconciler(t *testing.T, objs ...runtime.Object) *RolloutManagerReconciler {
 	s := scheme.Scheme
 	assert.NoError(t, rolloutsApi.AddToScheme(s))
 
 	cl := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(objs...).Build()
-	return &ArgoRolloutsReconciler{
+	return &RolloutManagerReconciler{
 		Client: cl,
 		Scheme: s,
 	}
 }
 
-func createNamespace(r *ArgoRolloutsReconciler, n string) error {
+func createNamespace(r *RolloutManagerReconciler, n string) error {
 	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: n}}
 	return r.Client.Create(context.TODO(), ns)
 }

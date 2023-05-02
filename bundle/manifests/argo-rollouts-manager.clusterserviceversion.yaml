@@ -6,25 +6,25 @@ metadata:
       [
         {
           "apiVersion": "argoproj.io/v1alpha1",
-          "kind": "ArgoRollout",
+          "kind": "RolloutManager",
           "metadata": {
             "labels": {
-              "app.kubernetes.io/created-by": "argo-rollouts-operator",
-              "app.kubernetes.io/instance": "argorollouts-sample",
+              "app.kubernetes.io/created-by": "argo-rollouts-manager",
+              "app.kubernetes.io/instance": "rolloutmanager-sample",
               "app.kubernetes.io/managed-by": "kustomize",
-              "app.kubernetes.io/name": "argorollouts",
-              "app.kubernetes.io/part-of": "argo-rollouts-operator"
+              "app.kubernetes.io/name": "rolloutmanagers",
+              "app.kubernetes.io/part-of": "argo-rollouts-manager"
             },
-            "name": "argorollouts-sample"
+            "name": "rolloutmanager-sample"
           },
           "spec": {}
         }
       ]
     capabilities: Basic Install
-    createdAt: "2023-04-26T10:42:47Z"
+    createdAt: "2023-05-02T14:14:02Z"
     operators.operatorframework.io/builder: operator-sdk-v1.28.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
-  name: argo-rollouts-operator.v0.0.1
+  name: argo-rollouts-manager.v0.0.1
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -36,20 +36,22 @@ spec:
     - kind: AnalysisTemplate
       name: analysistemplates.argoproj.io
       version: v1alpha1
-    - kind: ArgoRollout
-      name: argorollouts.argoproj.io
-      version: v1alpha1
     - kind: ClusterAnalysisTemplate
       name: clusteranalysistemplates.argoproj.io
       version: v1alpha1
     - kind: Experiment
       name: experiments.argoproj.io
       version: v1alpha1
+    - description: RolloutManager is the Schema for the RolloutManagers API
+      displayName: Rollout Manager
+      kind: RolloutManager
+      name: rolloutmanagers.argoproj.io
+      version: v1alpha1
     - kind: Rollout
       name: rollouts.argoproj.io
       version: v1alpha1
-  description: Kubernetes operator for Argo Rollouts
-  displayName: argo-rollouts-operator
+  description: Kubernetes Operator for managing argo-rollouts.
+  displayName: argo-rollouts-manager
   icon:
   - base64data: ""
     mediatype: ""
@@ -58,9 +60,48 @@ spec:
       clusterPermissions:
       - rules:
         - apiGroups:
+          - ""
+          resources:
+          - configmaps
+          - endpoints
+          - events
+          - namespaces
+          - pods
+          - secrets
+          - serviceaccounts
+          - services
+          - services/finalizers
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          - replicasets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - deployments/finalizers
+          verbs:
+          - update
+        - apiGroups:
           - argoproj.io
           resources:
-          - argorollouts
+          - rolloutmanagers
           verbs:
           - create
           - delete
@@ -72,17 +113,43 @@ spec:
         - apiGroups:
           - argoproj.io
           resources:
-          - argorollouts/finalizers
+          - rolloutmanagers/finalizers
           verbs:
           - update
         - apiGroups:
           - argoproj.io
           resources:
-          - argorollouts/status
+          - rolloutmanagers/status
           verbs:
           - get
           - patch
           - update
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - clusterrolebindings
+          - clusterroles
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - rolebindings
+          - roles
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
         - apiGroups:
           - authentication.k8s.io
           resources:
@@ -95,17 +162,17 @@ spec:
           - subjectaccessreviews
           verbs:
           - create
-        serviceAccountName: argo-rollouts-operator-controller-manager
+        serviceAccountName: argo-rollouts-manager-controller-manager
       deployments:
       - label:
           app.kubernetes.io/component: manager
-          app.kubernetes.io/created-by: argo-rollouts-operator
+          app.kubernetes.io/created-by: argo-rollouts-manager
           app.kubernetes.io/instance: controller-manager
           app.kubernetes.io/managed-by: kustomize
           app.kubernetes.io/name: deployment
-          app.kubernetes.io/part-of: argo-rollouts-operator
+          app.kubernetes.io/part-of: argo-rollouts-manager
           control-plane: controller-manager
-        name: argo-rollouts-operator-controller-manager
+        name: argo-rollouts-manager-controller-manager
         spec:
           replicas: 1
           selector:
@@ -165,7 +232,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: controller:latest
+                image: quay.io/aveerama/argo-rollouts-manager:v0.0.3
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -193,7 +260,7 @@ spec:
                     - ALL
               securityContext:
                 runAsNonRoot: true
-              serviceAccountName: argo-rollouts-operator-controller-manager
+              serviceAccountName: argo-rollouts-manager-controller-manager
               terminationGracePeriodSeconds: 10
       permissions:
       - rules:
@@ -228,7 +295,7 @@ spec:
           verbs:
           - create
           - patch
-        serviceAccountName: argo-rollouts-operator-controller-manager
+        serviceAccountName: argo-rollouts-manager-controller-manager
     strategy: deployment
   installModes:
   - supported: false
@@ -240,17 +307,13 @@ spec:
   - supported: true
     type: AllNamespaces
   keywords:
-  - rollouts
   - argo-rollouts
   - progressive delivery
+  - argoproj
   links:
-  - name: Argo Rollouts Operator
-    url: https://argo-rollouts-operator.domain
-  maintainers:
-  - email: aveerama@redhat.com
-    name: Abhishek.Veeramalla
+  - name: Argo Rollouts Manager
+    url: https://argo-rollouts-manager.domain
   maturity: alpha
   provider:
-    name: argo-rollouts-operator
-    url: https://github.com/argoproj/argo-rolloutsv
+    name: Argo Community
   version: 0.0.1

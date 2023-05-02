@@ -1,0 +1,10 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: argo-rollouts-manager-catalog
+  namespace: openshift-marketplace # for openshift choose - `openshift-marketplace` namespace
+spec:
+  sourceType: grpc
+  image: quay.io/aveerama/argo-rollouts-manager-catalog@sha256:dc3aaf1ae4148accac61c2d03abf6784a239f5350e244e931a0b8d414031adc4 # replace with your catalog image
+  displayName: Argo Rollouts Manager
+  publisher: Abhishek Veeramalla

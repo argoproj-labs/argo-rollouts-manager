@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
-	rolloutsApi "github.com/iam-veeramalla/argo-rollouts-operator/api/v1alpha1"
+	rolloutsApi "github.com/iam-veeramalla/argo-rollouts-manager/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/rbac/v1"
@@ -16,7 +16,7 @@ import (
 )
 
 // Reconciles rollouts serviceaccount.
-func (r *ArgoRolloutsReconciler) reconcileRolloutsServiceAccount(cr *rolloutsApi.ArgoRollout) (*corev1.ServiceAccount, error) {
+func (r *RolloutManagerReconciler) reconcileRolloutsServiceAccount(cr *rolloutsApi.RolloutManager) (*corev1.ServiceAccount, error) {
 
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
@@ -46,7 +46,7 @@ func (r *ArgoRolloutsReconciler) reconcileRolloutsServiceAccount(cr *rolloutsApi
 }
 
 // Reconciles rollouts role.
-func (r *ArgoRolloutsReconciler) reconcileRolloutsRole(cr *rolloutsApi.ArgoRollout) (*v1.Role, error) {
+func (r *RolloutManagerReconciler) reconcileRolloutsRole(cr *rolloutsApi.RolloutManager) (*v1.Role, error) {
 
 	expectedPolicyRules := getPolicyRules()
 
@@ -82,8 +82,7 @@ func (r *ArgoRolloutsReconciler) reconcileRolloutsRole(cr *rolloutsApi.ArgoRollo
 }
 
 // Reconcile rollouts rolebinding.
-func (r *ArgoRolloutsReconciler) reconcileRolloutsRoleBinding(cr *rolloutsApi.ArgoRollout, role *v1.Role, sa *corev1.ServiceAccount) error {
-
+func (r *RolloutManagerReconciler) reconcileRolloutsRoleBinding(cr *rolloutsApi.RolloutManager, role *v1.Role, sa *corev1.ServiceAccount) error {
 	expectedRoleBinding := &v1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultArgoRolloutsResourceName,
@@ -132,7 +131,7 @@ func (r *ArgoRolloutsReconciler) reconcileRolloutsRoleBinding(cr *rolloutsApi.Ar
 }
 
 // Reconcile rollouts service.
-func (r *ArgoRolloutsReconciler) reconcileRolloutsService(cr *rolloutsApi.ArgoRollout) error {
+func (r *RolloutManagerReconciler) reconcileRolloutsService(cr *rolloutsApi.RolloutManager) error {
 
 	expectedSvc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -180,7 +179,7 @@ func (r *ArgoRolloutsReconciler) reconcileRolloutsService(cr *rolloutsApi.ArgoRo
 }
 
 // Reconciles secrets for rollouts controller
-func (r *ArgoRolloutsReconciler) reconcileRolloutsSecrets(cr *rolloutsApi.ArgoRollout) error {
+func (r *RolloutManagerReconciler) reconcileRolloutsSecrets(cr *rolloutsApi.RolloutManager) error {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultRolloutsNotificationSecretName,
@@ -207,7 +206,7 @@ func (r *ArgoRolloutsReconciler) reconcileRolloutsSecrets(cr *rolloutsApi.ArgoRo
 }
 
 // Deletes rollout resources when the corresponding rollout CR is deleted.
-func (r *ArgoRolloutsReconciler) deleteRolloutResources(cr *rolloutsApi.ArgoRollout) error {
+func (r *RolloutManagerReconciler) deleteRolloutResources(cr *rolloutsApi.RolloutManager) error {
 	if cr.DeletionTimestamp != nil {
 		log.Info(fmt.Sprintf("Argo Rollout resource in %s namespace is deleted, Deleting the Argo Rollout workloads",
 			cr.Namespace))

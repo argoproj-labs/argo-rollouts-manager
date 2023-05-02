@@ -28,8 +28,8 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 # This variable is used to construct full image tags for bundle and catalog images.
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
-# /argo-rollouts-operator-bundle:$VERSION and /argo-rollouts-operator-catalog:$VERSION.
-IMAGE_TAG_BASE ?= /argo-rollouts-operator
+# /argo-rollouts-manager-bundle:$VERSION and /argo-rollouts-manager-catalog:$VERSION.
+IMAGE_TAG_BASE ?= quay.io/aveerama/argo-rollouts-manager
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
@@ -47,7 +47,7 @@ ifeq ($(USE_IMAGE_DIGESTS), true)
 endif
 
 # Image URL to use all building/pushing image targets
-IMG ?= quay.io/aveerama/argorollout-operator:v0.0.1
+IMG ?= quay.io/aveerama/argo-rollouts-manager:v0.0.1
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.26.0
 

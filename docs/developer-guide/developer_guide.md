@@ -39,7 +39,7 @@ make docker-build
 Override the name of the image to push by specifying the `IMG` variable.
 
 ``` bash
-make docker-push IMG=quay.io/my-org/argorollout-operator:latest
+make docker-push IMG=quay.io/<my-org>/argo-rollouts-manager:latest
 ```
 
 ### Generate the bundle artifacts.
@@ -48,7 +48,7 @@ Override the name of the development image by specifying the `IMG` variable.
 
 ``` bash
 rm -fr bundle/
-make bundle IMG=quay.io/my-org/argorollout-operator:latest
+make bundle IMG=quay.io/<my-org>/argo-rollouts-manager:latest
 ```
 
 ### Build and push the development bundle image.
@@ -56,8 +56,8 @@ make bundle IMG=quay.io/my-org/argorollout-operator:latest
 Override the name of the bundle image by specifying the `BUNDLE_IMG` variable.
 
 ``` bash
-make bundle-build BUNDLE_IMG=quay.io/my-org/argorollout-operator-bundle:latest
-make bundle-push BUNDLE_IMG=quay.io/my-org/argorollout-operator-bundle:latest
+make bundle-build BUNDLE_IMG=quay.io/<my-org>/argo-rollouts-manager-bundle:latest
+make bundle-push BUNDLE_IMG=quay.io/<my-org>/argo-rollouts-manager-bundle:latest
 ```
 
 ### Build and push the development catalog image.
@@ -66,11 +66,27 @@ Override the name of the catalog image by specifying the `CATALOG_IMG` variable.
 Specify the bundle image to include using the `BUNDLE_IMG` variable
 
 ``` bash
-make catalog-build BUNDLE_IMG=quay.io/my-org/argorollout-operator-bundle:latest CATALOG_IMG=quay.io/my-org/argorollout-operator-index:latest
-make catalog-push CATALOG_IMG=quay.io/my-org/argorollout-operator-index:latest
+make catalog-build BUNDLE_IMG=quay.io/<my-org>/argo-rollouts-manager-bundle:latest CATALOG_IMG=quay.io/<my-org>/argo-rollouts-manager-catalog:latest
+make catalog-push CATALOG_IMG=quay.io/<my-org>/argo-rollouts-manager-catalog:latest
 ```
 
-### Build and Verify ArgoRollout Operator Docs
+### Deploy the CatalogSource
+
+# Note: Make sure all the images created above(operator, bundle, catalog) are public.
+
+```
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: argo-rollouts-manager-catalog
+spec:
+  sourceType: grpc
+  image: quay.io/<my-org>/argo-rollouts-manager-catalog@sha256:dc3aaf1ae4148accac61c2d03abf6784a239f5350e244e931a0b8d414031adc4 # replace with your catalog image
+  displayName: Argo Rollouts Manager
+  publisher: Abhishek Veeramalla
+```
+
+### Build and Verify RolloutManager Operator Docs
 
 #### Prerequisites
 

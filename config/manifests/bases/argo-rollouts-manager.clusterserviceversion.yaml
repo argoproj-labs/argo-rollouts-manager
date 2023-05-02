@@ -4,19 +4,19 @@ metadata:
   annotations:
     alm-examples: '[]'
     capabilities: Basic Install
-  name: argo-rollouts-operator.v0.0.0
+  name: argo-rollouts-manager.v0.0.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: ArgoRollouts is the Schema for the argorollouts API
-      displayName: Argo Rollouts
-      kind: ArgoRollouts
-      name: argorollouts.argoproj.io
+    - description: RolloutManager is the Schema for the RolloutManagers API
+      displayName: Rollout Manager
+      kind: RolloutManager
+      name: rolloutmanagers.argoproj.io
       version: v1alpha1
-  description: Kubernetes operator for Argo Rollouts
-  displayName: argo-rollouts-operator
+  description: Kubernetes Operator for managing argo-rollouts.
+  displayName: argo-rollouts-manager
   icon:
   - base64data: ""
     mediatype: ""
@@ -34,17 +34,13 @@ spec:
   - supported: true
     type: AllNamespaces
   keywords:
-  - rollouts
   - argo-rollouts
   - progressive delivery
+  - argoproj
   links:
-  - name: Argo Rollouts Operator
-    url: https://argo-rollouts-operator.domain
-  maintainers:
-  - email: aveerama@redhat.com
-    name: Abhishek.Veeramalla
+  - name: Argo Rollouts Manager
+    url: https://argo-rollouts-manager.domain
   maturity: alpha
   provider:
-    name: argo-rollouts-operator
-    url: https://github.com/argoproj/argo-rolloutsv
+    name: Argo Community
   version: 0.0.0

@@ -31,8 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	argoprojiov1alpha1 "github.com/iam-veeramalla/argo-rollouts-operator/api/v1alpha1"
-	rolloutsApi "github.com/iam-veeramalla/argo-rollouts-operator/controllers"
+	argoprojiov1alpha1 "github.com/iam-veeramalla/argo-rollouts-manager/api/v1alpha1"
+	rolloutsApi "github.com/iam-veeramalla/argo-rollouts-manager/controllers"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -71,7 +71,7 @@ func main() {
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "0e2b8974.",
+		LeaderElectionID:       "rolloutsmanager.argoproj.io",
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
@@ -89,11 +89,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&rolloutsApi.ArgoRolloutsReconciler{
+	if err = (&rolloutsApi.RolloutManagerReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ArgoRollouts")
+		setupLog.Error(err, "unable to create controller", "controller", "RolloutManager")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

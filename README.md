@@ -12,11 +12,11 @@ This operator is built using `operator-sdk`, version - `v1.28.0`.
 
 ## Documentation
 
-The complete documentation for the operator can be found [here](https://argo-rollouts-operator.readthedocs.io/en/latest/).
+The complete documentation for the operator can be found [here](https://argo-rollouts-manager.readthedocs.io/en/latest/).
 
 ## What exactly the operator does ?
 
-When Installed, this operator creates a Custom Resource Definition called ArgoRollout. 
+When Installed, this operator creates a Custom Resource Definition called RolloutManager. 
 
 Operator will then wait for the users to deploy the corresponding Custom Resource to create the rollout controller and other resources according to the provided spec.
 

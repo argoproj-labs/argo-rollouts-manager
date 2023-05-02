@@ -9,8 +9,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestArgoRollout_Status(t *testing.T) {
-	a := makeTestArgoRollout()
+func TestRolloutManager_Status(t *testing.T) {
+	a := makeTestRolloutManager()
 
 	r := makeTestReconciler(t, a)
 	assert.NoError(t, createNamespace(r, a.Namespace))

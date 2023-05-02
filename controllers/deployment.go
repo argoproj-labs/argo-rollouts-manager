@@ -6,7 +6,7 @@ import (
 	"os"
 	"reflect"
 
-	rolloutsApi "github.com/iam-veeramalla/argo-rollouts-operator/api/v1alpha1"
+	rolloutsApi "github.com/iam-veeramalla/argo-rollouts-manager/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -16,7 +16,7 @@ import (
 )
 
 // Reconcile the Rollouts controller deployment.
-func (r *ArgoRolloutsReconciler) reconcileRolloutsDeployment(cr *rolloutsApi.ArgoRollout, sa *corev1.ServiceAccount) error {
+func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(cr *rolloutsApi.RolloutManager, sa *corev1.ServiceAccount) error {
 	// Configuration for the desired deployment
 	desiredDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -103,7 +103,7 @@ func (r *ArgoRolloutsReconciler) reconcileRolloutsDeployment(cr *rolloutsApi.Arg
 	return nil
 }
 
-func rolloutsContainer(cr *rolloutsApi.ArgoRollout) corev1.Container {
+func rolloutsContainer(cr *rolloutsApi.RolloutManager) corev1.Container {
 
 	// Global proxy env vars go firstArgoRollouts
 	rolloutsEnv := cr.Spec.Env
@@ -172,7 +172,7 @@ func boolPtr(val bool) *bool {
 }
 
 // Returns the container image for rollouts controller.
-func getRolloutsContainerImage(cr *rolloutsApi.ArgoRollout) string {
+func getRolloutsContainerImage(cr *rolloutsApi.RolloutManager) string {
 	defaultImg, defaultTag := false, false
 
 	img := cr.Spec.Image
@@ -196,7 +196,7 @@ func getRolloutsContainerImage(cr *rolloutsApi.ArgoRollout) string {
 }
 
 // getRolloutsCommand will return the command for the Rollouts controller component.
-func getRolloutsCommandArgs(cr *rolloutsApi.ArgoRollout) []string {
+func getRolloutsCommandArgs(cr *rolloutsApi.RolloutManager) []string {
 	args := make([]string, 0)
 
 	args = append(args, "--namespaced")

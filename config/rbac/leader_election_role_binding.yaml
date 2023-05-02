@@ -5,8 +5,8 @@ metadata:
     app.kubernetes.io/name: rolebinding
     app.kubernetes.io/instance: leader-election-rolebinding
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/created-by: argo-rollouts-operator
-    app.kubernetes.io/part-of: argo-rollouts-operator
+    app.kubernetes.io/created-by: argo-rollouts-manager
+    app.kubernetes.io/part-of: argo-rollouts-manager
     app.kubernetes.io/managed-by: kustomize
   name: leader-election-rolebinding
 roleRef:

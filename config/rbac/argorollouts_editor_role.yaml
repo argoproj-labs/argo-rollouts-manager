@@ -1,20 +1,20 @@
-# permissions for end users to edit argorollouts.
+# permissions for end users to edit rolloutmanagers.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/name: clusterrole
-    app.kubernetes.io/instance: argorollouts-editor-role
+    app.kubernetes.io/instance: rolloutmanagers-editor-role
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/created-by: argo-rollouts-operator
-    app.kubernetes.io/part-of: argo-rollouts-operator
+    app.kubernetes.io/created-by: argo-rollouts-manager
+    app.kubernetes.io/part-of: argo-rollouts-manager
     app.kubernetes.io/managed-by: kustomize
-  name: argorollouts-editor-role
+  name: rolloutmanagers-editor-role
 rules:
 - apiGroups:
   - argoproj.io
   resources:
-  - argorollouts
+  - rolloutmanagers
   verbs:
   - create
   - delete
@@ -26,6 +26,6 @@ rules:
 - apiGroups:
   - argoproj.io
   resources:
-  - argorollouts/status
+  - rolloutmanagers/status
   verbs:
   - get

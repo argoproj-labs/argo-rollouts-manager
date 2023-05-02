@@ -5,20 +5,20 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.11.1
   creationTimestamp: null
-  name: argorollouts.argoproj.io
+  name: rolloutmanagers.argoproj.io
 spec:
   group: argoproj.io
   names:
-    kind: ArgoRollout
-    listKind: ArgoRolloutList
-    plural: argorollouts
-    singular: argorollout
+    kind: RolloutManager
+    listKind: RolloutManagerList
+    plural: rolloutmanagers
+    singular: rolloutmanager
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ArgoRollout is the Schema for the argorollouts API
+        description: RolloutManager is the Schema for the RolloutManagers API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -33,7 +33,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: ArgoRolloutSpec defines the desired state of ArgoRollout
+            description: RolloutManagerSpec defines the desired state of Argo Rollouts
             properties:
               env:
                 description: Env lets you specify environment for Rollouts pods
@@ -212,15 +212,15 @@ spec:
                 type: string
             type: object
           status:
-            description: ArgoRolloutStatus defines the observed state of ArgoRollout
+            description: RolloutManagerStatus defines the observed state of RolloutManager
             properties:
               phase:
-                description: 'Phase is a simple, high-level summary of where the ArgoRollout
+                description: 'Phase is a simple, high-level summary of where the RolloutManager
                   is in its lifecycle. There are three possible phase values: Pending:
-                  The ArgoRollout has been accepted by the Kubernetes system, but
+                  The RolloutManager has been accepted by the Kubernetes system, but
                   one or more of the required resources have not been created. Available:
-                  All of the resources for the ArgoRollout are ready. Unknown: The
-                  state of the ArgoRollout phase could not be obtained.'
+                  All of the resources for the RolloutManager are ready. Unknown:
+                  The state of the RolloutManager phase could not be obtained.'
                 type: string
               rolloutController:
                 description: 'RolloutController is a simple, high-level summary of

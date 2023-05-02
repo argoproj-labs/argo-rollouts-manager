@@ -1,4 +1,4 @@
 ## Append samples you want in your CSV to this file as resources ##
 resources:
-- argoproj.io_v1alpha1_argorollouts.yaml
+- argoproj.io_v1alpha1_rolloutmanager.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

@@ -9,9 +9,9 @@ Install the operator using one of the two steps mentioned below.
 
 Alternatively, if you are a developer looking to run operator locally or build a new version of operator for your changes, please follow the steps mentioned in developer [guide](../developer-guide/developer_guide.md).
 
-## Deploy ArgoRollout
+## Deploy RolloutManager
 
-It is recommended to start with [basic](../crd_reference.md/#basic-argorollout-example) ArgoRollout configuration. 
+It is recommended to start with [basic](../crd_reference.md/#basic-argorollout-example) RolloutManager configuration. 
 
 ### Apply 
 

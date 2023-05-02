@@ -19,7 +19,7 @@ package rollouts
 import (
 	"context"
 
-	rolloutsApi "github.com/iam-veeramalla/argo-rollouts-operator/api/v1alpha1"
+	rolloutsApi "github.com/iam-veeramalla/argo-rollouts-manager/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -28,36 +28,46 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-// blank assignment to verify that ArgoRolloutsReconciler implements reconcile.Reconciler
-var _ reconcile.Reconciler = &ArgoRolloutsReconciler{}
+// blank assignment to verify that RolloutManagerReconciler implements reconcile.Reconciler
+var _ reconcile.Reconciler = &RolloutManagerReconciler{}
 
-// ArgoRolloutsReconciler reconciles a ArgoRollouts object
-type ArgoRolloutsReconciler struct {
+// RolloutManagerReconciler reconciles a RolloutManager object
+type RolloutManagerReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
 
 var log = logr.Log.WithName("rollouts-controller")
 
-//+kubebuilder:rbac:groups=argoproj.io,resources=argorollouts,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=argoproj.io,resources=argorollouts/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=argoproj.io,resources=argorollouts/finalizers,verbs=update
+//+kubebuilder:rbac:groups=argoproj.io,resources=rolloutmanagers,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=argoproj.io,resources=rolloutmanagers/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=argoproj.io,resources=rolloutmanagers/finalizers,verbs=update
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles;clusterrolebindings,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=configmaps;endpoints;events;pods;namespaces;secrets;serviceaccounts;services;services/finalizers,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apps,resources=podtemplates;deployments;replicasets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apps,resources=deployments/finalizers,verbs=update
+//+kubebuilder:rbac:groups="",resources=deployments,verbs=get;list;watch
+//+kubebuilder:rbac:groups="",resources=pods/eviction,verbs=create
+//+kubebuilder:rbac:groups="",resources=podtemplates,verbs=get;list;watch
+//+kubebuilder:rbac:groups="appmesh.k8s.aws",resources=virtualnodes;virtualrouters;virtualservices,verbs=get;list;watch;update;patch;delete
+//+kubebuilder:rbac:groups="argoproj.io",resources=analysisruns;analysisruns/finalizers;analysistemplates;clusteranalysistemplates;experiments;experiments/finalizers,verbs=get;list;watch;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
-// the ArgoRollouts object against the actual cluster state, and then
+// the RolloutManager object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
-func (r *ArgoRolloutsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *RolloutManagerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	reqLogger := logr.FromContext(ctx, "Request.Namespace", req.Namespace, "Request.Name", req.Name)
-	reqLogger.Info("Reconciling ArgoRollouts")
+	reqLogger.Info("Reconciling Rollout Managers")
 
-	// Fetch the ArgoRollouts instance
-	rollouts := &rolloutsApi.ArgoRollout{}
+	// Fetch the RolloutManager instance
+	rollouts := &rolloutsApi.RolloutManager{}
 	err := r.Client.Get(ctx, req.NamespacedName, rollouts)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -71,7 +81,7 @@ func (r *ArgoRolloutsReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	if err := r.reconcileRolloutsController(rollouts); err != nil {
-		// Error reconciling ArgoRollout sub-resources - requeue the request.
+		// Error reconciling RolloutManager sub-resources - requeue the request.
 		return reconcile.Result{}, err
 	}
 
@@ -79,7 +89,7 @@ func (r *ArgoRolloutsReconciler) Reconcile(ctx context.Context, req ctrl.Request
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ArgoRolloutsReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *RolloutManagerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	bld := ctrl.NewControllerManagedBy(mgr)
 	setResourceWatches(bld)
 	return bld.Complete(r)

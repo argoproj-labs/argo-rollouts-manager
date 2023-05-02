@@ -1,6 +1,6 @@
 ---
 apiVersion: argoproj.io/v1alpha1
-kind: ArgoRollout
+kind: RolloutManager
 metadata:
   name: argo-rollout
   labels:
