@@ -1,4 +1,4 @@
-# Argo Rollouts Operator
+# Argo Rollouts Manager
 
 **Project Status: BETA**
 
