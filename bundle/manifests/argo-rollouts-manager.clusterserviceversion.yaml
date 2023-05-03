@@ -21,7 +21,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2023-05-02T14:14:02Z"
+    createdAt: "2023-05-03T09:08:42Z"
     operators.operatorframework.io/builder: operator-sdk-v1.28.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: argo-rollouts-manager.v0.0.1
@@ -80,9 +80,51 @@ spec:
           - update
           - watch
         - apiGroups:
+          - ""
+          resources:
+          - deployments
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - pods/eviction
+          verbs:
+          - create
+        - apiGroups:
+          - ""
+          resources:
+          - podtemplates
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - appmesh.k8s.aws
+          resources:
+          - virtualnodes
+          - virtualrouters
+          verbs:
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - appmesh.k8s.aws
+          resources:
+          - virtualservices
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
           - apps
           resources:
           - deployments
+          - podtemplates
           - replicasets
           verbs:
           - create
@@ -98,6 +140,39 @@ spec:
           - deployments/finalizers
           verbs:
           - update
+        - apiGroups:
+          - argoproj.io
+          resources:
+          - analysisruns
+          - analysisruns/finalizers
+          - experiments
+          - experiments/finalizers
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - argoproj.io
+          resources:
+          - analysistemplates
+          verbs:
+          - create
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - argoproj.io
+          resources:
+          - clusteranalysistemplates
+          verbs:
+          - create
+          - get
+          - list
+          - watch
         - apiGroups:
           - argoproj.io
           resources:
@@ -125,6 +200,89 @@ spec:
           - patch
           - update
         - apiGroups:
+          - argoproj.io
+          resources:
+          - rollouts
+          - rollouts/finalizers
+          - rollouts/status
+          verbs:
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - batch
+          resources:
+          - jobs
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - coordination.k8s.io
+          resources:
+          - leases
+          verbs:
+          - create
+          - get
+          - update
+        - apiGroups:
+          - elbv2.k8s.aws
+          resources:
+          - targetgroupbindings
+          verbs:
+          - get
+          - list
+        - apiGroups:
+          - extensions
+          resources:
+          - ingresses
+          verbs:
+          - create
+          - get
+          - list
+          - patch
+          - watch
+        - apiGroups:
+          - getambassador.io
+          resources:
+          - ambassadormappings
+          - mappings
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - update
+          - watch
+        - apiGroups:
+          - networking.istio.io
+          resources:
+          - destinationrules
+          - virtualservices
+          verbs:
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - networking.k8s.io
+          resources:
+          - ingresses
+          verbs:
+          - create
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
           - rbac.authorization.k8s.io
           resources:
           - clusterrolebindings
@@ -148,6 +306,36 @@ spec:
           - get
           - list
           - patch
+          - update
+          - watch
+        - apiGroups:
+          - split.smi-spec.io
+          resources:
+          - trafficsplits
+          verbs:
+          - create
+          - get
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - traefik.containo.us
+          resources:
+          - traefikservices
+          verbs:
+          - get
+          - update
+          - watch
+        - apiGroups:
+          - x.getambassador.io
+          resources:
+          - ambassadormappings
+          - mappings
+          verbs:
+          - create
+          - delete
+          - get
+          - list
           - update
           - watch
         - apiGroups:
@@ -232,7 +420,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/aveerama/argo-rollouts-manager:v0.0.3
+                image: quay.io/aveerama/argo-rollouts-manager:v0.0.1
                 livenessProbe:
                   httpGet:
                     path: /healthz

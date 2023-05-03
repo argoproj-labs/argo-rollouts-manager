@@ -50,8 +50,22 @@ var log = logr.Log.WithName("rollouts-controller")
 //+kubebuilder:rbac:groups="",resources=deployments,verbs=get;list;watch
 //+kubebuilder:rbac:groups="",resources=pods/eviction,verbs=create
 //+kubebuilder:rbac:groups="",resources=podtemplates,verbs=get;list;watch
-//+kubebuilder:rbac:groups="appmesh.k8s.aws",resources=virtualnodes;virtualrouters;virtualservices,verbs=get;list;watch;update;patch;delete
-//+kubebuilder:rbac:groups="argoproj.io",resources=analysisruns;analysisruns/finalizers;analysistemplates;clusteranalysistemplates;experiments;experiments/finalizers,verbs=get;list;watch;update;patch;delete
+//+kubebuilder:rbac:groups="appmesh.k8s.aws",resources=virtualnodes;virtualrouters,verbs=get;list;watch;update;patch
+//+kubebuilder:rbac:groups="appmesh.k8s.aws",resources=virtualservices,verbs=get;list;watch
+//+kubebuilder:rbac:groups="argoproj.io",resources=analysisruns;analysisruns/finalizers;experiments;experiments/finalizers,verbs=create;get;list;watch;update;patch;delete
+//+kubebuilder:rbac:groups="argoproj.io",resources=analysistemplates,verbs=create;get;list;watch
+//+kubebuilder:rbac:groups="argoproj.io",resources=clusteranalysistemplates,verbs=create;get;list;watch
+//+kubebuilder:rbac:groups="argoproj.io",resources=rollouts;rollouts/finalizers;rollouts/status,verbs=get;list;watch;update;patch
+//+kubebuilder:rbac:groups="batch",resources=jobs,verbs=create;get;list;watch;update;patch;delete
+//+kubebuilder:rbac:groups="coordination.k8s.io",resources=leases,verbs=create;get;update
+//+kubebuilder:rbac:groups="elbv2.k8s.aws",resources=targetgroupbindings,verbs=list;get
+//+kubebuilder:rbac:groups="extensions",resources=ingresses,verbs=create;get;list;watch;patch
+//+kubebuilder:rbac:groups="getambassador.io",resources=ambassadormappings;mappings,verbs=create;watch;get;update;list;delete
+//+kubebuilder:rbac:groups="networking.istio.io",resources=destinationrules;virtualservices,verbs=watch;get;update;patch;list
+//+kubebuilder:rbac:groups="networking.k8s.io",resources=ingresses,verbs=create;watch;get;update;patch;list
+//+kubebuilder:rbac:groups="split.smi-spec.io",resources=trafficsplits,verbs=create;watch;get;update;patch
+//+kubebuilder:rbac:groups="traefik.containo.us",resources=traefikservices,verbs=watch;get;update
+//+kubebuilder:rbac:groups="x.getambassador.io",resources=ambassadormappings;mappings,verbs=create;watch;get;update;list;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
