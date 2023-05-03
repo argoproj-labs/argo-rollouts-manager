@@ -11,7 +11,7 @@ Alternatively, if you are a developer looking to run operator locally or build a
 
 ## Deploy RolloutManager
 
-It is recommended to start with [basic](../crd_reference.md/#basic-argorollout-example) RolloutManager configuration. 
+It is recommended to start with [basic](../crd_reference.md/#basic-rolloutmanager-example) RolloutManager configuration. 
 
 ### Apply 
 
