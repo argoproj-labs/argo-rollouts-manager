@@ -16,7 +16,7 @@ It is recommended to start with [basic](../crd_reference.md/#basic-rolloutmanage
 ### Apply 
 
 ```bash
-kubectl apply -f examples/basic_argorollout.yaml
+kubectl apply -f examples/basic_rolloutmanager.yaml
 ```
 
 This will create the rollout controller and related resources such as serviceaccount, roles, rolebinding, deployment, service, secret and others.
