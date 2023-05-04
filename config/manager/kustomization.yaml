@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: quay.io/aveerama/argo-rollouts-manager
-  newTag: v0.0.7
+  newTag: v0.0.1
