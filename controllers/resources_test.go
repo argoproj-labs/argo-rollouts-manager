@@ -59,18 +59,24 @@ func TestReconcileRolloutManager_verifyRolloutsResources(t *testing.T) {
 		t.Fatalf("failed to find the rollouts rolebinding: %#v\n", err)
 	}
 
+	aggregateToAdminClusterRole := &v1.ClusterRole{}
+	if err = r.Client.Get(context.TODO(), types.NamespacedName{
+		Name:      "argo-rollouts-aggregate-to-admin",
+		Namespace: "",
+	}, aggregateToAdminClusterRole); err != nil {
+		t.Fatalf("failed to find the aggregateToAdmin ClusterRole: %#v\n", err)
+	}
+
 	service := &corev1.Service{}
 	if err = r.Client.Get(context.TODO(), types.NamespacedName{
-		Name:      DefaultArgoRolloutsResourceName,
-		Namespace: testNamespace,
+		Name: DefaultArgoRolloutsResourceName,
 	}, service); err != nil {
 		t.Fatalf("failed to find the rollouts service: %#v\n", err)
 	}
 
 	secret := &corev1.Secret{}
 	if err = r.Client.Get(context.TODO(), types.NamespacedName{
-		Name:      DefaultRolloutsNotificationSecretName,
-		Namespace: testNamespace,
+		Name: DefaultRolloutsNotificationSecretName,
 	}, secret); err != nil {
 		t.Fatalf("failed to find the rollouts secret: %#v\n", err)
 	}

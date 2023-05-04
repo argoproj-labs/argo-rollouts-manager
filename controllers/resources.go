@@ -130,6 +130,108 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRoleBinding(cr *rolloutsApi.
 	return nil
 }
 
+// Reconciles aggregate-to-admin ClusterRole.
+func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToAdminClusterRole(cr *rolloutsApi.RolloutManager) error {
+
+	var aggregationType string = "aggregate-to-admin"
+	name := fmt.Sprintf("%s-%s", DefaultArgoRolloutsResourceName, aggregationType)
+
+	expectedPolicyRules := getAggregateToAdminPolicyRules()
+
+	clusterRole := &v1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
+	setRolloutsAggregatedClusterRoleLabels(&clusterRole.ObjectMeta, name)
+
+	if err := fetchObject(r.Client, cr.Namespace, clusterRole.Name, clusterRole); err != nil {
+		if !errors.IsNotFound(err) {
+			return fmt.Errorf("failed to reconcile the aggregated ClusterRole %s : %s", clusterRole.Name, err)
+		}
+
+		log.Info(fmt.Sprintf("Creating aggregated ClusterRole %s", clusterRole.Name))
+		clusterRole.Rules = expectedPolicyRules
+		return r.Client.Create(context.TODO(), clusterRole)
+	}
+
+	// Reconcile if the aggregated role already exists and modified.
+	if !reflect.DeepEqual(clusterRole.Rules, expectedPolicyRules) {
+		clusterRole.Rules = expectedPolicyRules
+		return r.Client.Update(context.TODO(), clusterRole)
+	}
+
+	return nil
+}
+
+// Reconciles aggregate-to-edit ClusterRole.
+func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToEditClusterRole(cr *rolloutsApi.RolloutManager) error {
+
+	var aggregationType string = "aggregate-to-edit"
+	name := fmt.Sprintf("%s-%s", DefaultArgoRolloutsResourceName, aggregationType)
+
+	expectedPolicyRules := getAggregateToEditPolicyRules()
+
+	clusterRole := &v1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
+	setRolloutsAggregatedClusterRoleLabels(&clusterRole.ObjectMeta, name)
+
+	if err := fetchObject(r.Client, cr.Namespace, clusterRole.Name, clusterRole); err != nil {
+		if !errors.IsNotFound(err) {
+			return fmt.Errorf("failed to reconcile the aggregated ClusterRole %s : %s", clusterRole.Name, err)
+		}
+
+		log.Info(fmt.Sprintf("Creating aggregated ClusterRole %s", clusterRole.Name))
+		clusterRole.Rules = expectedPolicyRules
+		return r.Client.Create(context.TODO(), clusterRole)
+	}
+
+	// Reconcile if the aggregated role already exists and modified.
+	if !reflect.DeepEqual(clusterRole.Rules, expectedPolicyRules) {
+		clusterRole.Rules = expectedPolicyRules
+		return r.Client.Update(context.TODO(), clusterRole)
+	}
+
+	return nil
+}
+
+// Reconciles aggregate-to-view ClusterRole.
+func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToViewClusterRole(cr *rolloutsApi.RolloutManager) error {
+
+	var aggregationType string = "aggregate-to-view"
+	name := fmt.Sprintf("%s-%s", DefaultArgoRolloutsResourceName, aggregationType)
+
+	expectedPolicyRules := getAggregateToViewPolicyRules()
+
+	clusterRole := &v1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
+	setRolloutsAggregatedClusterRoleLabels(&clusterRole.ObjectMeta, name)
+
+	if err := fetchObject(r.Client, cr.Namespace, clusterRole.Name, clusterRole); err != nil {
+		if !errors.IsNotFound(err) {
+			return fmt.Errorf("failed to reconcile the aggregated ClusterRole %s : %s", clusterRole.Name, err)
+		}
+
+		log.Info(fmt.Sprintf("Creating aggregated ClusterRole %s", clusterRole.Name))
+		clusterRole.Rules = expectedPolicyRules
+		return r.Client.Create(context.TODO(), clusterRole)
+	}
+
+	// Reconcile if the aggregated role already exists and modified.
+	if !reflect.DeepEqual(clusterRole.Rules, expectedPolicyRules) {
+		clusterRole.Rules = expectedPolicyRules
+		return r.Client.Update(context.TODO(), clusterRole)
+	}
+
+	return nil
+}
+
 // Reconcile rollouts service.
 func (r *RolloutManagerReconciler) reconcileRolloutsService(cr *rolloutsApi.RolloutManager) error {
 

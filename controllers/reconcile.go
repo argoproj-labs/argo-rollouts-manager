@@ -18,6 +18,21 @@ func (r *RolloutManagerReconciler) reconcileRolloutsController(cr *rolloutsApi.R
 		return err
 	}
 
+	log.Info("reconciling aggregate-to-admin ClusterRole")
+	if err := r.reconcileRolloutsAggregateToAdminClusterRole(cr); err != nil {
+		return err
+	}
+
+	log.Info("reconciling aggregate-to-edit ClusterRole")
+	if err := r.reconcileRolloutsAggregateToEditClusterRole(cr); err != nil {
+		return err
+	}
+
+	log.Info("reconciling aggregate-to-view ClusterRole")
+	if err := r.reconcileRolloutsAggregateToViewClusterRole(cr); err != nil {
+		return err
+	}
+
 	log.Info("reconciling rollouts role bindings")
 	if err := r.reconcileRolloutsRoleBinding(cr, role, sa); err != nil {
 		return err

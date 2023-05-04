@@ -18,9 +18,18 @@ import (
 
 func setRolloutsLabels(obj *metav1.ObjectMeta) {
 	obj.Labels = map[string]string{}
-	obj.Labels["app.kubernetes.io/name"] = "argo-rollouts"
-	obj.Labels["app.kubernetes.io/part-of"] = "argo-rollouts"
-	obj.Labels["app.kubernetes.io/component"] = "rollouts-controller"
+	obj.Labels["app.kubernetes.io/name"] = DefaultArgoRolloutsResourceName
+	obj.Labels["app.kubernetes.io/part-of"] = DefaultArgoRolloutsResourceName
+	obj.Labels["app.kubernetes.io/component"] = DefaultArgoRolloutsResourceName
+}
+
+func setRolloutsAggregatedClusterRoleLabels(obj *metav1.ObjectMeta, name string) {
+
+	obj.Labels = map[string]string{}
+	obj.Labels["app.kubernetes.io/component"] = "aggregate-cluster-role"
+	obj.Labels["app.kubernetes.io/name"] = name
+	obj.Labels["app.kubernetes.io/part-of"] = DefaultArgoRolloutsResourceName
+	obj.Labels["rbac.authorization.k8s.io/aggregate-to-admin"] = "true"
 }
 
 // fetchObject will retrieve the object with the given namespace and name using the Kubernetes API.
@@ -340,6 +349,90 @@ func getPolicyRules() []rbacv1.PolicyRule {
 				"watch",
 				"get",
 				"update",
+			},
+		},
+	}
+}
+
+// Returns PolicyRules for the Cluster Role argo-rollouts-aggregate-to-admin
+func getAggregateToAdminPolicyRules() []v1.PolicyRule {
+	return []v1.PolicyRule{
+		{
+			APIGroups: []string{
+				"argoproj.io",
+			},
+			Resources: []string{
+				"rollouts",
+				"rollouts/scale",
+				"rollouts/status",
+				"experiments",
+				"analysistemplates",
+				"clusteranalysistemplates",
+				"analysisruns",
+			},
+			Verbs: []string{
+				"create",
+				"delete",
+				"deletecollection",
+				"get",
+				"list",
+				"patch",
+				"update",
+				"watch",
+			},
+		},
+	}
+}
+
+// Returns PolicyRules for the Cluster Role argo-rollouts-aggregate-to-edit
+func getAggregateToEditPolicyRules() []v1.PolicyRule {
+	return []v1.PolicyRule{
+		{
+			APIGroups: []string{
+				"argoproj.io",
+			},
+			Resources: []string{
+				"rollouts",
+				"rollouts/scale",
+				"rollouts/status",
+				"experiments",
+				"analysistemplates",
+				"clusteranalysistemplates",
+				"analysisruns",
+			},
+			Verbs: []string{
+				"create",
+				"delete",
+				"deletecollection",
+				"get",
+				"list",
+				"patch",
+				"update",
+				"watch",
+			},
+		},
+	}
+}
+
+// Returns PolicyRules for the Cluster Role argo-rollouts-aggregate-to-view
+func getAggregateToViewPolicyRules() []v1.PolicyRule {
+	return []v1.PolicyRule{
+		{
+			APIGroups: []string{
+				"argoproj.io",
+			},
+			Resources: []string{
+				"rollouts",
+				"rollouts/scale",
+				"experiments",
+				"analysistemplates",
+				"clusteranalysistemplates",
+				"analysisruns",
+			},
+			Verbs: []string{
+				"get",
+				"list",
+				"watch",
 			},
 		},
 	}
