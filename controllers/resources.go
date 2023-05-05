@@ -138,7 +138,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToAdminClusterRole(
 
 	expectedPolicyRules := getAggregateToAdminPolicyRules()
 
-	clusterRole := &v1.Role{
+	clusterRole := &v1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
@@ -172,7 +172,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToEditClusterRole(c
 
 	expectedPolicyRules := getAggregateToEditPolicyRules()
 
-	clusterRole := &v1.Role{
+	clusterRole := &v1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
@@ -206,7 +206,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToViewClusterRole(c
 
 	expectedPolicyRules := getAggregateToViewPolicyRules()
 
-	clusterRole := &v1.Role{
+	clusterRole := &v1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},

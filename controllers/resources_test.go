@@ -61,25 +61,67 @@ func TestReconcileRolloutManager_verifyRolloutsResources(t *testing.T) {
 
 	aggregateToAdminClusterRole := &v1.ClusterRole{}
 	if err = r.Client.Get(context.TODO(), types.NamespacedName{
-		Name:      "argo-rollouts-aggregate-to-admin",
-		Namespace: "",
+		Name: "argo-rollouts-aggregate-to-admin",
 	}, aggregateToAdminClusterRole); err != nil {
 		t.Fatalf("failed to find the aggregateToAdmin ClusterRole: %#v\n", err)
 	}
 
+	aggregateToEditClusterRole := &v1.ClusterRole{}
+	if err = r.Client.Get(context.TODO(), types.NamespacedName{
+		Name: "argo-rollouts-aggregate-to-edit",
+	}, aggregateToEditClusterRole); err != nil {
+		t.Fatalf("failed to find the aggregateToEdit ClusterRole: %#v\n", err)
+	}
+
+	aggregateToViewClusterRole := &v1.ClusterRole{}
+	if err = r.Client.Get(context.TODO(), types.NamespacedName{
+		Name: "argo-rollouts-aggregate-to-view",
+	}, aggregateToViewClusterRole); err != nil {
+		t.Fatalf("failed to find the aggregateToView ClusterRole: %#v\n", err)
+	}
+
 	service := &corev1.Service{}
 	if err = r.Client.Get(context.TODO(), types.NamespacedName{
-		Name: DefaultArgoRolloutsResourceName,
+		Name:      DefaultArgoRolloutsResourceName,
+		Namespace: a.Namespace,
 	}, service); err != nil {
 		t.Fatalf("failed to find the rollouts service: %#v\n", err)
 	}
 
 	secret := &corev1.Secret{}
 	if err = r.Client.Get(context.TODO(), types.NamespacedName{
-		Name: DefaultRolloutsNotificationSecretName,
+		Name:      DefaultRolloutsNotificationSecretName,
+		Namespace: a.Namespace,
 	}, secret); err != nil {
 		t.Fatalf("failed to find the rollouts secret: %#v\n", err)
 	}
+}
+
+func TestReconcileAggregateToAdminClusterRole(t *testing.T) {
+	a := makeTestRolloutManager()
+
+	r := makeTestReconciler(t, a)
+	assert.NoError(t, createNamespace(r, a.Namespace))
+
+	assert.NoError(t, r.reconcileRolloutsAggregateToAdminClusterRole(a))
+}
+
+func TestReconcileAggregateToEditClusterRole(t *testing.T) {
+	a := makeTestRolloutManager()
+
+	r := makeTestReconciler(t, a)
+	assert.NoError(t, createNamespace(r, a.Namespace))
+
+	assert.NoError(t, r.reconcileRolloutsAggregateToEditClusterRole(a))
+}
+
+func TestReconcileAggregateToViewClusterRole(t *testing.T) {
+	a := makeTestRolloutManager()
+
+	r := makeTestReconciler(t, a)
+	assert.NoError(t, createNamespace(r, a.Namespace))
+
+	assert.NoError(t, r.reconcileRolloutsAggregateToViewClusterRole(a))
 }
 
 func TestReconcileRolloutManager_CleanUp(t *testing.T) {
