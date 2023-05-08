@@ -119,4 +119,4 @@ mkdocs serve
 
 ### Run the e2e tests.
 
-[WIP]
+Please refer the e2e tests [usage](../e2e-tests/usage.md) guide.

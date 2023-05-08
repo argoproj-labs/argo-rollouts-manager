@@ -19,6 +19,9 @@ markdown_extensions:
 nav:
   - CRD Reference: crd_reference.md
   - Developer Guide: developer-guide/developer_guide.md
+  - E2E Tests:
+    - Usage: e2e-tests/usage.md
+    - Guide: e2e-tests/guide.md
   - Install:
     - Kustomize: install/kustomize.md
     - OLM: install/olm.md

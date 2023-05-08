@@ -105,6 +105,10 @@ vet: ## Run go vet against code.
 test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
 
+.PHONY: test-e2e
+test-e2e: ## Run operator e2e tests using kuttl.
+	kubectl kuttl test --config ./tests/e2e/kuttl-tests.yaml 
+
 ##@ Build
 
 .PHONY: build

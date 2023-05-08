@@ -9,6 +9,8 @@ bin
 testbin/*
 Dockerfile.cross
 docs-website
+e2e.json
+kubeconfig
 
 # Test binary, build with `go test -c`
 *.test
