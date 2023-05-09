@@ -48,8 +48,8 @@ func (r *RolloutManagerReconciler) reconcileRolloutsController(cr *rolloutsApi.R
 		return err
 	}
 
-	log.Info("reconciling rollouts service")
-	if err := r.reconcileRolloutsService(cr); err != nil {
+	log.Info("reconciling rollouts metrics service")
+	if err := r.reconcileRolloutsMetricsService(cr); err != nil {
 		return err
 	}
 

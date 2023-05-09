@@ -21,7 +21,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2023-05-04T08:00:38Z"
+    createdAt: "2023-05-09T11:21:43Z"
     operators.operatorframework.io/builder: operator-sdk-v1.28.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: argo-rollouts-manager.v0.0.1
@@ -150,6 +150,7 @@ spec:
           verbs:
           - create
           - delete
+          - deletecollection
           - get
           - list
           - patch
@@ -161,8 +162,12 @@ spec:
           - analysistemplates
           verbs:
           - create
+          - delete
+          - deletecollection
           - get
           - list
+          - patch
+          - update
           - watch
         - apiGroups:
           - argoproj.io
@@ -170,8 +175,12 @@ spec:
           - clusteranalysistemplates
           verbs:
           - create
+          - delete
+          - deletecollection
           - get
           - list
+          - patch
+          - update
           - watch
         - apiGroups:
           - argoproj.io
@@ -204,8 +213,12 @@ spec:
           resources:
           - rollouts
           - rollouts/finalizers
+          - rollouts/scale
           - rollouts/status
           verbs:
+          - create
+          - delete
+          - deletecollection
           - get
           - list
           - patch

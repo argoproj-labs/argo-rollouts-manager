@@ -232,16 +232,19 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToViewClusterRole(c
 	return nil
 }
 
-// Reconcile rollouts service.
-func (r *RolloutManagerReconciler) reconcileRolloutsService(cr *rolloutsApi.RolloutManager) error {
+// Reconcile rollouts metrics service.
+func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(cr *rolloutsApi.RolloutManager) error {
 
 	expectedSvc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      DefaultArgoRolloutsResourceName,
+			Name:      DefaultArgoRolloutsMetricsServiceName,
 			Namespace: cr.Namespace,
 		},
 	}
 	setRolloutsLabels(&expectedSvc.ObjectMeta)
+	// overwrite the annotations for rollouts metrics service
+	expectedSvc.ObjectMeta.Labels["app.kubernetes.io/name"] = DefaultArgoRolloutsMetricsServiceName
+	expectedSvc.ObjectMeta.Labels["app.kubernetes.io/component"] = "server"
 
 	expectedSvc.Spec.Ports = []corev1.ServicePort{
 		{

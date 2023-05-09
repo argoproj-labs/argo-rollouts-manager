@@ -4,6 +4,8 @@ const (
 	// ArgoRolloutsImageEnvName is an environment variable that can be used to deploy a
 	// Custom Image of rollouts controller.
 	ArgoRolloutsImageEnvName = "ARGO_ROLLOUTS_IMAGE"
+	// DefaultArgoRolloutsMetricsServiceName is the default name for rollouts metrics service.
+	DefaultArgoRolloutsMetricsServiceName = "argo-rollouts-metrics"
 	// ArgoRolloutsDefaultImage is the default image for rollouts controller.
 	DefaultArgoRolloutsImage = "quay.io/argoproj/argo-rollouts"
 	// ArgoRolloutsDefaultVersion is the default version for the rollouts controller.

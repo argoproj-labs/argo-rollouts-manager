@@ -82,10 +82,10 @@ func TestReconcileRolloutManager_verifyRolloutsResources(t *testing.T) {
 
 	service := &corev1.Service{}
 	if err = r.Client.Get(context.TODO(), types.NamespacedName{
-		Name:      DefaultArgoRolloutsResourceName,
+		Name:      DefaultArgoRolloutsMetricsServiceName,
 		Namespace: a.Namespace,
 	}, service); err != nil {
-		t.Fatalf("failed to find the rollouts service: %#v\n", err)
+		t.Fatalf("failed to find the rollouts metrics service: %#v\n", err)
 	}
 
 	secret := &corev1.Secret{}

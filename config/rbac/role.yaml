@@ -96,6 +96,7 @@ rules:
   verbs:
   - create
   - delete
+  - deletecollection
   - get
   - list
   - patch
@@ -107,8 +108,12 @@ rules:
   - analysistemplates
   verbs:
   - create
+  - delete
+  - deletecollection
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - argoproj.io
@@ -116,8 +121,12 @@ rules:
   - clusteranalysistemplates
   verbs:
   - create
+  - delete
+  - deletecollection
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - argoproj.io
@@ -150,8 +159,12 @@ rules:
   resources:
   - rollouts
   - rollouts/finalizers
+  - rollouts/scale
   - rollouts/status
   verbs:
+  - create
+  - delete
+  - deletecollection
   - get
   - list
   - patch
