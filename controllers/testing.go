@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	rolloutsApi "github.com/iam-veeramalla/argo-rollouts-manager/api/v1alpha1"
+	rolloutsApi "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

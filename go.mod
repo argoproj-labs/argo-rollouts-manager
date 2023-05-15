@@ -1,4 +1,4 @@
-module github.com/iam-veeramalla/argo-rollouts-manager
+module github.com/argoproj-labs/argo-rollouts-manager
 
 go 1.19
 

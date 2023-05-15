@@ -1,7 +1,7 @@
 package rollouts
 
 import (
-	rolloutsApi "github.com/iam-veeramalla/argo-rollouts-manager/api/v1alpha1"
+	rolloutsApi "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/rbac/v1"

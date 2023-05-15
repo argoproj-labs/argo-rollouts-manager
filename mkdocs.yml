@@ -1,6 +1,6 @@
 site_name: Argo Rollouts Manager
 site_url: ""
-repo_url: https://github.com/iam-veeramalla/argo-rollouts-manager
+repo_url: https://github.com/argoproj-labs/argo-rollouts-manager
 strict: true
 theme:
   name: material

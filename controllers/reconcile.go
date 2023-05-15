@@ -1,7 +1,7 @@
 package rollouts
 
 import (
-	rolloutsApi "github.com/iam-veeramalla/argo-rollouts-manager/api/v1alpha1"
+	rolloutsApi "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 )
 
 func (r *RolloutManagerReconciler) reconcileRolloutsController(cr *rolloutsApi.RolloutManager) error {
