@@ -31,8 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	argoprojiov1alpha1 "github.com/iam-veeramalla/argo-rollouts-manager/api/v1alpha1"
-	rolloutsApi "github.com/iam-veeramalla/argo-rollouts-manager/controllers"
+	argoprojiov1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
+	rolloutsApi "github.com/argoproj-labs/argo-rollouts-manager/controllers"
 	//+kubebuilder:scaffold:imports
 )
 

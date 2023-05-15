@@ -19,7 +19,7 @@ package rollouts
 import (
 	"context"
 
-	rolloutsApi "github.com/iam-veeramalla/argo-rollouts-manager/api/v1alpha1"
+	rolloutsApi "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
