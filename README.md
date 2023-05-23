@@ -18,9 +18,9 @@ The complete documentation for the operator can be found [here](https://argo-rol
 
 When Installed, this operator creates a Custom Resource Definition called RolloutManager. 
 
-Operator will then wait for the users to deploy the corresponding Custom Resource to create the rollout controller and other resources according to the provided spec.
+Operator will then wait for the users to deploy the corresponding Custom Resource to create the [rollout](https://argo-rollouts.readthedocs.io/en/stable/) controller and other resources according to the provided spec.
 
-Read more about the Argo Rollout CRD specification here.
+Read more about the Argo Rollout CRD specification [here](https://argo-rollouts-manager.readthedocs.io/en/latest/crd_reference/).
 
 ## Where to start ?
 
