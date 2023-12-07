@@ -27,7 +27,7 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(cr *rolloutsApi.RolloutMan
 	trafficRouterPlugins := []types.PluginItem{
 		{
 			Name:     OpenshiftRolloutPluginName,
-			Location: "",
+			Location: "file://" + OpenshiftRolloutPluginPath,
 		},
 	}
 	pluginString, err := yaml.Marshal(trafficRouterPlugins)
