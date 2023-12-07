@@ -41,6 +41,7 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(cr *rolloutsApi.RolloutMan
 	if err := fetchObject(r.Client, cr.Namespace, desiredConfigMap.Name, actualConfiMap); err != nil {
 		if errors.IsNotFound(err) {
 			// ConfigMap is not present, create default config map
+			log.Info("configMap not found, creating default configmap with openshift route plugin information")
 			return r.Client.Create(context.TODO(), desiredConfigMap)
 		}
 		return fmt.Errorf("failed to get the serviceAccount associated with %s : %s", desiredConfigMap.Name, err)

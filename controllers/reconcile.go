@@ -48,9 +48,11 @@ func (r *RolloutManagerReconciler) reconcileRolloutsController(cr *rolloutsApi.R
 		return err
 	}
 
-	log.Info("reconciling rollouts deployment")
-	if err := r.reconcileRolloutsDeployment(cr, sa); err != nil {
-		return err
+	if !cr.Spec.DisableRoutePlugin {
+		log.Info("reconciling rollouts deployment")
+		if err := r.reconcileRolloutsDeployment(cr, sa); err != nil {
+			return err
+		}
 	}
 
 	log.Info("reconciling rollouts metrics service")
