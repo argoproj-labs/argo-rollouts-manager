@@ -44,19 +44,6 @@ func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(cr *rolloutsApi.R
 		},
 	}
 
-	if !cr.Spec.DisableRoutePlugin {
-		desiredDeployment.Spec.Template.Spec.Volumes = []corev1.Volume{
-			{
-				Name: OpenshiftRolloutPluginName,
-				VolumeSource: corev1.VolumeSource{
-					HostPath: &corev1.HostPathVolumeSource{
-						Path: OpenshiftRolloutPluginPath,
-					},
-				},
-			},
-		}
-	}
-
 	if cr.Spec.NodePlacement != nil {
 		desiredDeployment.Spec.Template.Spec.NodeSelector = appendStringMap(
 			desiredDeployment.Spec.Template.Spec.NodeSelector, cr.Spec.NodePlacement.NodeSelector)
@@ -126,7 +113,7 @@ func rolloutsContainer(cr *rolloutsApi.RolloutManager) corev1.Container {
 	// Environment specified in the CR take precedence over everything else
 	rolloutsEnv = envMerge(rolloutsEnv, proxyEnvVars(), false)
 
-	container := corev1.Container{
+	return corev1.Container{
 		Args:            getRolloutsCommandArgs(cr),
 		Env:             rolloutsEnv,
 		Image:           getRolloutsContainerImage(cr),
@@ -180,16 +167,6 @@ func rolloutsContainer(cr *rolloutsApi.RolloutManager) corev1.Container {
 		},
 	}
 
-	if !cr.Spec.DisableRoutePlugin {
-		container.VolumeMounts = []corev1.VolumeMount{
-			{
-				Name:      "openshift-route-plugin",
-				MountPath: "/plugins/openshift-route-plugin",
-			},
-		}
-	}
-
-	return container
 }
 
 // boolPtr returns a pointer to val
