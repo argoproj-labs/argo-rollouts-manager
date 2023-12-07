@@ -18,9 +18,10 @@ const (
 	// DefaultRolloutsServiceSelectorKey is key used by selector
 	DefaultRolloutsSelectorKey = "app.kubernetes.io/name"
 
-	//
+	// OpenshiftRolloutPluginName is the plugin name for Openshift Route Plugin
 	OpenshiftRolloutPluginName = "openshift-route-plugin"
-
-	//
-	OpenshiftRolloutPluginPath = "/plugin/openshift-route-plugin"
+	// OpenshiftRolloutPluginPath is the path on the rollout controller pod where the plugin will be mounted
+	OpenshiftRolloutPluginPath = "/plugin/rollouts-plugin-trafficrouter-openshift"
+	// DefaultRolloutsConfigMapName is the default name of the ConfigMap that contains the Rollouts controller configuration
+	DefaultRolloutsConfigMapName = "argo-rollouts-config"
 )

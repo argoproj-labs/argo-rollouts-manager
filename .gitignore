@@ -27,3 +27,4 @@ kubeconfig
 *.swp
 *.swo
 *~
+vendor/*
