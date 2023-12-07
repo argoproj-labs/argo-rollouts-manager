@@ -17,4 +17,10 @@ const (
 	DefaultRolloutsNotificationSecretName = "argo-rollouts-notification-secret"
 	// DefaultRolloutsServiceSelectorKey is key used by selector
 	DefaultRolloutsSelectorKey = "app.kubernetes.io/name"
+
+	//
+	OpenshiftRolloutPluginName = "openshift-route-plugin"
+
+	//
+	OpenshiftRolloutPluginPath = "/plugin/openshift-route-plugin"
 )

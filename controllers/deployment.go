@@ -44,6 +44,19 @@ func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(cr *rolloutsApi.R
 		},
 	}
 
+	if !cr.Spec.DisableRoutePlugin {
+		desiredDeployment.Spec.Template.Spec.Volumes = []corev1.Volume{
+			{
+				Name: OpenshiftRolloutPluginName,
+				VolumeSource: corev1.VolumeSource{
+					HostPath: &corev1.HostPathVolumeSource{
+						Path: OpenshiftRolloutPluginPath,
+					},
+				},
+			},
+		}
+	}
+
 	if cr.Spec.NodePlacement != nil {
 		desiredDeployment.Spec.Template.Spec.NodeSelector = appendStringMap(
 			desiredDeployment.Spec.Template.Spec.NodeSelector, cr.Spec.NodePlacement.NodeSelector)
@@ -87,7 +100,8 @@ func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(cr *rolloutsApi.R
 		!reflect.DeepEqual(actualDeployment.Spec.Selector, desiredDeployment.Spec.Selector) ||
 		!reflect.DeepEqual(actualDeployment.Spec.Template.Spec.NodeSelector, desiredDeployment.Spec.Template.Spec.NodeSelector) ||
 		!reflect.DeepEqual(actualDeployment.Spec.Template.Spec.Tolerations, desiredDeployment.Spec.Template.Spec.Tolerations) ||
-		!reflect.DeepEqual(actualPodSpec.SecurityContext, desiredPodSpec.SecurityContext)
+		!reflect.DeepEqual(actualPodSpec.SecurityContext, desiredPodSpec.SecurityContext) ||
+		!reflect.DeepEqual(actualDeployment.Spec.Template.Spec.Volumes, desiredDeployment.Spec.Template.Spec.Volumes)
 
 	if deploymentsDifferent {
 		actualDeployment.Spec.Template.Spec.Containers = desiredPodSpec.Containers
@@ -98,6 +112,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(cr *rolloutsApi.R
 		actualDeployment.Spec.Template.Spec.NodeSelector = desiredDeployment.Spec.Template.Spec.NodeSelector
 		actualDeployment.Spec.Template.Spec.Tolerations = desiredDeployment.Spec.Template.Spec.Tolerations
 		actualDeployment.Spec.Template.Spec.SecurityContext = desiredPodSpec.SecurityContext
+		actualDeployment.Spec.Template.Spec.Volumes = desiredDeployment.Spec.Template.Spec.Volumes
 		return r.Client.Update(context.TODO(), actualDeployment)
 	}
 	return nil
@@ -111,7 +126,7 @@ func rolloutsContainer(cr *rolloutsApi.RolloutManager) corev1.Container {
 	// Environment specified in the CR take precedence over everything else
 	rolloutsEnv = envMerge(rolloutsEnv, proxyEnvVars(), false)
 
-	return corev1.Container{
+	container := corev1.Container{
 		Args:            getRolloutsCommandArgs(cr),
 		Env:             rolloutsEnv,
 		Image:           getRolloutsContainerImage(cr),
@@ -160,10 +175,21 @@ func rolloutsContainer(cr *rolloutsApi.RolloutManager) corev1.Container {
 				},
 			},
 			AllowPrivilegeEscalation: boolPtr(false),
-			ReadOnlyRootFilesystem:   boolPtr(true),
+			ReadOnlyRootFilesystem:   boolPtr(false),
 			RunAsNonRoot:             boolPtr(true),
 		},
 	}
+
+	if !cr.Spec.DisableRoutePlugin {
+		container.VolumeMounts = []corev1.VolumeMount{
+			{
+				Name:      "openshift-route-plugin",
+				MountPath: "/plugins/openshift-route-plugin",
+			},
+		}
+	}
+
+	return container
 }
 
 // boolPtr returns a pointer to val

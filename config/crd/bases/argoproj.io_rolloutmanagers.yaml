@@ -35,6 +35,10 @@ spec:
           spec:
             description: RolloutManagerSpec defines the desired state of Argo Rollouts
             properties:
+              disableRoutePlugin:
+                description: DisableRoutePlugin defines if the Openshift Route Plugin
+                  should not be installed on Rollouts Controller
+                type: boolean
               env:
                 description: Env lets you specify environment for Rollouts pods
                 items:
