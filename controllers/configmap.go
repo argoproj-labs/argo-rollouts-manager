@@ -36,9 +36,9 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(cr *rolloutsApi.RolloutMan
 	}
 	desiredConfigMap.Data["trafficRouterPlugins"] = string(pluginString)
 
-	actualConfiMap := &corev1.ConfigMap{}
+	actualConfigMap := &corev1.ConfigMap{}
 
-	if err := fetchObject(r.Client, cr.Namespace, desiredConfigMap.Name, actualConfiMap); err != nil {
+	if err := fetchObject(r.Client, cr.Namespace, desiredConfigMap.Name, actualConfigMap); err != nil {
 		if errors.IsNotFound(err) {
 			// ConfigMap is not present, create default config map
 			log.Info("configMap not found, creating default configmap with openshift route plugin information")
@@ -48,7 +48,7 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(cr *rolloutsApi.RolloutMan
 	}
 
 	var actualTrafficRouterPlugins []types.PluginItem
-	if err = yaml.Unmarshal([]byte(actualConfiMap.Data["trafficRouterPlugins"]), &actualTrafficRouterPlugins); err != nil {
+	if err = yaml.Unmarshal([]byte(actualConfigMap.Data["trafficRouterPlugins"]), &actualTrafficRouterPlugins); err != nil {
 		return fmt.Errorf("failed to unmarshal traffic router plugins from ConfigMap: %s", err)
 	}
 
@@ -66,7 +66,7 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(cr *rolloutsApi.RolloutMan
 		return fmt.Errorf("error marshalling trafficRouterPlugin to string %s", err)
 	}
 
-	actualConfiMap.Data["trafficRouterPlugins"] = string(pluginString)
+	actualConfigMap.Data["trafficRouterPlugins"] = string(pluginString)
 
-	return r.Client.Update(context.TODO(), actualConfiMap)
+	return r.Client.Update(context.TODO(), actualConfigMap)
 }
