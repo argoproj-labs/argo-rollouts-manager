@@ -78,3 +78,22 @@ spec:
 ```
 
 
+### RolloutManager example with metadata for the resources generatd
+
+You can provide labels and annotation for all the resources generated (Argo Rollouts controller, ConfigMap, etc.).
+
+``` yaml
+apiVersion: argoproj.io/v1alpha1
+kind: RolloutManager
+metadata:
+  name: argo-rollout
+  labels:
+    example: with-metadata-example
+spec:
+  additionalMetadata:
+    labels:
+      mylabel: "true"
+    annotations:
+      myannotation: "myvalue"
+```
+

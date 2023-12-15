@@ -64,7 +64,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsManager(ctx context.Context,
 		}
 	} else {
 		log.Info("reconciling Rollouts ClusterRoles")
-		clusterRole, err = r.reconcileRolloutsClusterRole(ctx)
+		clusterRole, err = r.reconcileRolloutsClusterRole(ctx, cr)
 		if err != nil {
 			log.Error(err, "failed to reconcile Rollout's ClusterRoles.")
 			return wrapCondition(createCondition(err.Error())), err
@@ -72,19 +72,19 @@ func (r *RolloutManagerReconciler) reconcileRolloutsManager(ctx context.Context,
 	}
 
 	log.Info("reconciling aggregate-to-admin ClusterRole")
-	if err := r.reconcileRolloutsAggregateToAdminClusterRole(ctx); err != nil {
+	if err := r.reconcileRolloutsAggregateToAdminClusterRole(ctx, cr); err != nil {
 		log.Error(err, "failed to reconcile Rollout's aggregate-to-admin ClusterRoles.")
 		return wrapCondition(createCondition(err.Error())), err
 	}
 
 	log.Info("reconciling aggregate-to-edit ClusterRole")
-	if err := r.reconcileRolloutsAggregateToEditClusterRole(ctx); err != nil {
+	if err := r.reconcileRolloutsAggregateToEditClusterRole(ctx, cr); err != nil {
 		log.Error(err, "failed to reconcile Rollout's aggregate-to-edit ClusterRoles.")
 		return wrapCondition(createCondition(err.Error())), err
 	}
 
 	log.Info("reconciling aggregate-to-view ClusterRole")
-	if err := r.reconcileRolloutsAggregateToViewClusterRole(ctx); err != nil {
+	if err := r.reconcileRolloutsAggregateToViewClusterRole(ctx, cr); err != nil {
 		log.Error(err, "failed to reconcile Rollout's aggregate-to-view ClusterRoles.")
 		return wrapCondition(createCondition(err.Error())), err
 	}
@@ -97,7 +97,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsManager(ctx context.Context,
 		}
 	} else {
 		log.Info("reconciling Rollouts ClusterRoleBinding")
-		if err := r.reconcileRolloutsClusterRoleBinding(ctx, clusterRole, sa); err != nil {
+		if err := r.reconcileRolloutsClusterRoleBinding(ctx, clusterRole, sa, cr); err != nil {
 			log.Error(err, "failed to reconcile Rollout's ClusterRoleBinding.")
 			return wrapCondition(createCondition(err.Error())), err
 		}

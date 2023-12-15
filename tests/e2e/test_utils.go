@@ -42,13 +42,21 @@ func CreateNamespace(ctx context.Context, k8sClient client.Client, name string) 
 
 // Create RolloutManager CR
 func CreateRolloutManager(ctx context.Context, k8sClient client.Client, name, namespace string, namespaceScoped bool) (rmv1alpha1.RolloutManager, error) {
+	return CreateRolloutManagerWithMetadata(ctx, k8sClient, name, namespace, namespaceScoped, &rmv1alpha1.ResourceMetadata{})
+}
+
+// Create RolloutManager CR
+func CreateRolloutManagerWithMetadata(ctx context.Context, k8sClient client.Client, name, namespace string, namespaceScoped bool,
+	additionalMetadata *rmv1alpha1.ResourceMetadata) (rmv1alpha1.RolloutManager, error) {
+
 	rolloutsManager := rmv1alpha1.RolloutManager{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
 		Spec: rmv1alpha1.RolloutManagerSpec{
-			NamespaceScoped: namespaceScoped,
+			NamespaceScoped:    namespaceScoped,
+			AdditionalMetadata: additionalMetadata,
 		},
 	}
 	return rolloutsManager, k8sClient.Create(ctx, &rolloutsManager)
@@ -87,17 +95,17 @@ func ValidateArgoRolloutManagerResources(ctx context.Context, rolloutsManager rm
 		validateArgoRolloutsRole(k8sClient, rolloutsManager)
 	} else {
 		By("Verify that argo-rollout ClusterRoles is created.")
-		validateArgoRolloutsClusterRole(k8sClient)
+		validateArgoRolloutsClusterRole(k8sClient, rolloutsManager)
 	}
 
 	By("Verify that aggregate-to-admin ClusterRole is created.")
-	validateAggregateToAdminClusterRole(k8sClient)
+	validateAggregateToAdminClusterRole(k8sClient, rolloutsManager)
 
 	By("Verify that aggregate-to-edit ClusterRole is created.")
-	validateAggregateToEditClusterRole(k8sClient)
+	validateAggregateToEditClusterRole(k8sClient, rolloutsManager)
 
 	By("Verify that aggregate-to-view ClusterRole is created.")
-	validateAggregateToViewClusterRole(k8sClient)
+	validateAggregateToViewClusterRole(k8sClient, rolloutsManager)
 
 	if namespaceScoped {
 		By("Verify that RoleBinding is created.")
@@ -148,6 +156,18 @@ func ValidateArgoRolloutsResources(ctx context.Context, k8sClient client.Client,
 
 }
 
+// Checks that the labels and annotations provided are present in the ObjectMeta
+func ExpectMetadataOnObjectMeta(ObjectMeta *metav1.ObjectMeta, expectedMetadata *rmv1alpha1.ResourceMetadata) {
+	if expectedMetadata != nil {
+		for k, v := range expectedMetadata.Labels {
+			Expect(ObjectMeta.Labels).To(HaveKeyWithValue(k, v))
+		}
+		for k, v := range expectedMetadata.Annotations {
+			Expect(ObjectMeta.Annotations).To(HaveKeyWithValue(k, v))
+		}
+	}
+}
+
 func validateServiceAccount(k8sClient client.Client, rolloutsManager rmv1alpha1.RolloutManager) {
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
@@ -157,8 +177,9 @@ func validateServiceAccount(k8sClient client.Client, rolloutsManager rmv1alpha1.
 	}
 	Eventually(sa, "10s", "1s").Should(k8s.ExistByName(k8sClient))
 
-	By("Verify that ServiceAccount has correct labels.")
+	By("Verify that ServiceAccount has correct labels and annotations.")
 	validateLabels(&sa.ObjectMeta)
+	ExpectMetadataOnObjectMeta(&sa.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
 }
 
 func validateArgoRolloutsRole(k8sClient client.Client, rolloutsManager rmv1alpha1.RolloutManager) {
@@ -170,14 +191,15 @@ func validateArgoRolloutsRole(k8sClient client.Client, rolloutsManager rmv1alpha
 	}
 	Eventually(role, "10s", "1s").Should(k8s.ExistByName(k8sClient))
 
-	By("Verify that Role has correct labels.")
+	By("Verify that Role has correct labels and annotations.")
 	validateLabels(&role.ObjectMeta)
+	ExpectMetadataOnObjectMeta(&role.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
 
 	By("Verify that Role has correct policy rules.")
 	Expect(role.Rules).To(ConsistOf(controllers.GetPolicyRules()))
 }
 
-func validateArgoRolloutsClusterRole(k8sClient client.Client) {
+func validateArgoRolloutsClusterRole(k8sClient client.Client, rolloutsManager rmv1alpha1.RolloutManager) {
 	clusterRole := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: controllers.DefaultArgoRolloutsResourceName,
@@ -185,14 +207,15 @@ func validateArgoRolloutsClusterRole(k8sClient client.Client) {
 	}
 	Eventually(clusterRole, "30s", "1s").Should(k8s.ExistByName(k8sClient))
 
-	By("Verify that ClusterRole has correct labels.")
+	By("Verify that ClusterRole has correct labels and annotations.")
 	validateLabels(&clusterRole.ObjectMeta)
+	ExpectMetadataOnObjectMeta(&clusterRole.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
 
 	By("Verify that ClusterRole has correct policy rules.")
 	Expect(clusterRole.Rules).To(ConsistOf(controllers.GetPolicyRules()))
 }
 
-func validateAggregateToAdminClusterRole(k8sClient client.Client) {
+func validateAggregateToAdminClusterRole(k8sClient client.Client, rolloutsManager rmv1alpha1.RolloutManager) {
 
 	aggregationType := "aggregate-to-admin"
 	clusterRoleName := fmt.Sprintf("%s-%s", controllers.DefaultArgoRolloutsResourceName, aggregationType)
@@ -203,14 +226,15 @@ func validateAggregateToAdminClusterRole(k8sClient client.Client) {
 	}
 	Eventually(clusterRole, "30s", "1s").Should(k8s.ExistByName(k8sClient))
 
-	By("Verify that ClusterRole has correct labels.")
+	By("Verify that ClusterRole has correct labels and annotations.")
 	validateAggregateLabels(&clusterRole.ObjectMeta, aggregationType)
+	ExpectMetadataOnObjectMeta(&clusterRole.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
 
 	By("Verify that ClusterRole has correct policy rules.")
 	Expect(clusterRole.Rules).To(ConsistOf(controllers.GetAggregateToAdminPolicyRules()))
 }
 
-func validateAggregateToEditClusterRole(k8sClient client.Client) {
+func validateAggregateToEditClusterRole(k8sClient client.Client, rolloutsManager rmv1alpha1.RolloutManager) {
 
 	aggregationType := "aggregate-to-edit"
 	clusterRoleName := fmt.Sprintf("%s-%s", controllers.DefaultArgoRolloutsResourceName, aggregationType)
@@ -221,14 +245,15 @@ func validateAggregateToEditClusterRole(k8sClient client.Client) {
 	}
 	Eventually(clusterRole, "30s", "1s").Should(k8s.ExistByName(k8sClient))
 
-	By("Verify that ClusterRole has correct labels.")
+	By("Verify that ClusterRole has correct labels and annotations.")
 	validateAggregateLabels(&clusterRole.ObjectMeta, aggregationType)
+	ExpectMetadataOnObjectMeta(&clusterRole.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
 
 	By("Verify that ClusterRole has correct policy rules.")
 	Expect(clusterRole.Rules).To(ConsistOf(controllers.GetAggregateToEditPolicyRules()))
 }
 
-func validateAggregateToViewClusterRole(k8sClient client.Client) {
+func validateAggregateToViewClusterRole(k8sClient client.Client, rolloutsManager rmv1alpha1.RolloutManager) {
 
 	aggregationType := "aggregate-to-view"
 	clusterRoleName := fmt.Sprintf("%s-%s", controllers.DefaultArgoRolloutsResourceName, aggregationType)
@@ -239,8 +264,9 @@ func validateAggregateToViewClusterRole(k8sClient client.Client) {
 	}
 	Eventually(clusterRole, "30s", "1s").Should(k8s.ExistByName(k8sClient))
 
-	By("Verify that ClusterRole has correct labels.")
+	By("Verify that ClusterRole has correct labels and annotations.")
 	validateAggregateLabels(&clusterRole.ObjectMeta, aggregationType)
+	ExpectMetadataOnObjectMeta(&clusterRole.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
 
 	By("Verify that ClusterRole has correct policy rules.")
 	Expect(clusterRole.Rules).To(ConsistOf(controllers.GetAggregateToViewPolicyRules()))
@@ -255,8 +281,9 @@ func validateRoleBinding(k8sClient client.Client, rolloutsManager rmv1alpha1.Rol
 	}
 	Eventually(binding, "30s", "1s").Should(k8s.ExistByName(k8sClient))
 
-	By("Verify that RoleBinding has correct labels.")
+	By("Verify that RoleBinding has correct labels and annotations.")
 	validateLabels(&binding.ObjectMeta)
+	ExpectMetadataOnObjectMeta(&binding.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
 
 	By("Verify that RoleBinding has correct RoleRef.")
 	Expect(binding.RoleRef).To(Equal(rbacv1.RoleRef{
@@ -285,8 +312,9 @@ func validateClusterRoleBinding(k8sClient client.Client, rolloutsManager rmv1alp
 	}
 	Eventually(clusterRoleBinding, "30s", "1s").Should(k8s.ExistByName(k8sClient))
 
-	By("Verify that ClusterRoleBinding has correct labels.")
+	By("Verify that ClusterRoleBinding has correct labels and annotations.")
 	validateLabels(&clusterRoleBinding.ObjectMeta)
+	ExpectMetadataOnObjectMeta(&clusterRoleBinding.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
 
 	By("Verify that ClusterRoleBinding has correct RoleRef.")
 	Expect(clusterRoleBinding.RoleRef).To(Equal(rbacv1.RoleRef{
@@ -316,10 +344,11 @@ func validateService(k8sClient client.Client, rolloutsManager rmv1alpha1.Rollout
 	}
 	Eventually(service, "10s", "1s").Should(k8s.ExistByName(k8sClient))
 
-	By("Verify that Service has correct labels.")
+	By("Verify that Service has correct labels and annotations.")
 	Expect(service.Labels["app.kubernetes.io/name"]).To(Equal(controllers.DefaultArgoRolloutsMetricsServiceName))
 	Expect(service.Labels["app.kubernetes.io/part-of"]).To(Equal(controllers.DefaultArgoRolloutsResourceName))
 	Expect(service.Labels["app.kubernetes.io/component"]).To(Equal("server"))
+	ExpectMetadataOnObjectMeta(&service.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
 
 	By("Verify that ClusterRoleBinding has correct Ports.")
 	Expect(service.Spec.Ports).To(Equal([]corev1.ServicePort{
@@ -348,6 +377,9 @@ func validateSecret(k8sClient client.Client, rolloutsManager rmv1alpha1.RolloutM
 
 	By("Verify that Secret has correct Type.")
 	Expect(secret.Type).To(Equal(corev1.SecretTypeOpaque))
+
+	By("Verify that Secret has correct labels and annotations.")
+	ExpectMetadataOnObjectMeta(&secret.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
 }
 
 func validateDeployment(ctx context.Context, k8sClient client.Client, rolloutsManager rmv1alpha1.RolloutManager) {
@@ -367,17 +399,16 @@ func validateDeployment(ctx context.Context, k8sClient client.Client, rolloutsMa
 		return depl.Status.ReadyReplicas == 1
 	}, "3m", "1s").Should(BeTrue())
 
-	By("Verify that Deployment has correct labels.")
+	By("Verify that Deployment has correct labels and annotations.")
 	validateLabels(&depl.ObjectMeta)
+	ExpectMetadataOnObjectMeta(&depl.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
 
 	By("Verify that Deployment has correct Selector.")
-	Expect(depl.Spec.Selector).To(Equal(&metav1.LabelSelector{
-		MatchLabels: map[string]string{
-			controllers.DefaultRolloutsSelectorKey: controllers.DefaultArgoRolloutsResourceName,
-		}}))
+	Expect(depl.Spec.Selector.MatchLabels).To(HaveKeyWithValue(controllers.DefaultRolloutsSelectorKey, controllers.DefaultArgoRolloutsResourceName))
 
 	By("Verify that Deployment Template has correct Template.")
-	Expect(depl.Spec.Template.Labels).To(Equal(map[string]string{controllers.DefaultRolloutsSelectorKey: controllers.DefaultArgoRolloutsResourceName}))
+	Expect(depl.Spec.Template.Labels).To(HaveKeyWithValue(controllers.DefaultRolloutsSelectorKey, controllers.DefaultArgoRolloutsResourceName))
+	ExpectMetadataOnObjectMeta(&depl.Spec.Template.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
 
 	By("Verify that Deployment Template has correct NodeSelector.")
 	Expect(depl.Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"kubernetes.io/os": "linux"}))
@@ -394,7 +425,6 @@ func validateDeployment(ctx context.Context, k8sClient client.Client, rolloutsMa
 
 func validateLabels(object *metav1.ObjectMeta) {
 	GinkgoHelper()
-	Expect(len(object.Labels)).To(Equal(3))
 	Expect(object.Labels["app.kubernetes.io/name"]).To(Equal(controllers.DefaultArgoRolloutsResourceName))
 	Expect(object.Labels["app.kubernetes.io/part-of"]).To(Equal(controllers.DefaultArgoRolloutsResourceName))
 	Expect(object.Labels["app.kubernetes.io/component"]).To(Equal(controllers.DefaultArgoRolloutsResourceName))
@@ -402,7 +432,6 @@ func validateLabels(object *metav1.ObjectMeta) {
 
 func validateAggregateLabels(object *metav1.ObjectMeta, aggregationType string) {
 	GinkgoHelper()
-	Expect(len(object.Labels)).To(Equal(4))
 	Expect(object.Labels["app.kubernetes.io/name"]).To(Equal(object.Name))
 	Expect(object.Labels["app.kubernetes.io/part-of"]).To(Equal(controllers.DefaultArgoRolloutsResourceName))
 	Expect(object.Labels["app.kubernetes.io/component"]).To(Equal("aggregate-cluster-role"))

@@ -52,7 +52,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 		})
 
 		It("Test for reconcileRolloutsClusterRole function", func() {
-			clusterRole, err := r.reconcileRolloutsClusterRole(ctx)
+			clusterRole, err := r.reconcileRolloutsClusterRole(ctx, a)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("Modify Rules of Role.")
@@ -60,7 +60,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 			Expect(r.Client.Update(ctx, clusterRole)).To(Succeed())
 
 			By("Reconciler should revert modifications.")
-			clusterRole, err = r.reconcileRolloutsClusterRole(ctx)
+			clusterRole, err = r.reconcileRolloutsClusterRole(ctx, a)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(clusterRole.Rules).To(Equal(GetPolicyRules()))
 		})
@@ -95,10 +95,10 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 		It("Test for reconcileRolloutsClusterRoleBinding function", func() {
 			sa, err := r.reconcileRolloutsServiceAccount(ctx, a)
 			Expect(err).ToNot(HaveOccurred())
-			clusterRole, err := r.reconcileRolloutsClusterRole(ctx)
+			clusterRole, err := r.reconcileRolloutsClusterRole(ctx, a)
 			Expect(err).ToNot(HaveOccurred())
 
-			Expect(r.reconcileRolloutsClusterRoleBinding(ctx, clusterRole, sa)).To(Succeed())
+			Expect(r.reconcileRolloutsClusterRoleBinding(ctx, clusterRole, sa, a)).To(Succeed())
 
 			By("Modify Subject of ClusterRoleBinding.")
 			crb := &rbacv1.ClusterRoleBinding{
@@ -113,13 +113,13 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 			Expect(r.Client.Update(ctx, crb)).To(Succeed())
 
 			By("Reconciler should revert modifications.")
-			Expect(r.reconcileRolloutsClusterRoleBinding(ctx, clusterRole, sa)).To(Succeed())
+			Expect(r.reconcileRolloutsClusterRoleBinding(ctx, clusterRole, sa, a)).To(Succeed())
 			Expect(fetchObject(ctx, r.Client, "", crb.Name, crb)).To(Succeed())
 			Expect(crb.Subjects).To(Equal(subTemp))
 		})
 
 		It("Test for reconcileRolloutsAggregateToAdminClusterRole function", func() {
-			Expect(r.reconcileRolloutsAggregateToAdminClusterRole(ctx)).To(Succeed())
+			Expect(r.reconcileRolloutsAggregateToAdminClusterRole(ctx, a)).To(Succeed())
 
 			By("Modify Rules of ClusterRole.")
 			clusterRole := &rbacv1.ClusterRole{
@@ -132,13 +132,13 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 			Expect(r.Client.Update(ctx, clusterRole)).To(Succeed())
 
 			By("Reconciler should revert modifications.")
-			Expect(r.reconcileRolloutsAggregateToAdminClusterRole(ctx)).To(Succeed())
+			Expect(r.reconcileRolloutsAggregateToAdminClusterRole(ctx, a)).To(Succeed())
 			Expect(fetchObject(ctx, r.Client, "", clusterRole.Name, clusterRole)).To(Succeed())
 			Expect(clusterRole.Rules).To(Equal(GetAggregateToAdminPolicyRules()))
 		})
 
 		It("Test for reconcileRolloutsAggregateToEditClusterRole function", func() {
-			Expect(r.reconcileRolloutsAggregateToEditClusterRole(ctx)).To(Succeed())
+			Expect(r.reconcileRolloutsAggregateToEditClusterRole(ctx, a)).To(Succeed())
 
 			By("Modify Rules of ClusterRole.")
 			clusterRole := &rbacv1.ClusterRole{
@@ -151,13 +151,13 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 			Expect(r.Client.Update(ctx, clusterRole)).To(Succeed())
 
 			By("Reconciler should revert modifications.")
-			Expect(r.reconcileRolloutsAggregateToEditClusterRole(ctx)).To(Succeed())
+			Expect(r.reconcileRolloutsAggregateToEditClusterRole(ctx, a)).To(Succeed())
 			Expect(fetchObject(ctx, r.Client, "", clusterRole.Name, clusterRole)).To(Succeed())
 			Expect(clusterRole.Rules).To(Equal(GetAggregateToEditPolicyRules()))
 		})
 
 		It("Test for reconcileRolloutsAggregateToViewClusterRole function", func() {
-			Expect(r.reconcileRolloutsAggregateToViewClusterRole(ctx)).To(Succeed())
+			Expect(r.reconcileRolloutsAggregateToViewClusterRole(ctx, a)).To(Succeed())
 
 			By("Modify Rules of ClusterRole.")
 			clusterRole := &rbacv1.ClusterRole{
@@ -170,7 +170,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 			Expect(r.Client.Update(ctx, clusterRole)).To(Succeed())
 
 			By("Reconciler should revert modifications.")
-			Expect(r.reconcileRolloutsAggregateToViewClusterRole(ctx)).To(Succeed())
+			Expect(r.reconcileRolloutsAggregateToViewClusterRole(ctx, a)).To(Succeed())
 			Expect(fetchObject(ctx, r.Client, "", clusterRole.Name, clusterRole)).To(Succeed())
 			Expect(clusterRole.Rules).To(Equal(GetAggregateToViewPolicyRules()))
 		})

@@ -26,20 +26,30 @@ func generateDesiredRolloutsDeployment(cr rolloutsmanagerv1alpha1.RolloutManager
 			Namespace: cr.Namespace,
 		},
 	}
+	setRolloutsLabelsAndAnnotationsToObject(&desiredDeployment.ObjectMeta, &cr)
 
-	setRolloutsLabels(&desiredDeployment.ObjectMeta)
+	// Add labels and annotations as well to the pod template
+	labels := map[string]string{
+		DefaultRolloutsSelectorKey: DefaultArgoRolloutsResourceName,
+	}
+	annotations := map[string]string{}
+	if cr.Spec.AdditionalMetadata != nil {
+		for k, v := range cr.Spec.AdditionalMetadata.Labels {
+			labels[k] = v
+		}
+		for k, v := range cr.Spec.AdditionalMetadata.Annotations {
+			annotations[k] = v
+		}
+	}
 
 	desiredDeployment.Spec = appsv1.DeploymentSpec{
 		Selector: &metav1.LabelSelector{
-			MatchLabels: map[string]string{
-				DefaultRolloutsSelectorKey: DefaultArgoRolloutsResourceName,
-			},
+			MatchLabels: labels,
 		},
 		Template: corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels: map[string]string{
-					DefaultRolloutsSelectorKey: DefaultArgoRolloutsResourceName,
-				},
+				Labels:      labels,
+				Annotations: annotations,
 			},
 			Spec: corev1.PodSpec{
 				NodeSelector: map[string]string{
@@ -123,6 +133,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(ctx context.Conte
 		actualDeployment.Spec.Template.Spec.ServiceAccountName = desiredDeployment.Spec.Template.Spec.ServiceAccountName
 		actualDeployment.Labels = desiredDeployment.Labels
 		actualDeployment.Spec.Template.Labels = desiredDeployment.Spec.Template.Labels
+		actualDeployment.Spec.Template.Annotations = desiredDeployment.Spec.Template.Annotations
 		actualDeployment.Spec.Selector = desiredDeployment.Spec.Selector
 		actualDeployment.Spec.Template.Spec.NodeSelector = desiredDeployment.Spec.Template.Spec.NodeSelector
 		actualDeployment.Spec.Template.Spec.Tolerations = desiredDeployment.Spec.Template.Spec.Tolerations
@@ -153,6 +164,10 @@ func identifyDeploymentDifference(x appsv1.Deployment, y appsv1.Deployment) stri
 
 	if !reflect.DeepEqual(x.Spec.Template.Labels, y.Spec.Template.Labels) {
 		return ".Spec.Template.Labels"
+	}
+
+	if !reflect.DeepEqual(x.Spec.Template.Annotations, y.Spec.Template.Annotations) {
+		return ".Spec.Template.Annotations"
 	}
 
 	if !reflect.DeepEqual(x.Spec.Selector, y.Spec.Selector) {
@@ -268,9 +283,10 @@ func normalizeDeployment(inputParam appsv1.Deployment) (appsv1.Deployment, error
 
 	res := appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      input.ObjectMeta.Name,
-			Namespace: input.ObjectMeta.Namespace,
-			Labels:    input.ObjectMeta.Labels,
+			Name:        input.ObjectMeta.Name,
+			Namespace:   input.ObjectMeta.Namespace,
+			Labels:      input.ObjectMeta.Labels,
+			Annotations: input.ObjectMeta.Annotations,
 		},
 	}
 
@@ -295,7 +311,8 @@ func normalizeDeployment(inputParam appsv1.Deployment) (appsv1.Deployment, error
 		},
 		Template: corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels: input.Spec.Template.Labels,
+				Labels:      input.Spec.Template.Labels,
+				Annotations: input.Spec.Template.Annotations,
 			},
 			Spec: corev1.PodSpec{
 				NodeSelector:       input.Spec.Template.Spec.NodeSelector,

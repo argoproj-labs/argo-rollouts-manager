@@ -305,5 +305,43 @@ var _ = Describe("Namespace-scoped RolloutManager tests", func() {
 				BeTrue(),
 			)
 		})
+
+		/*
+			In this test, we specify some additional labels and annotations to the Rollout Manager, and expect them to be set on all generated resources.
+		*/
+		It("Should create resources with additional metadata when provided", func() {
+			nsName := "test-rom-ns"
+
+			By("Create a namespace for RolloutManager.")
+			Expect(utils.CreateNamespace(ctx, k8sClient, nsName)).To(Succeed())
+
+			By("Create namespace-scoped RolloutManager with additionalMetadata in same namespace.")
+			metadata := &rmv1alpha1.ResourceMetadata{
+				Annotations: map[string]string{
+					"foo-annotation":  "bar-annotation",
+					"foo-annotation2": "bar-annotation2",
+				},
+				Labels: map[string]string{
+					"foo-label":  "bar-label",
+					"foo-label2": "bar-label2",
+				},
+			}
+			rolloutsManager, err := utils.CreateRolloutManagerWithMetadata(ctx, k8sClient, "test-rollouts-manager-1", nsName, true, metadata)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("Verify that RolloutManager is successfully created.")
+			Eventually(rolloutsManager, "2m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseAvailable))
+
+			By("Verify that Status.Condition is having success condition.")
+			Eventually(rolloutsManager, "2m", "1s").Should(rmFixture.HaveSuccessCondition())
+
+			By("Verify that expected resources are created.")
+			utils.ValidateArgoRolloutManagerResources(ctx, rolloutsManager, k8sClient, true)
+
+			By("Verify argo Rollouts controller is able to reconcile CR.")
+
+			By("Create and validate rollouts.")
+			utils.ValidateArgoRolloutsResources(ctx, k8sClient, nsName, 31000, 32000)
+		})
 	})
 })
