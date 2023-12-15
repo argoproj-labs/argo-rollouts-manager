@@ -30,8 +30,35 @@ type pluginItem struct {
 	Sha256   string `json:"sha256" yaml:"sha256"`
 }
 
-func setRolloutsLabels(obj *metav1.ObjectMeta) {
+func setRolloutsLabelsAndAnnotationsToObject(obj *metav1.ObjectMeta, cr *rolloutsmanagerv1alpha1.RolloutManager) {
+
+	setRolloutsLabelsAndAnnotations(obj)
+
+	setAdditionalRolloutsLabelsAndAnnotationsToObject(obj, cr)
+}
+
+func setAdditionalRolloutsLabelsAndAnnotationsToObject(obj *metav1.ObjectMeta, cr *rolloutsmanagerv1alpha1.RolloutManager) {
+
+	if cr.Spec.AdditionalMetadata != nil {
+		if obj.Labels == nil {
+			obj.Labels = map[string]string{}
+		}
+		if obj.Annotations == nil {
+			obj.Annotations = map[string]string{}
+		}
+		for k, v := range cr.Spec.AdditionalMetadata.Labels {
+			obj.Labels[k] = v
+		}
+		for k, v := range cr.Spec.AdditionalMetadata.Annotations {
+			obj.Annotations[k] = v
+		}
+	}
+
+}
+
+func setRolloutsLabelsAndAnnotations(obj *metav1.ObjectMeta) {
 	obj.Labels = map[string]string{}
+	obj.Annotations = map[string]string{}
 	obj.Labels["app.kubernetes.io/name"] = DefaultArgoRolloutsResourceName
 	obj.Labels["app.kubernetes.io/part-of"] = DefaultArgoRolloutsResourceName
 	obj.Labels["app.kubernetes.io/component"] = DefaultArgoRolloutsResourceName

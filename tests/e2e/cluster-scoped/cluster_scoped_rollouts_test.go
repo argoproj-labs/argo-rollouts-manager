@@ -50,7 +50,17 @@ var _ = Describe("Cluster-scoped RolloutManager tests", func() {
 			nsName := "test-ro-ns"
 
 			By("Create cluster-scoped RolloutManager in default namespace.")
-			rolloutsManager, err := utils.CreateRolloutManager(ctx, k8sClient, "test-rollouts-manager-1", fixture.TestE2ENamespace, false)
+			metadata := &rmv1alpha1.ResourceMetadata{
+				Annotations: map[string]string{
+					"foo-annotation":  "bar-annotation",
+					"foo-annotation2": "bar-annotation2",
+				},
+				Labels: map[string]string{
+					"foo-label":  "bar-label",
+					"foo-label2": "bar-label2",
+				},
+			}
+			rolloutsManager, err := utils.CreateRolloutManagerWithMetadata(ctx, k8sClient, "test-rollouts-manager-1", fixture.TestE2ENamespace, false, metadata)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("Verify that RolloutManager is successfully created.")

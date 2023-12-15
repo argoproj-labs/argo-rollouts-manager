@@ -30,6 +30,9 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr ro
 			},
 		},
 	}
+
+	setRolloutsLabelsAndAnnotationsToObject(&desiredConfigMap.ObjectMeta, &cr)
+
 	trafficRouterPlugins := []pluginItem{
 		{
 			Name:     OpenShiftRolloutPluginName,

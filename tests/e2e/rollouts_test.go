@@ -239,5 +239,67 @@ var _ = Describe("RolloutManager tests", func() {
 				}, "10s", "1s").Should(Equal(expectedVersion))
 			})
 		})
+
+		When("A RolloutManager specifies metadata", func() {
+
+			It("should create the controller with the correct labels and annotations", func() {
+
+				rolloutsManager := rolloutsmanagerv1alpha1.RolloutManager{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "basic-rollouts-manager-with-metadata",
+						Namespace: fixture.TestE2ENamespace,
+					},
+					Spec: rolloutsmanagerv1alpha1.RolloutManagerSpec{
+						AdditionalMetadata: &rolloutsmanagerv1alpha1.ResourceMetadata{
+							Annotations: map[string]string{
+								"foo-annotation":  "bar-annotation",
+								"foo-annotation2": "bar-annotation2",
+							},
+							Labels: map[string]string{
+								"foo-label":  "bar-label",
+								"foo-label2": "bar-label2",
+							},
+						},
+						NamespaceScoped: true,
+					},
+				}
+
+				Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
+
+				Eventually(rolloutsManager, "1m", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
+
+				deployment := appsv1.Deployment{
+					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rolloutManager.Namespace},
+				}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&deployment), &deployment)).To(Succeed())
+
+				ExpectMetadataOnObjectMeta(&deployment.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
+				ExpectMetadataOnObjectMeta(&deployment.Spec.Template.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
+
+				configMap := corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultRolloutsConfigMapName, Namespace: rolloutManager.Namespace},
+				}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&configMap), &configMap)).To(Succeed())
+				ExpectMetadataOnObjectMeta(&configMap.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
+
+				serviceAccount := corev1.ServiceAccount{
+					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rolloutManager.Namespace},
+				}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&serviceAccount), &serviceAccount)).To(Succeed())
+				ExpectMetadataOnObjectMeta(&serviceAccount.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
+
+				secret := corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultRolloutsNotificationSecretName, Namespace: rolloutManager.Namespace},
+				}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&secret), &secret)).To(Succeed())
+				ExpectMetadataOnObjectMeta(&secret.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
+
+				service := corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsMetricsServiceName, Namespace: rolloutManager.Namespace},
+				}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&service), &service)).To(Succeed())
+				ExpectMetadataOnObjectMeta(&service.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
+			})
+		})
 	})
 })

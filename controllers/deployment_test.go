@@ -223,7 +223,7 @@ func deploymentCR(name string, namespace string, label string, volumeName string
 			Namespace: namespace,
 		},
 	}
-	setRolloutsLabels(&deploymentCR.ObjectMeta)
+	setRolloutsLabelsAndAnnotationsToObject(&deploymentCR.ObjectMeta, &rolloutManager)
 	deploymentCR.Spec = appsv1.DeploymentSpec{
 		Selector: &metav1.LabelSelector{
 			MatchLabels: map[string]string{
