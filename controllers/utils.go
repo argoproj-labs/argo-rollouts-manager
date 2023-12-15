@@ -8,17 +8,28 @@ import (
 	"sort"
 	"strings"
 
+	rolloutsApi "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func setRolloutsLabels(obj *metav1.ObjectMeta) {
+func setRolloutsLabelsAndAnnotations(obj *metav1.ObjectMeta, cr *rolloutsApi.RolloutManager) {
 	obj.Labels = map[string]string{}
+	obj.Annotations = map[string]string{}
 	obj.Labels["app.kubernetes.io/name"] = DefaultArgoRolloutsResourceName
 	obj.Labels["app.kubernetes.io/part-of"] = DefaultArgoRolloutsResourceName
 	obj.Labels["app.kubernetes.io/component"] = DefaultArgoRolloutsResourceName
+
+	if cr.Spec.ControllerMetadata != nil {
+		for k, v := range cr.Spec.ControllerMetadata.Labels {
+			obj.Labels[k] = v
+		}
+		for k, v := range cr.Spec.ControllerMetadata.Annotations {
+			obj.Annotations[k] = v
+		}
+	}
 }
 
 // fetchObject will retrieve the object with the given namespace and name using the Kubernetes API.

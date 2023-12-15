@@ -1,0 +1,15 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: RolloutManager
+metadata:
+  name: rollout-manager
+  labels:
+    example: withLabelsAndAnnotations
+spec:
+  controllerMetadata:
+    labels:
+      exampleLabel: example-label
+      secondExampleLabel: second-example-label
+    annotations:
+      exampleAnnotation: example-annotation
+      secondExampleAnnotation: second-example-annotation

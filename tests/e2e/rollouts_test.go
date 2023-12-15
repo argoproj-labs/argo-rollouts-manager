@@ -297,6 +297,42 @@ var _ = Describe("RolloutManager tests", func() {
 					return deployment.Spec.Template.Spec.Containers[0].Image
 				}, "10s", "1s").Should(Equal(expectedVersion))
 			})
+
+			It("should create the controller with the correct labels and annotations", func() {
+
+				rolloutsManager := rolloutsmanagerv1alpha1.RolloutManager{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "basic-rollouts-manager-with-metadata",
+						Namespace: fixture.TestE2ENamespace,
+					},
+					Spec: rolloutsmanagerv1alpha1.RolloutManagerSpec{
+						ControllerMetadata: &rolloutsmanagerv1alpha1.ResourceMetadata{
+							Annotations: map[string]string{
+								"foo-annotation":  "bar-annotation",
+								"foo-annotation2": "bar-annotation2",
+							},
+							Labels: map[string]string{
+								"foo-label":  "bar-label",
+								"foo-label2": "bar-label2",
+							},
+						},
+					},
+				}
+
+				Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
+
+				Eventually(rolloutsManager, "60s", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
+
+				deployment := appsv1.Deployment{
+					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: fixture.TestE2ENamespace},
+				}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&deployment), &deployment)).To(Succeed())
+
+				Expect(deployment.Spec.Template.ObjectMeta.Labels).To(HaveKeyWithValue("foo-label", "bar-label"))
+				Expect(deployment.Spec.Template.ObjectMeta.Labels).To(HaveKeyWithValue("foo-label2", "bar-label2"))
+				Expect(deployment.Spec.Template.ObjectMeta.Annotations).To(HaveKeyWithValue("foo-annotation", "bar-annotation"))
+				Expect(deployment.Spec.Template.ObjectMeta.Annotations).To(HaveKeyWithValue("foo-annotation2", "bar-annotation2"))
+			})
 		})
 	})
 })
