@@ -43,11 +43,10 @@ func (r *RolloutManagerReconciler) reconcileRolloutsController(cr *rolloutsApi.R
 		return err
 	}
 
-	if !cr.Spec.DisableRoutePlugin {
-		log.Info("reconciling configMap for openshift route plugin")
-		if err := r.reconcileConfigMap(cr); err != nil {
-			return err
-		}
+	// reconcile configMap for plugins
+	log.Info("reconciling configMap for plugins")
+	if err := r.reconcileConfigMap(cr); err != nil {
+		return err
 	}
 
 	log.Info("reconciling rollouts deployment")

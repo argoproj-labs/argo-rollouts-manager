@@ -43,9 +43,6 @@ type RolloutManagerSpec struct {
 
 	// Version defines Argo Rollouts controller tag (optional)
 	Version string `json:"version,omitempty"`
-
-	// DisableRoutePlugin defines if the Openshift Route Plugin should not be installed on Rollouts Controller
-	DisableRoutePlugin bool `json:"disableRoutePlugin,omitempty"`
 }
 
 // ArgoRolloutsNodePlacementSpec is used to specify NodeSelector and Tolerations for Rollouts workloads

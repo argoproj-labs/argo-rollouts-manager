@@ -26,8 +26,8 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(cr *rolloutsApi.RolloutMan
 	}
 	trafficRouterPlugins := []types.PluginItem{
 		{
-			Name:     OpenshiftRolloutPluginName,
-			Location: "file://" + OpenshiftRolloutPluginPath,
+			Name:     OpenShiftRolloutPluginName,
+			Location: "file://" + OpenShiftRolloutPluginPath,
 		},
 	}
 	pluginString, err := yaml.Marshal(trafficRouterPlugins)
@@ -53,7 +53,7 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(cr *rolloutsApi.RolloutMan
 	}
 
 	for _, plugin := range actualTrafficRouterPlugins {
-		if plugin.Name == OpenshiftRolloutPluginName {
+		if plugin.Name == OpenShiftRolloutPluginName {
 			// Openshift Route Plugin already present, nothing to do
 			return nil
 		}
