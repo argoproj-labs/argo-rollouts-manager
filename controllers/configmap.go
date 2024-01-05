@@ -34,6 +34,7 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(cr *rolloutsApi.RolloutMan
 	if err != nil {
 		return fmt.Errorf("error marshalling trafficRouterPlugin to string %s", err)
 	}
+	desiredConfigMap.Data = make(map[string]string, 0)
 	desiredConfigMap.Data["trafficRouterPlugins"] = string(pluginString)
 
 	actualConfigMap := &corev1.ConfigMap{}
