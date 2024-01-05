@@ -87,7 +87,8 @@ func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(cr *rolloutsApi.R
 		!reflect.DeepEqual(actualDeployment.Spec.Selector, desiredDeployment.Spec.Selector) ||
 		!reflect.DeepEqual(actualDeployment.Spec.Template.Spec.NodeSelector, desiredDeployment.Spec.Template.Spec.NodeSelector) ||
 		!reflect.DeepEqual(actualDeployment.Spec.Template.Spec.Tolerations, desiredDeployment.Spec.Template.Spec.Tolerations) ||
-		!reflect.DeepEqual(actualPodSpec.SecurityContext, desiredPodSpec.SecurityContext)
+		!reflect.DeepEqual(actualPodSpec.SecurityContext, desiredPodSpec.SecurityContext) ||
+		!reflect.DeepEqual(actualDeployment.Spec.Template.Spec.Volumes, desiredDeployment.Spec.Template.Spec.Volumes)
 
 	if deploymentsDifferent {
 		actualDeployment.Spec.Template.Spec.Containers = desiredPodSpec.Containers
@@ -98,6 +99,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(cr *rolloutsApi.R
 		actualDeployment.Spec.Template.Spec.NodeSelector = desiredDeployment.Spec.Template.Spec.NodeSelector
 		actualDeployment.Spec.Template.Spec.Tolerations = desiredDeployment.Spec.Template.Spec.Tolerations
 		actualDeployment.Spec.Template.Spec.SecurityContext = desiredPodSpec.SecurityContext
+		actualDeployment.Spec.Template.Spec.Volumes = desiredDeployment.Spec.Template.Spec.Volumes
 		return r.Client.Update(context.TODO(), actualDeployment)
 	}
 	return nil
@@ -160,10 +162,11 @@ func rolloutsContainer(cr *rolloutsApi.RolloutManager) corev1.Container {
 				},
 			},
 			AllowPrivilegeEscalation: boolPtr(false),
-			ReadOnlyRootFilesystem:   boolPtr(true),
+			ReadOnlyRootFilesystem:   boolPtr(false),
 			RunAsNonRoot:             boolPtr(true),
 		},
 	}
+
 }
 
 // boolPtr returns a pointer to val

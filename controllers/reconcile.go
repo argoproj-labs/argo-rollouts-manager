@@ -43,6 +43,12 @@ func (r *RolloutManagerReconciler) reconcileRolloutsController(cr *rolloutsApi.R
 		return err
 	}
 
+	// reconcile configMap for plugins
+	log.Info("reconciling configMap for plugins")
+	if err := r.reconcileConfigMap(cr); err != nil {
+		return err
+	}
+
 	log.Info("reconciling rollouts deployment")
 	if err := r.reconcileRolloutsDeployment(cr, sa); err != nil {
 		return err
