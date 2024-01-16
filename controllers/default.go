@@ -14,7 +14,7 @@ const (
 	// deployment, service, role, rolebinding and serviceaccount.
 	DefaultArgoRolloutsResourceName = "argo-rollouts"
 	// DefaultRolloutsNotificationSecretName is the default name for rollout controller secret resource.
-	DefaultRolloutsNotificationSecretName = "argo-rollouts-notification-secret"
+	DefaultRolloutsNotificationSecretName = "argo-rollouts-notification-secret" // #nosec G101
 	// DefaultRolloutsServiceSelectorKey is key used by selector
 	DefaultRolloutsSelectorKey = "app.kubernetes.io/name"
 

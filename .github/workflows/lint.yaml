@@ -1,20 +1,21 @@
-name: Integration tests
+name: Lint code
 on:
   pull_request:
     branches:
-      - 'master'
-      - 'release-*'
+      - '*'     
 
 jobs:
   lint_code:
-    name: Run golangci-lint on PR
+    name: Run golangci-lint and gosec on PR
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-      - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v3
-        with:
-          version: v1.52.2
-          args: --timeout 5m --exclude SA5011
-          only-new-issues: true
+      - name: "run gosec"
+        run: |
+          cd $GITHUB_WORKSPACE
+          make gosec
+      - name: "run golangci-lint"
+        run: |
+          cd $GITHUB_WORKSPACE
+          make lint

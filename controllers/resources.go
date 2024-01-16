@@ -124,7 +124,10 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRoleBinding(cr *rolloutsApi.
 	// Reconcile if the role already exists and modified.
 	if !reflect.DeepEqual(expectedRoleBinding.Subjects, actualRoleBinding.Subjects) {
 		actualRoleBinding.Subjects = expectedRoleBinding.Subjects
-		r.Client.Update(context.TODO(), actualRoleBinding)
+
+		if err := r.Client.Update(context.TODO(), actualRoleBinding); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -311,6 +314,10 @@ func (r *RolloutManagerReconciler) reconcileRolloutsSecrets(cr *rolloutsApi.Roll
 }
 
 // Deletes rollout resources when the corresponding rollout CR is deleted.
+//
+// TODO: Remove the nolint:all once this function is called
+//
+//nolint:unused
 func (r *RolloutManagerReconciler) deleteRolloutResources(cr *rolloutsApi.RolloutManager) error {
 	if cr.DeletionTimestamp != nil {
 		log.Info(fmt.Sprintf("Argo Rollout resource in %s namespace is deleted, Deleting the Argo Rollout workloads",
