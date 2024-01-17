@@ -10,7 +10,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	v1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -40,7 +39,7 @@ func fetchObject(client client.Client, namespace string, name string, obj client
 
 // getPolicyRules returns the policy rules for Argo Rollouts Role.
 func getPolicyRules() []rbacv1.PolicyRule {
-	return []v1.PolicyRule{
+	return []rbacv1.PolicyRule{
 		{
 			APIGroups: []string{
 				"argoproj.io",
@@ -355,8 +354,8 @@ func getPolicyRules() []rbacv1.PolicyRule {
 }
 
 // Returns PolicyRules for the Cluster Role argo-rollouts-aggregate-to-admin
-func getAggregateToAdminPolicyRules() []v1.PolicyRule {
-	return []v1.PolicyRule{
+func getAggregateToAdminPolicyRules() []rbacv1.PolicyRule {
+	return []rbacv1.PolicyRule{
 		{
 			APIGroups: []string{
 				"argoproj.io",
@@ -385,8 +384,8 @@ func getAggregateToAdminPolicyRules() []v1.PolicyRule {
 }
 
 // Returns PolicyRules for the Cluster Role argo-rollouts-aggregate-to-edit
-func getAggregateToEditPolicyRules() []v1.PolicyRule {
-	return []v1.PolicyRule{
+func getAggregateToEditPolicyRules() []rbacv1.PolicyRule {
+	return []rbacv1.PolicyRule{
 		{
 			APIGroups: []string{
 				"argoproj.io",
@@ -415,8 +414,8 @@ func getAggregateToEditPolicyRules() []v1.PolicyRule {
 }
 
 // Returns PolicyRules for the Cluster Role argo-rollouts-aggregate-to-view
-func getAggregateToViewPolicyRules() []v1.PolicyRule {
-	return []v1.PolicyRule{
+func getAggregateToViewPolicyRules() []rbacv1.PolicyRule {
+	return []rbacv1.PolicyRule{
 		{
 			APIGroups: []string{
 				"argoproj.io",

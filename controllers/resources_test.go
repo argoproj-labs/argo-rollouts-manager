@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	v1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -43,7 +42,7 @@ func TestReconcileRolloutManager_verifyRolloutsResources(t *testing.T) {
 		t.Fatalf("failed to find the rollouts serviceaccount: %#v\n", err)
 	}
 
-	role := &v1.Role{}
+	role := &rbacv1.Role{}
 	if err = r.Client.Get(context.TODO(), types.NamespacedName{
 		Name:      DefaultArgoRolloutsResourceName,
 		Namespace: testNamespace,
@@ -51,7 +50,7 @@ func TestReconcileRolloutManager_verifyRolloutsResources(t *testing.T) {
 		t.Fatalf("failed to find the rollouts role: %#v\n", err)
 	}
 
-	rolebinding := &v1.RoleBinding{}
+	rolebinding := &rbacv1.RoleBinding{}
 	if err = r.Client.Get(context.TODO(), types.NamespacedName{
 		Name:      DefaultArgoRolloutsResourceName,
 		Namespace: testNamespace,
@@ -59,21 +58,21 @@ func TestReconcileRolloutManager_verifyRolloutsResources(t *testing.T) {
 		t.Fatalf("failed to find the rollouts rolebinding: %#v\n", err)
 	}
 
-	aggregateToAdminClusterRole := &v1.ClusterRole{}
+	aggregateToAdminClusterRole := &rbacv1.ClusterRole{}
 	if err = r.Client.Get(context.TODO(), types.NamespacedName{
 		Name: "argo-rollouts-aggregate-to-admin",
 	}, aggregateToAdminClusterRole); err != nil {
 		t.Fatalf("failed to find the aggregateToAdmin ClusterRole: %#v\n", err)
 	}
 
-	aggregateToEditClusterRole := &v1.ClusterRole{}
+	aggregateToEditClusterRole := &rbacv1.ClusterRole{}
 	if err = r.Client.Get(context.TODO(), types.NamespacedName{
 		Name: "argo-rollouts-aggregate-to-edit",
 	}, aggregateToEditClusterRole); err != nil {
 		t.Fatalf("failed to find the aggregateToEdit ClusterRole: %#v\n", err)
 	}
 
-	aggregateToViewClusterRole := &v1.ClusterRole{}
+	aggregateToViewClusterRole := &rbacv1.ClusterRole{}
 	if err = r.Client.Get(context.TODO(), types.NamespacedName{
 		Name: "argo-rollouts-aggregate-to-view",
 	}, aggregateToViewClusterRole); err != nil {
@@ -145,7 +144,8 @@ func TestReconcileRolloutManager_CleanUp(t *testing.T) {
 		t.Fatal("reconcile requeued request")
 	}
 
-	r.Client.Delete(context.TODO(), a)
+	err = r.Client.Delete(context.TODO(), a)
+	assert.NoError(t, err)
 
 	// check if rollouts resources are deleted
 	tt := []struct {
@@ -172,7 +172,7 @@ func TestReconcileRolloutManager_CleanUp(t *testing.T) {
 		},
 		{
 			fmt.Sprintf("RoleBinding %s", DefaultArgoRolloutsResourceName),
-			&v1.RoleBinding{
+			&rbacv1.RoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      DefaultArgoRolloutsResourceName,
 					Namespace: a.Namespace,
