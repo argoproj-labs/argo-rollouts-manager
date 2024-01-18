@@ -38,7 +38,7 @@ func fetchObject(client client.Client, namespace string, name string, obj client
 }
 
 // getPolicyRules returns the policy rules for Argo Rollouts Role.
-func getPolicyRules() []rbacv1.PolicyRule {
+func GetPolicyRules() []rbacv1.PolicyRule {
 	return []rbacv1.PolicyRule{
 		{
 			APIGroups: []string{

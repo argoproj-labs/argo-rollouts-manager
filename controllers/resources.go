@@ -8,8 +8,8 @@ import (
 	rolloutsApi "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -27,7 +27,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsServiceAccount(cr *rolloutsA
 	setRolloutsLabels(&sa.ObjectMeta)
 
 	if err := fetchObject(r.Client, cr.Namespace, sa.Name, sa); err != nil {
-		if !errors.IsNotFound(err) {
+		if !apierrors.IsNotFound(err) {
 			return nil, fmt.Errorf("failed to get the serviceAccount associated with %s : %s", sa.Name, err)
 		}
 
@@ -46,11 +46,11 @@ func (r *RolloutManagerReconciler) reconcileRolloutsServiceAccount(cr *rolloutsA
 }
 
 // Reconciles rollouts role.
-func (r *RolloutManagerReconciler) reconcileRolloutsRole(cr *rolloutsApi.RolloutManager) (*v1.Role, error) {
+func (r *RolloutManagerReconciler) reconcileRolloutsRole(cr *rolloutsApi.RolloutManager) (*rbacv1.Role, error) {
 
-	expectedPolicyRules := getPolicyRules()
+	expectedPolicyRules := GetPolicyRules()
 
-	role := &v1.Role{
+	role := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultArgoRolloutsResourceName,
 			Namespace: cr.Namespace,
@@ -59,7 +59,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRole(cr *rolloutsApi.Rollout
 	setRolloutsLabels(&role.ObjectMeta)
 
 	if err := fetchObject(r.Client, cr.Namespace, role.Name, role); err != nil {
-		if !errors.IsNotFound(err) {
+		if !apierrors.IsNotFound(err) {
 			return nil, fmt.Errorf("failed to reconcile the role for the service account associated with %s : %s", role.Name, err)
 		}
 
@@ -82,8 +82,8 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRole(cr *rolloutsApi.Rollout
 }
 
 // Reconcile rollouts rolebinding.
-func (r *RolloutManagerReconciler) reconcileRolloutsRoleBinding(cr *rolloutsApi.RolloutManager, role *v1.Role, sa *corev1.ServiceAccount) error {
-	expectedRoleBinding := &v1.RoleBinding{
+func (r *RolloutManagerReconciler) reconcileRolloutsRoleBinding(cr *rolloutsApi.RolloutManager, role *rbacv1.Role, sa *corev1.ServiceAccount) error {
+	expectedRoleBinding := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultArgoRolloutsResourceName,
 			Namespace: cr.Namespace,
@@ -91,25 +91,25 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRoleBinding(cr *rolloutsApi.
 	}
 	setRolloutsLabels(&expectedRoleBinding.ObjectMeta)
 
-	expectedRoleBinding.RoleRef = v1.RoleRef{
-		APIGroup: v1.GroupName,
+	expectedRoleBinding.RoleRef = rbacv1.RoleRef{
+		APIGroup: rbacv1.GroupName,
 		Kind:     "Role",
 		Name:     role.Name,
 	}
 
-	expectedRoleBinding.Subjects = []v1.Subject{
+	expectedRoleBinding.Subjects = []rbacv1.Subject{
 		{
-			Kind:      v1.ServiceAccountKind,
+			Kind:      rbacv1.ServiceAccountKind,
 			Name:      sa.Name,
 			Namespace: sa.Namespace,
 		},
 	}
 
-	actualRoleBinding := &v1.RoleBinding{}
+	actualRoleBinding := &rbacv1.RoleBinding{}
 
 	// Fetch the rolebinding if exists and store that in actualRoleBinding.
 	if err := fetchObject(r.Client, cr.Namespace, expectedRoleBinding.Name, actualRoleBinding); err != nil {
-		if !errors.IsNotFound(err) {
+		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to get the rolebinding associated with %s : %s", expectedRoleBinding.Name, err)
 		}
 
@@ -141,7 +141,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToAdminClusterRole(
 
 	expectedPolicyRules := getAggregateToAdminPolicyRules()
 
-	clusterRole := &v1.ClusterRole{
+	clusterRole := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
@@ -149,7 +149,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToAdminClusterRole(
 	setRolloutsAggregatedClusterRoleLabels(&clusterRole.ObjectMeta, name)
 
 	if err := fetchObject(r.Client, cr.Namespace, clusterRole.Name, clusterRole); err != nil {
-		if !errors.IsNotFound(err) {
+		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to reconcile the aggregated ClusterRole %s : %s", clusterRole.Name, err)
 		}
 
@@ -175,7 +175,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToEditClusterRole(c
 
 	expectedPolicyRules := getAggregateToEditPolicyRules()
 
-	clusterRole := &v1.ClusterRole{
+	clusterRole := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
@@ -183,7 +183,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToEditClusterRole(c
 	setRolloutsAggregatedClusterRoleLabels(&clusterRole.ObjectMeta, name)
 
 	if err := fetchObject(r.Client, cr.Namespace, clusterRole.Name, clusterRole); err != nil {
-		if !errors.IsNotFound(err) {
+		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to reconcile the aggregated ClusterRole %s : %s", clusterRole.Name, err)
 		}
 
@@ -209,7 +209,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToViewClusterRole(c
 
 	expectedPolicyRules := getAggregateToViewPolicyRules()
 
-	clusterRole := &v1.ClusterRole{
+	clusterRole := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
@@ -217,7 +217,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToViewClusterRole(c
 	setRolloutsAggregatedClusterRoleLabels(&clusterRole.ObjectMeta, name)
 
 	if err := fetchObject(r.Client, cr.Namespace, clusterRole.Name, clusterRole); err != nil {
-		if !errors.IsNotFound(err) {
+		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to reconcile the aggregated ClusterRole %s : %s", clusterRole.Name, err)
 		}
 
@@ -266,7 +266,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(cr *rolloutsA
 
 	// Fetch the service if exists and store that in actualSvc.
 	if err := fetchObject(r.Client, cr.Namespace, expectedSvc.Name, actualSvc); err != nil {
-		if !errors.IsNotFound(err) {
+		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to get the service %s : %s", expectedSvc.Name, err)
 		}
 
@@ -297,7 +297,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsSecrets(cr *rolloutsApi.Roll
 	}
 
 	if err := fetchObject(r.Client, cr.Namespace, secret.Name, secret); err != nil {
-		if !errors.IsNotFound(err) {
+		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to get the secret %s : %s", secret.Name, err)
 		}
 
@@ -319,6 +319,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsSecrets(cr *rolloutsApi.Roll
 //
 //nolint:unused
 func (r *RolloutManagerReconciler) deleteRolloutResources(cr *rolloutsApi.RolloutManager) error {
+
 	if cr.DeletionTimestamp != nil {
 		log.Info(fmt.Sprintf("Argo Rollout resource in %s namespace is deleted, Deleting the Argo Rollout workloads",
 			cr.Namespace))
@@ -335,7 +336,7 @@ func (r *RolloutManagerReconciler) deleteRolloutResources(cr *rolloutsApi.Rollou
 				DefaultArgoRolloutsResourceName, cr.Namespace))
 		}
 
-		role := &v1.Role{
+		role := &rbacv1.Role{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      DefaultArgoRolloutsResourceName,
 				Namespace: cr.Namespace,
@@ -346,7 +347,7 @@ func (r *RolloutManagerReconciler) deleteRolloutResources(cr *rolloutsApi.Rollou
 				DefaultArgoRolloutsResourceName, cr.Namespace))
 		}
 
-		rolebinding := &v1.RoleBinding{
+		rolebinding := &rbacv1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      DefaultArgoRolloutsResourceName,
 				Namespace: cr.Namespace,

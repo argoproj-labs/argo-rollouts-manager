@@ -433,7 +433,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/aveerama/argo-rollouts-manager:v0.0.1
+                image: quay.io/argoproj-labs/argo-rollouts-manager:v0.0.1
                 livenessProbe:
                   httpGet:
                     path: /healthz

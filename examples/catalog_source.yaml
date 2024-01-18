@@ -5,6 +5,6 @@ metadata:
   namespace: openshift-marketplace # for kubernetes choose - `operators` namespace
 spec:
   sourceType: grpc
-  image: quay.io/aveerama/argo-rollouts-manager-catalog@sha256:00d94e2b82490a98a06025c48b2f4781f85eaf626a4a0f6d8b6da1a9b8a4ff19 # replace with your catalog image
+  image: quay.io/argoproj-labs/argo-rollouts-manager-catalog@sha256:00d94e2b82490a98a06025c48b2f4781f85eaf626a4a0f6d8b6da1a9b8a4ff19 # replace with your catalog image
   displayName: Argo Rollouts Manager
-  publisher: Abhishek Veeramalla
+  publisher: Argo Rollouts

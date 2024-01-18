@@ -3,13 +3,13 @@ package rollouts
 import (
 	"context"
 
-	rolloutsApi "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
+	rolloutsmanagerv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 // reconcileStatus will ensure that all of the Status properties are updated for the given RolloutManager.
-func (r *RolloutManagerReconciler) reconcileStatus(cr *rolloutsApi.RolloutManager) error {
+func (r *RolloutManagerReconciler) reconcileStatus(cr *rolloutsmanagerv1alpha1.RolloutManager) error {
 
 	if err := r.reconcileRolloutControllerStatus(cr); err != nil {
 		return err
@@ -22,21 +22,21 @@ func (r *RolloutManagerReconciler) reconcileStatus(cr *rolloutsApi.RolloutManage
 	return nil
 }
 
-func (r *RolloutManagerReconciler) reconcileRolloutControllerStatus(cr *rolloutsApi.RolloutManager) error {
-	status := "Unknown"
+func (r *RolloutManagerReconciler) reconcileRolloutControllerStatus(cr *rolloutsmanagerv1alpha1.RolloutManager) error {
+	status := rolloutsmanagerv1alpha1.PhaseUnknown
 
 	deploy := &appsv1.Deployment{}
 	if err := fetchObject(r.Client, cr.Namespace, DefaultArgoRolloutsResourceName, deploy); err != nil {
-		if errors.IsNotFound(err) {
-			status = "Failure"
+		if apierrors.IsNotFound(err) {
+			status = rolloutsmanagerv1alpha1.PhaseFailure
 		}
 		log.Error(err, "error getting deployment")
 	}
 
 	if deploy.Spec.Replicas != nil {
-		status = "Pending"
+		status = rolloutsmanagerv1alpha1.PhasePending
 		if deploy.Status.ReadyReplicas == *deploy.Spec.Replicas {
-			status = "Available"
+			status = rolloutsmanagerv1alpha1.PhaseAvailable
 		}
 	}
 
@@ -51,7 +51,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutControllerStatus(cr *rollouts
 }
 
 // Reconciles the status phase of the RolloutManager
-func (r *RolloutManagerReconciler) reconcileStatusPhase(cr *rolloutsApi.RolloutManager) error {
+func (r *RolloutManagerReconciler) reconcileStatusPhase(cr *rolloutsmanagerv1alpha1.RolloutManager) error {
 
 	// For now, there is only one controller that is created by RolloutManager CR
 	// So the status of Argo ROllout will be same as the status of the Rollout Controller

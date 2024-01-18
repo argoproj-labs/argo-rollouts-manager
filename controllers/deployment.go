@@ -204,6 +204,8 @@ func getRolloutsCommandArgs(cr *rolloutsApi.RolloutManager) []string {
 
 	args = append(args, "--namespaced")
 
+	args = append(args, "--instance-id", "argo-rollouts-e2e")
+
 	extraArgs := cr.Spec.ExtraCommandArgs
 	err := isMergable(extraArgs, args)
 	if err != nil {
