@@ -63,9 +63,7 @@ func EnsureDestinationNamespaceExists(ctx context.Context, namespaceParam string
 func DeleteNamespace(ctx context.Context, namespaceParam string, k8sClient client.Client) error {
 
 	// Delete the namespace:
-	// - First, we do a bunch of clean up in the namespace (and in the Argo CD namespace), to ensure the namespace
-	//   can be successfully clean.ed
-	// - Next, we issue a request to Delete the namespace
+	// - Issue a request to Delete the namespace
 	// - Finally, we check if it has been deleted.
 	if err := wait.PollImmediate(time.Second*5, time.Minute*6, func() (done bool, err error) {
 
@@ -113,9 +111,7 @@ func GetE2ETestKubeClient() (client.Client, error) {
 	return k8sClient, nil
 }
 
-// GetKubeClient returns a controller-runtime Client for accessing K8s API resources.
-// The client returned by this function will, by default, already be aware of all
-// the necessary schemes for interacting with Argo CD/GitOps Service.
+// GetKubeClient returns a controller-runtime Client for accessing K8s API resources used by the controller.
 func GetKubeClient(config *rest.Config) (client.Client, error) {
 
 	scheme := runtime.NewScheme()
@@ -134,10 +130,6 @@ func GetKubeClient(config *rest.Config) (client.Client, error) {
 	if err := rbacv1.AddToScheme(scheme); err != nil {
 		return nil, err
 	}
-	// err = routev1.AddToScheme(scheme)
-	// if err != nil {
-	// 	return nil, err
-	// }
 
 	if err := admissionv1.AddToScheme(scheme); err != nil {
 		return nil, err
@@ -152,7 +144,7 @@ func GetKubeClient(config *rest.Config) (client.Client, error) {
 
 }
 
-// Retrieve the system-level Kubernetes config (e.g. ~/.kube/config)
+// Retrieve the system-level Kubernetes config (e.g. ~/.kube/config or service account config from volume)
 func GetSystemKubeConfig() (*rest.Config, error) {
 
 	overrides := clientcmd.ConfigOverrides{}
