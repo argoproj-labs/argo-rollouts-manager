@@ -18,7 +18,7 @@ jobs:
         k3s-version: [ v1.28.2 ]
         # k3s-version: [ v1.28.2, v1.27.6, v1.26.9 ]
     steps:
-      - name: Install K3D
+      - name: Install K3S
         run: |
           set -x
           curl -sfL https://get.k3s.io | sh -
@@ -28,7 +28,6 @@ jobs:
           sudo chown runner $HOME/.kube/config
           sudo chmod go-r $HOME/.kube/config
           kubectl version
-          k3d version
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Setup Golang
