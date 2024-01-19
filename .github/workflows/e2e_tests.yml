@@ -51,4 +51,4 @@ jobs:
       - name: Run tests
         run: |
           set -o pipefail
-          bash make test-e2e 2>&1 | tee /tmp/e2e-test.log
+          make test-e2e 2>&1 | tee /tmp/e2e-test.log
