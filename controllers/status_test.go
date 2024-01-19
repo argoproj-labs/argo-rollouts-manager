@@ -11,12 +11,15 @@ import (
 )
 
 func TestRolloutManager_Status(t *testing.T) {
+
+	ctx := context.Background()
+
 	a := makeTestRolloutManager()
 
 	r := makeTestReconciler(t, a)
 	assert.NoError(t, createNamespace(r, a.Namespace))
 
-	err := r.reconcileStatus(a)
+	err := r.reconcileStatus(ctx, a)
 	assert.NoError(t, err)
 
 	// When deployment for rollout controller does not exist
@@ -30,9 +33,9 @@ func TestRolloutManager_Status(t *testing.T) {
 			Namespace: a.Namespace,
 		},
 	}
-	assert.NoError(t, r.Client.Create(context.TODO(), deploy))
+	assert.NoError(t, r.Client.Create(ctx, deploy))
 
-	assert.NoError(t, r.reconcileStatus(a))
+	assert.NoError(t, r.reconcileStatus(ctx, a))
 	assert.Equal(t, a.Status.RolloutController, rolloutsmanagerv1alpha1.PhaseUnknown)
 	assert.Equal(t, a.Status.Phase, rolloutsmanagerv1alpha1.PhaseUnknown)
 
@@ -41,9 +44,9 @@ func TestRolloutManager_Status(t *testing.T) {
 	deploy.Status.ReadyReplicas = 0
 	deploy.Spec.Replicas = &requiredReplicas
 
-	assert.NoError(t, r.Client.Update(context.TODO(), deploy))
+	assert.NoError(t, r.Client.Update(ctx, deploy))
 
-	assert.NoError(t, r.reconcileStatus(a))
+	assert.NoError(t, r.reconcileStatus(ctx, a))
 	assert.Equal(t, a.Status.RolloutController, rolloutsmanagerv1alpha1.PhasePending)
 	assert.Equal(t, a.Status.Phase, rolloutsmanagerv1alpha1.PhasePending)
 
@@ -51,9 +54,9 @@ func TestRolloutManager_Status(t *testing.T) {
 	deploy.Status.ReadyReplicas = 1
 	deploy.Spec.Replicas = &requiredReplicas
 
-	assert.NoError(t, r.Client.Update(context.TODO(), deploy))
+	assert.NoError(t, r.Client.Update(ctx, deploy))
 
-	assert.NoError(t, r.reconcileStatus(a))
+	assert.NoError(t, r.reconcileStatus(ctx, a))
 	assert.Equal(t, a.Status.RolloutController, rolloutsmanagerv1alpha1.PhaseAvailable)
 	assert.Equal(t, a.Status.Phase, rolloutsmanagerv1alpha1.PhaseAvailable)
 }

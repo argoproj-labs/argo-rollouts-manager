@@ -16,6 +16,8 @@ import (
 )
 
 func TestReconcileRolloutManager_verifyRolloutsResources(t *testing.T) {
+
+	ctx := context.Background()
 	a := makeTestRolloutManager()
 
 	r := makeTestReconciler(t, a)
@@ -28,14 +30,14 @@ func TestReconcileRolloutManager_verifyRolloutsResources(t *testing.T) {
 		},
 	}
 
-	res, err := r.Reconcile(context.TODO(), req)
+	res, err := r.Reconcile(ctx, req)
 	assert.NoError(t, err)
 	if res.Requeue {
 		t.Fatal("reconcile requeued request")
 	}
 
 	sa := &corev1.ServiceAccount{}
-	if err = r.Client.Get(context.TODO(), types.NamespacedName{
+	if err = r.Client.Get(ctx, types.NamespacedName{
 		Name:      DefaultArgoRolloutsResourceName,
 		Namespace: testNamespace,
 	}, sa); err != nil {
@@ -43,7 +45,7 @@ func TestReconcileRolloutManager_verifyRolloutsResources(t *testing.T) {
 	}
 
 	role := &rbacv1.Role{}
-	if err = r.Client.Get(context.TODO(), types.NamespacedName{
+	if err = r.Client.Get(ctx, types.NamespacedName{
 		Name:      DefaultArgoRolloutsResourceName,
 		Namespace: testNamespace,
 	}, role); err != nil {
@@ -51,7 +53,7 @@ func TestReconcileRolloutManager_verifyRolloutsResources(t *testing.T) {
 	}
 
 	rolebinding := &rbacv1.RoleBinding{}
-	if err = r.Client.Get(context.TODO(), types.NamespacedName{
+	if err = r.Client.Get(ctx, types.NamespacedName{
 		Name:      DefaultArgoRolloutsResourceName,
 		Namespace: testNamespace,
 	}, rolebinding); err != nil {
@@ -59,28 +61,28 @@ func TestReconcileRolloutManager_verifyRolloutsResources(t *testing.T) {
 	}
 
 	aggregateToAdminClusterRole := &rbacv1.ClusterRole{}
-	if err = r.Client.Get(context.TODO(), types.NamespacedName{
+	if err = r.Client.Get(ctx, types.NamespacedName{
 		Name: "argo-rollouts-aggregate-to-admin",
 	}, aggregateToAdminClusterRole); err != nil {
 		t.Fatalf("failed to find the aggregateToAdmin ClusterRole: %#v\n", err)
 	}
 
 	aggregateToEditClusterRole := &rbacv1.ClusterRole{}
-	if err = r.Client.Get(context.TODO(), types.NamespacedName{
+	if err = r.Client.Get(ctx, types.NamespacedName{
 		Name: "argo-rollouts-aggregate-to-edit",
 	}, aggregateToEditClusterRole); err != nil {
 		t.Fatalf("failed to find the aggregateToEdit ClusterRole: %#v\n", err)
 	}
 
 	aggregateToViewClusterRole := &rbacv1.ClusterRole{}
-	if err = r.Client.Get(context.TODO(), types.NamespacedName{
+	if err = r.Client.Get(ctx, types.NamespacedName{
 		Name: "argo-rollouts-aggregate-to-view",
 	}, aggregateToViewClusterRole); err != nil {
 		t.Fatalf("failed to find the aggregateToView ClusterRole: %#v\n", err)
 	}
 
 	service := &corev1.Service{}
-	if err = r.Client.Get(context.TODO(), types.NamespacedName{
+	if err = r.Client.Get(ctx, types.NamespacedName{
 		Name:      DefaultArgoRolloutsMetricsServiceName,
 		Namespace: a.Namespace,
 	}, service); err != nil {
@@ -88,7 +90,7 @@ func TestReconcileRolloutManager_verifyRolloutsResources(t *testing.T) {
 	}
 
 	secret := &corev1.Secret{}
-	if err = r.Client.Get(context.TODO(), types.NamespacedName{
+	if err = r.Client.Get(ctx, types.NamespacedName{
 		Name:      DefaultRolloutsNotificationSecretName,
 		Namespace: a.Namespace,
 	}, secret); err != nil {
@@ -102,7 +104,7 @@ func TestReconcileAggregateToAdminClusterRole(t *testing.T) {
 	r := makeTestReconciler(t, a)
 	assert.NoError(t, createNamespace(r, a.Namespace))
 
-	assert.NoError(t, r.reconcileRolloutsAggregateToAdminClusterRole(a))
+	assert.NoError(t, r.reconcileRolloutsAggregateToAdminClusterRole(context.Background(), a))
 }
 
 func TestReconcileAggregateToEditClusterRole(t *testing.T) {
@@ -111,7 +113,7 @@ func TestReconcileAggregateToEditClusterRole(t *testing.T) {
 	r := makeTestReconciler(t, a)
 	assert.NoError(t, createNamespace(r, a.Namespace))
 
-	assert.NoError(t, r.reconcileRolloutsAggregateToEditClusterRole(a))
+	assert.NoError(t, r.reconcileRolloutsAggregateToEditClusterRole(context.Background(), a))
 }
 
 func TestReconcileAggregateToViewClusterRole(t *testing.T) {
@@ -120,11 +122,12 @@ func TestReconcileAggregateToViewClusterRole(t *testing.T) {
 	r := makeTestReconciler(t, a)
 	assert.NoError(t, createNamespace(r, a.Namespace))
 
-	assert.NoError(t, r.reconcileRolloutsAggregateToViewClusterRole(a))
+	assert.NoError(t, r.reconcileRolloutsAggregateToViewClusterRole(context.Background(), a))
 }
 
 func TestReconcileRolloutManager_CleanUp(t *testing.T) {
 
+	ctx := context.Background()
 	a := makeTestRolloutManager()
 
 	resources := []runtime.Object{a}
@@ -138,13 +141,13 @@ func TestReconcileRolloutManager_CleanUp(t *testing.T) {
 			Namespace: a.Namespace,
 		},
 	}
-	res, err := r.Reconcile(context.TODO(), req)
+	res, err := r.Reconcile(ctx, req)
 	assert.NoError(t, err)
 	if res.Requeue {
 		t.Fatal("reconcile requeued request")
 	}
 
-	err = r.Client.Delete(context.TODO(), a)
+	err = r.Client.Delete(ctx, a)
 	assert.NoError(t, err)
 
 	// check if rollouts resources are deleted
@@ -202,7 +205,7 @@ func TestReconcileRolloutManager_CleanUp(t *testing.T) {
 
 	for _, test := range tt {
 		t.Run(test.name, func(t *testing.T) {
-			if err = fetchObject(r.Client, a.Namespace, test.name, test.resource); err == nil {
+			if err = fetchObject(ctx, r.Client, a.Namespace, test.name, test.resource); err == nil {
 				t.Errorf("Expected %s to be deleted", test.name)
 			}
 		})

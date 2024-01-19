@@ -6,7 +6,7 @@ import (
 	"os"
 	"reflect"
 
-	rolloutsApi "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
+	rolloutsmanagerv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -16,7 +16,7 @@ import (
 )
 
 // Reconcile the Rollouts controller deployment.
-func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(cr *rolloutsApi.RolloutManager, sa *corev1.ServiceAccount) error {
+func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager, sa *corev1.ServiceAccount) error {
 	// Configuration for the desired deployment
 	desiredDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -39,7 +39,9 @@ func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(cr *rolloutsApi.R
 				},
 			},
 			Spec: corev1.PodSpec{
-				NodeSelector: defaultNodeSelector(),
+				NodeSelector: map[string]string{
+					"kubernetes.io/os": "linux",
+				},
 			},
 		},
 	}
@@ -65,7 +67,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(cr *rolloutsApi.R
 
 	// If the deployment for rollouts does not exist, create one.
 	actualDeployment := &appsv1.Deployment{}
-	if err := fetchObject(r.Client, cr.Namespace, DefaultArgoRolloutsResourceName, actualDeployment); err != nil {
+	if err := fetchObject(ctx, r.Client, cr.Namespace, DefaultArgoRolloutsResourceName, actualDeployment); err != nil {
 		if !errors.IsNotFound(err) {
 			return fmt.Errorf("failed to get the deployment %s : %s", DefaultArgoRolloutsResourceName, err)
 		}
@@ -74,7 +76,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(cr *rolloutsApi.R
 			return err
 		}
 		log.Info(fmt.Sprintf("Creating deployment %s", DefaultArgoRolloutsResourceName))
-		return r.Client.Create(context.TODO(), desiredDeployment)
+		return r.Client.Create(ctx, desiredDeployment)
 	}
 
 	actualPodSpec := actualDeployment.Spec.Template.Spec
@@ -100,12 +102,12 @@ func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(cr *rolloutsApi.R
 		actualDeployment.Spec.Template.Spec.Tolerations = desiredDeployment.Spec.Template.Spec.Tolerations
 		actualDeployment.Spec.Template.Spec.SecurityContext = desiredPodSpec.SecurityContext
 		actualDeployment.Spec.Template.Spec.Volumes = desiredDeployment.Spec.Template.Spec.Volumes
-		return r.Client.Update(context.TODO(), actualDeployment)
+		return r.Client.Update(ctx, actualDeployment)
 	}
 	return nil
 }
 
-func rolloutsContainer(cr *rolloutsApi.RolloutManager) corev1.Container {
+func rolloutsContainer(cr *rolloutsmanagerv1alpha1.RolloutManager) corev1.Container {
 
 	// Global proxy env vars go firstArgoRollouts
 	rolloutsEnv := cr.Spec.Env
@@ -175,7 +177,7 @@ func boolPtr(val bool) *bool {
 }
 
 // Returns the container image for rollouts controller.
-func getRolloutsContainerImage(cr *rolloutsApi.RolloutManager) string {
+func getRolloutsContainerImage(cr *rolloutsmanagerv1alpha1.RolloutManager) string {
 	defaultImg, defaultTag := false, false
 
 	img := cr.Spec.Image
@@ -199,7 +201,7 @@ func getRolloutsContainerImage(cr *rolloutsApi.RolloutManager) string {
 }
 
 // getRolloutsCommand will return the command for the Rollouts controller component.
-func getRolloutsCommandArgs(cr *rolloutsApi.RolloutManager) []string {
+func getRolloutsCommandArgs(cr *rolloutsmanagerv1alpha1.RolloutManager) []string {
 	args := make([]string, 0)
 
 	args = append(args, "--namespaced")

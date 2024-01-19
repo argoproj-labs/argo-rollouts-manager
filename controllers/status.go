@@ -9,24 +9,24 @@ import (
 )
 
 // reconcileStatus will ensure that all of the Status properties are updated for the given RolloutManager.
-func (r *RolloutManagerReconciler) reconcileStatus(cr *rolloutsmanagerv1alpha1.RolloutManager) error {
+func (r *RolloutManagerReconciler) reconcileStatus(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager) error {
 
-	if err := r.reconcileRolloutControllerStatus(cr); err != nil {
+	if err := r.reconcileRolloutControllerStatus(ctx, cr); err != nil {
 		return err
 	}
 
-	if err := r.reconcileStatusPhase(cr); err != nil {
+	if err := r.reconcileStatusPhase(ctx, cr); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (r *RolloutManagerReconciler) reconcileRolloutControllerStatus(cr *rolloutsmanagerv1alpha1.RolloutManager) error {
+func (r *RolloutManagerReconciler) reconcileRolloutControllerStatus(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager) error {
 	status := rolloutsmanagerv1alpha1.PhaseUnknown
 
 	deploy := &appsv1.Deployment{}
-	if err := fetchObject(r.Client, cr.Namespace, DefaultArgoRolloutsResourceName, deploy); err != nil {
+	if err := fetchObject(ctx, r.Client, cr.Namespace, DefaultArgoRolloutsResourceName, deploy); err != nil {
 		if apierrors.IsNotFound(err) {
 			status = rolloutsmanagerv1alpha1.PhaseFailure
 		}
@@ -42,7 +42,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutControllerStatus(cr *rollouts
 
 	if cr.Status.RolloutController != status {
 		cr.Status.RolloutController = status
-		if err := r.Client.Status().Update(context.TODO(), cr); err != nil {
+		if err := r.Client.Status().Update(ctx, cr); err != nil {
 			log.Error(err, "error updating the Argo Rollout CR status")
 		}
 	}
@@ -51,14 +51,14 @@ func (r *RolloutManagerReconciler) reconcileRolloutControllerStatus(cr *rollouts
 }
 
 // Reconciles the status phase of the RolloutManager
-func (r *RolloutManagerReconciler) reconcileStatusPhase(cr *rolloutsmanagerv1alpha1.RolloutManager) error {
+func (r *RolloutManagerReconciler) reconcileStatusPhase(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager) error {
 
 	// For now, there is only one controller that is created by RolloutManager CR
-	// So the status of Argo ROllout will be same as the status of the Rollout Controller
+	// So the status of Argo Rollout will be same as the status of the Rollout Controller
 	// In future this condition may change
 	if cr.Status.Phase != cr.Status.RolloutController {
 		cr.Status.Phase = cr.Status.RolloutController
-		return r.Client.Status().Update(context.TODO(), cr)
+		return r.Client.Status().Update(ctx, cr)
 	}
 	return nil
 }

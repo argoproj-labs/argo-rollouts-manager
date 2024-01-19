@@ -31,8 +31,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	argoprojiov1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
-	rolloutsApi "github.com/argoproj-labs/argo-rollouts-manager/controllers"
+	rolloutsmanagerv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
+
+	controllers "github.com/argoproj-labs/argo-rollouts-manager/controllers"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -44,7 +45,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(argoprojiov1alpha1.AddToScheme(scheme))
+	utilruntime.Must(rolloutsmanagerv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -89,7 +90,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&rolloutsApi.RolloutManagerReconciler{
+	if err = (&controllers.RolloutManagerReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {

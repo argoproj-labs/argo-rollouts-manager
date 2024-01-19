@@ -19,7 +19,10 @@ package rollouts
 import (
 	"context"
 
-	rolloutsApi "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
+	rolloutsmanagerv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -77,9 +80,8 @@ func (r *RolloutManagerReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	reqLogger.Info("Reconciling Rollout Managers")
 
 	// Fetch the RolloutManager instance
-	rollouts := &rolloutsApi.RolloutManager{}
-	err := r.Client.Get(ctx, req.NamespacedName, rollouts)
-	if err != nil {
+	rollouts := &rolloutsmanagerv1alpha1.RolloutManager{}
+	if err := r.Client.Get(ctx, req.NamespacedName, rollouts); err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
@@ -90,7 +92,7 @@ func (r *RolloutManagerReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return reconcile.Result{}, err
 	}
 
-	if err := r.reconcileRolloutsController(rollouts); err != nil {
+	if err := r.reconcileRolloutsManager(ctx, rollouts); err != nil {
 		// Error reconciling RolloutManager sub-resources - requeue the request.
 		return reconcile.Result{}, err
 	}
@@ -101,6 +103,26 @@ func (r *RolloutManagerReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 // SetupWithManager sets up the controller with the Manager.
 func (r *RolloutManagerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	bld := ctrl.NewControllerManagedBy(mgr)
-	setResourceWatches(bld)
+	// Watch for changes to primary resource RolloutManager.
+	bld.For(&rolloutsmanagerv1alpha1.RolloutManager{})
+
+	// Watch for changes to ConfigMap sub-resources owned by RolloutManager.
+	bld.Owns(&corev1.ConfigMap{})
+
+	// Watch for changes to Secret sub-resources owned by RolloutManager.
+	bld.Owns(&corev1.Secret{})
+
+	// Watch for changes to Service sub-resources owned by RolloutManager.
+	bld.Owns(&corev1.Service{})
+
+	// Watch for changes to Deployment sub-resources owned by RolloutManager.
+	bld.Owns(&appsv1.Deployment{})
+
+	// Watch for changes to Role sub-resources owned by RolloutManager.
+	bld.Owns(&rbacv1.Role{})
+
+	// Watch for changes to RoleBinding sub-resources owned by RolloutManager.
+	bld.Owns(&rbacv1.RoleBinding{})
+
 	return bld.Complete(r)
 }

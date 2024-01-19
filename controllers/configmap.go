@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	rolloutsApi "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
+	rolloutsmanagerv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 	"github.com/argoproj/argo-rollouts/utils/plugin/types"
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
@@ -13,7 +13,7 @@ import (
 )
 
 // Reconcile the Rollouts Default Config Map.
-func (r *RolloutManagerReconciler) reconcileConfigMap(cr *rolloutsApi.RolloutManager) error {
+func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager) error {
 
 	desiredConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -34,16 +34,17 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(cr *rolloutsApi.RolloutMan
 	if err != nil {
 		return fmt.Errorf("error marshalling trafficRouterPlugin to string %s", err)
 	}
-	desiredConfigMap.Data = make(map[string]string, 0)
-	desiredConfigMap.Data["trafficRouterPlugins"] = string(pluginString)
+	desiredConfigMap.Data = map[string]string{
+		"trafficRouterPlugins": string(pluginString),
+	}
 
 	actualConfigMap := &corev1.ConfigMap{}
 
-	if err := fetchObject(r.Client, cr.Namespace, desiredConfigMap.Name, actualConfigMap); err != nil {
+	if err := fetchObject(ctx, r.Client, cr.Namespace, desiredConfigMap.Name, actualConfigMap); err != nil {
 		if errors.IsNotFound(err) {
 			// ConfigMap is not present, create default config map
 			log.Info("configMap not found, creating default configmap with openshift route plugin information")
-			return r.Client.Create(context.TODO(), desiredConfigMap)
+			return r.Client.Create(ctx, desiredConfigMap)
 		}
 		return fmt.Errorf("failed to get the serviceAccount associated with %s : %s", desiredConfigMap.Name, err)
 	}
@@ -69,5 +70,5 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(cr *rolloutsApi.RolloutMan
 
 	actualConfigMap.Data["trafficRouterPlugins"] = string(pluginString)
 
-	return r.Client.Update(context.TODO(), actualConfigMap)
+	return r.Client.Update(ctx, actualConfigMap)
 }
