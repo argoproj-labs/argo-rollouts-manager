@@ -21,9 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // RolloutManagerSpec defines the desired state of Argo Rollouts
 type RolloutManagerSpec struct {
 
@@ -60,14 +57,23 @@ type RolloutManagerStatus struct {
 	// Pending: The RolloutController component has been accepted by the Kubernetes system, but one or more of the required resources have not been created.
 	// Running: All of the required Pods for the RolloutController component are in a Ready state.
 	// Unknown: The state of the RolloutController component could not be obtained.
-	RolloutController string `json:"rolloutController,omitempty"`
+	RolloutController RolloutControllerPhase `json:"rolloutController,omitempty"`
 	// Phase is a simple, high-level summary of where the RolloutManager is in its lifecycle.
 	// There are three possible phase values:
 	// Pending: The RolloutManager has been accepted by the Kubernetes system, but one or more of the required resources have not been created.
 	// Available: All of the resources for the RolloutManager are ready.
 	// Unknown: The state of the RolloutManager phase could not be obtained.
-	Phase string `json:"phase,omitempty"`
+	Phase RolloutControllerPhase `json:"phase,omitempty"`
 }
+
+type RolloutControllerPhase string
+
+const (
+	PhaseAvailable RolloutControllerPhase = "Available"
+	PhasePending   RolloutControllerPhase = "Pending"
+	PhaseUnknown   RolloutControllerPhase = "Unknown"
+	PhaseFailure   RolloutControllerPhase = "Failure"
+)
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status

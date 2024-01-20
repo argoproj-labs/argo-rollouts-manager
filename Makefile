@@ -29,7 +29,7 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
 # /argo-rollouts-manager-bundle:$VERSION and /argo-rollouts-manager-catalog:$VERSION.
-IMAGE_TAG_BASE ?= quay.io/aveerama/argo-rollouts-manager
+IMAGE_TAG_BASE ?= quay.io/argoprojlabs/argo-rollouts-manager
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
@@ -47,7 +47,8 @@ ifeq ($(USE_IMAGE_DIGESTS), true)
 endif
 
 # Image URL to use all building/pushing image targets
-IMG ?= quay.io/aveerama/argo-rollouts-manager:v0.0.1
+IMG ?= $(IMAGE_TAG_BASE):v$(VERSION)
+
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.26.0
 
@@ -103,11 +104,12 @@ vet: ## Run go vet against code.
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -coverprofile cover.out `go list ./... | grep -v 'tests/e2e'`
+	
 
 .PHONY: test-e2e
-test-e2e: ## Run operator e2e tests using kuttl.
-	kubectl kuttl test --config ./tests/e2e/kuttl-tests.yaml 
+test-e2e: ## Run operator e2e tests
+	go test -v -p=1 -timeout=10m -race -count=1 -coverprofile=coverage.out ./tests/e2e
 
 ##@ Build
 
