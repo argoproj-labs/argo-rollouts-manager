@@ -21,7 +21,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2023-05-09T11:21:43Z"
+    createdAt: "2024-01-20T16:43:19Z"
     operators.operatorframework.io/builder: operator-sdk-v1.28.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: argo-rollouts-manager.v0.0.1
@@ -433,7 +433,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/argoproj-labs/argo-rollouts-manager:v0.0.1
+                image: quay.io/argoprojlabs/argo-rollouts-manager:v0.0.1
                 livenessProbe:
                   httpGet:
                     path: /healthz
