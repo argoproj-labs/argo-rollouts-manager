@@ -6,7 +6,7 @@ name: Go
 on:
   push:
     branches:
-      - 'master'
+      - 'main'
       - 'release-*'
   pull_request:
     branches:
@@ -29,3 +29,18 @@ jobs:
 
     - name: Test
       run: make test
+
+  gofmt:
+    name: "Ensure that code is gofmt-ed"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+      - name: Setup Golang
+        uses: actions/setup-go@v5.0.0
+        with:
+          go-version-file: './go.mod'
+      - name: "Run make fmt and then 'git diff' to see if anything changed: to fix this check, run make fmt and then commit the changes."
+        run: |
+          make fmt
+          git diff --exit-code -- .
+  
