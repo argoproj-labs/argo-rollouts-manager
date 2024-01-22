@@ -3,7 +3,7 @@ module github.com/argoproj-labs/argo-rollouts-manager
 go 1.19
 
 require (
-	github.com/argoproj/argo-rollouts v1.6.3
+	github.com/argoproj/argo-rollouts v1.6.4
 	github.com/onsi/ginkgo/v2 v2.11.0
 	github.com/onsi/gomega v1.27.10
 	github.com/stretchr/testify v1.8.4
