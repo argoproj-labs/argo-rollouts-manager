@@ -12,6 +12,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// TODO: #22 - Remove this once ConfigMap reconciliation is fixed:
+// nolint:unused
 // Reconcile the Rollouts Default Config Map.
 func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager) error {
 
