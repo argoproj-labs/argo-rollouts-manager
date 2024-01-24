@@ -717,6 +717,19 @@ func GetPolicyRules() []rbacv1.PolicyRule {
 				"update",
 			},
 		},
+		{
+			APIGroups: []string{
+				"apisix.apache.org",
+			},
+			Resources: []string{
+				"apisixroutes",
+			},
+			Verbs: []string{
+				"watch",
+				"get",
+				"update",
+			},
+		},
 	}
 }
 

@@ -48,6 +48,14 @@ rules:
   - list
   - watch
 - apiGroups:
+  - apisix.apache.org
+  resources:
+  - apisixroutes
+  verbs:
+  - get
+  - update
+  - watch
+- apiGroups:
   - appmesh.k8s.aws
   resources:
   - virtualnodes
