@@ -23,6 +23,14 @@ const (
 
 	argoprojlabsRepoOrg         = "argoproj-labs"
 	argoRolloutsManagerRepoName = "argo-rollouts-manager"
+
+	skipInitialPRCheck = false // default to false
+
+	// if readOnly is true:
+	// - PRs will not be opened
+	// - Git commits will not be pushed to fork
+	// This is roughly equivalent to a dry run
+	readOnly = false // default to false
 )
 
 func main() {
@@ -39,17 +47,19 @@ func main() {
 
 	// 1) Check for existing version update PRs on the repo
 
-	// prList, _, err := client.PullRequests.List(context.Background(), argoprojlabsRepoOrg, argoRolloutsManagerRepoName, &github.PullRequestListOptions{})
-	// if err != nil {
-	// 	exitWithError(err)
-	// 	return
-	// }
-	// for _, pr := range prList {
-	// 	if strings.HasPrefix(*pr.Title, PRTitle) {
-	// 		exitWithError(fmt.Errorf("PR already exists"))
-	// 		return
-	// 	}
-	// }
+	if !skipInitialPRCheck {
+		prList, _, err := client.PullRequests.List(context.Background(), argoprojlabsRepoOrg, argoRolloutsManagerRepoName, &github.PullRequestListOptions{})
+		if err != nil {
+			exitWithError(err)
+			return
+		}
+		for _, pr := range prList {
+			if strings.HasPrefix(*pr.Title, PRTitle) {
+				exitWithError(fmt.Errorf("PR already exists"))
+				return
+			}
+		}
+	}
 
 	// 2) Pull the latest releases from rollouts repo
 
@@ -83,14 +93,23 @@ func main() {
 		return
 	}
 
-	// // 4) Create PR if it doesn't exist
-	// if stdout, stderr, err := runCommandWithWD(pathToGitHubRepo, "gh", "pr", "create",
-	// 	"-R", argoprojlabsRepoOrg+"/"+argoRolloutsManagerRepoName,
-	// 	"--title", PRTitle+(*firstProperRelease.TagName), "--body", "Update to latest release of Argo Rollouts"); err != nil {
-	// 	fmt.Println(stdout, stderr)
-	// 	exitWithError(err)
-	// 	return
-	// }
+	if !readOnly {
+
+		bodyText := "Update to latest release of Argo Rollouts"
+
+		if firstProperRelease != nil && firstProperRelease.HTMLURL != nil && *firstProperRelease.HTMLURL != "" {
+			bodyText += ": " + *firstProperRelease.HTMLURL
+		}
+
+		// 4) Create PR if it doesn't exist
+		if stdout, stderr, err := runCommandWithWD(pathToGitHubRepo, "gh", "pr", "create",
+			"-R", argoprojlabsRepoOrg+"/"+argoRolloutsManagerRepoName,
+			"--title", PRTitle+(*firstProperRelease.TagName), "--body", bodyText); err != nil {
+			fmt.Println(stdout, stderr)
+			exitWithError(err)
+			return
+		}
+	}
 
 }
 
@@ -103,7 +122,7 @@ func createNewCommitAndBranch(latestReleaseVersionTag string, latestReleaseVersi
 		{"git", "checkout", "-b", newBranchName},
 	}
 
-	if err := runCommandListWithWD(pathToGitRepo, commands); err != nil {
+	if err := runCommandListWithWorkDir(pathToGitRepo, commands); err != nil {
 		return err
 	}
 
@@ -112,6 +131,10 @@ func createNewCommitAndBranch(latestReleaseVersionTag string, latestReleaseVersi
 	}
 
 	if err := regenerateGoMod(latestReleaseVersionTag, pathToGitRepo); err != nil {
+		return err
+	}
+
+	if err := regenerateArgoRolloutsE2ETestScriptMod(latestReleaseVersionTag, pathToGitRepo); err != nil {
 		return err
 	}
 
@@ -177,12 +200,21 @@ func createNewCommitAndBranch(latestReleaseVersionTag string, latestReleaseVersi
 		{"go", "mod", "tidy"},
 		{"make", "generate", "manifests"},
 		{"make", "bundle"},
+		{"make", "fmt"},
 		{"git", "add", "--all"},
 		{"git", "commit", "-s", "-m", PRTitle + latestReleaseVersionTag},
-		{"git", "push", "-f", "--set-upstream", "origin", newBranchName},
 	}
-	if err := runCommandListWithWD(pathToGitRepo, commands); err != nil {
+	if err := runCommandListWithWorkDir(pathToGitRepo, commands); err != nil {
 		return err
+	}
+
+	if !readOnly {
+		commands = [][]string{
+			{"git", "push", "-f", "--set-upstream", "origin", newBranchName},
+		}
+		if err := runCommandListWithWorkDir(pathToGitRepo, commands); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -206,14 +238,14 @@ func checkoutRolloutsRepo(latestReleaseVersionTag string) (string, error) {
 		{"git", "checkout", latestReleaseVersionTag},
 	}
 
-	if err := runCommandListWithWD(newWD, commands); err != nil {
+	if err := runCommandListWithWorkDir(newWD, commands); err != nil {
 		return "", err
 	}
 
 	return newWD, nil
 }
 
-func runCommandListWithWD(workingDir string, commands [][]string) error {
+func runCommandListWithWorkDir(workingDir string, commands [][]string) error {
 
 	for _, command := range commands {
 
@@ -227,6 +259,7 @@ func runCommandListWithWD(workingDir string, commands [][]string) error {
 
 func regenerateGoMod(latestReleaseVersionTag string, pathToGitRepo string) error {
 
+	// Format of string to modify:
 	//	github.com/argoproj/argo-rollouts v1.6.3
 
 	path := filepath.Join(pathToGitRepo, "go.mod")
@@ -243,6 +276,40 @@ func regenerateGoMod(latestReleaseVersionTag string, pathToGitRepo string) error
 		if strings.Contains(line, "\tgithub.com/argoproj/argo-rollouts v") {
 
 			res += "\tgithub.com/argoproj/argo-rollouts " + latestReleaseVersionTag + "\n"
+
+		} else {
+			res += line + "\n"
+		}
+
+	}
+
+	if err := os.WriteFile(path, []byte(res), 0600); err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+func regenerateArgoRolloutsE2ETestScriptMod(latestReleaseVersionTag string, pathToGitRepo string) error {
+
+	// Format of string to modify:
+	// CURRENT_ROLLOUTS_VERSION=v1.6.4
+
+	path := filepath.Join(pathToGitRepo, "hack/run-upstream-argo-rollouts-e2e-tests.sh")
+
+	fileBytes, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	var res string
+
+	for _, line := range strings.Split(string(fileBytes), "\n") {
+
+		if strings.Contains(line, "CURRENT_ROLLOUTS_VERSION=") {
+
+			res += "CURRENT_ROLLOUTS_VERSION=" + latestReleaseVersionTag + "\n"
 
 		} else {
 			res += line + "\n"
