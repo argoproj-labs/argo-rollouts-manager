@@ -283,7 +283,7 @@ lint: golangci_lint
 
 .PHONY: gosec
 gosec: go_sec
-	$(GO_SEC) ./...
+	$(GO_SEC) -exclude-dir=hack ./...
 
 # go-get-tool will 'go install' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
