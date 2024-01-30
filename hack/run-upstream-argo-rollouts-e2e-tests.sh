@@ -1,6 +1,6 @@
 #!/bin/bash
 
-CURRENT_ROLLOUTS_VERSION=v1.6.4
+CURRENT_ROLLOUTS_VERSION=v1.6.5
 
 function cleanup {
   echo "* Cleaning up"
@@ -148,3 +148,4 @@ if [ -n "$UNEXPECTED_FAILURES" ]; then
 else
   echo "* SUCCESS: No unexpected errors occurred."
 fi
+
