@@ -16,7 +16,7 @@ There should be a `kubeconfig` pointing to your cluster, user should have full a
 
 Run the controller:
 ```sh
-make run
+make install run
 ```
 
 In a separate window/terminal, run the tests against the controller:
