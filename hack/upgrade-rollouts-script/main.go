@@ -16,6 +16,18 @@ import (
 	"github.com/google/go-github/v58/github"
 )
 
+// These can be set while debugging
+const (
+	skipInitialPRCheck = false // default to false
+
+	// if readOnly is true:
+	// - PRs will not be opened
+	// - Git commits will not be pushed to fork
+	// This is roughly equivalent to a dry run
+	readOnly = false // default to false
+
+)
+
 const (
 	PRTitle              = "Upgrade to Argo Rollouts "
 	argoRolloutsRepoOrg  = "argoproj"
@@ -24,13 +36,7 @@ const (
 	argoprojlabsRepoOrg         = "argoproj-labs"
 	argoRolloutsManagerRepoName = "argo-rollouts-manager"
 
-	skipInitialPRCheck = false // default to false
-
-	// if readOnly is true:
-	// - PRs will not be opened
-	// - Git commits will not be pushed to fork
-	// This is roughly equivalent to a dry run
-	readOnly = false // default to false
+	controllersDefaultGo = "controllers/default.go"
 )
 
 func main() {
@@ -88,7 +94,13 @@ func main() {
 	newBranchName := "upgrade-to-rollouts-" + *firstProperRelease.TagName
 
 	// 3) Create, commit, and push a new branch
-	if err := createNewCommitAndBranch(*firstProperRelease.TagName, "quay.io/argoproj/argo-rollouts", newBranchName, pathToGitHubRepo); err != nil {
+	if repoAlreadyUpToDate, err := createNewCommitAndBranch(*firstProperRelease.TagName, "quay.io/argoproj/argo-rollouts", newBranchName, pathToGitHubRepo); err != nil {
+
+		if repoAlreadyUpToDate {
+			fmt.Println("* Exiting as target repository is already up to date.")
+			return
+		}
+
 		exitWithError(err)
 		return
 	}
@@ -101,8 +113,13 @@ func main() {
 			bodyText += ": " + *firstProperRelease.HTMLURL
 		}
 
+		bodyText += `
+Before merging this PR, ensure you check the Argo Rollouts change logs and release notes: 
+- ensure there are no changes to the Argo Rollouts install YAML that we need to respond to with changes in the operator
+- ensure there are no backwards incompatible API/behaviour changes in the change logs`
+
 		// 4) Create PR if it doesn't exist
-		if stdout, stderr, err := runCommandWithWD(pathToGitHubRepo, "gh", "pr", "create",
+		if stdout, stderr, err := runCommandWithWorkDir(pathToGitHubRepo, "gh", "pr", "create",
 			"-R", argoprojlabsRepoOrg+"/"+argoRolloutsManagerRepoName,
 			"--title", PRTitle+(*firstProperRelease.TagName), "--body", bodyText); err != nil {
 			fmt.Println(stdout, stderr)
@@ -113,9 +130,11 @@ func main() {
 
 }
 
-func createNewCommitAndBranch(latestReleaseVersionTag string, latestReleaseVersionImage, newBranchName, pathToGitRepo string) error {
+// return true if the argo-rollouts-manager repo is already up to date
+func createNewCommitAndBranch(latestReleaseVersionTag string, latestReleaseVersionImage, newBranchName, pathToGitRepo string) (bool, error) {
 
 	commands := [][]string{
+		{"git", "stash"},
 		{"git", "fetch", "parent"},
 		{"git", "checkout", "main"},
 		{"git", "rebase", "parent/main"},
@@ -123,22 +142,59 @@ func createNewCommitAndBranch(latestReleaseVersionTag string, latestReleaseVersi
 	}
 
 	if err := runCommandListWithWorkDir(pathToGitRepo, commands); err != nil {
-		return err
+		return false, err
+	}
+
+	if repoTargetVersion, err := extractCurrentTargetVersionFromRepo(pathToGitRepo); err != nil {
+		return false, fmt.Errorf("unable to extract current target version from repo")
+	} else if repoTargetVersion == latestReleaseVersionTag {
+		return true, fmt.Errorf("target repository is already on the most recent version")
 	}
 
 	if err := regenerateControllersDefaultGo(latestReleaseVersionTag, latestReleaseVersionImage, pathToGitRepo); err != nil {
-		return err
+		return false, err
 	}
 
 	if err := regenerateGoMod(latestReleaseVersionTag, pathToGitRepo); err != nil {
-		return err
+		return false, err
 	}
 
 	if err := regenerateArgoRolloutsE2ETestScriptMod(latestReleaseVersionTag, pathToGitRepo); err != nil {
-		return err
+		return false, err
 	}
 
-	rolloutsRepoPath, err := checkoutRolloutsRepo(latestReleaseVersionTag)
+	if err := copyCRDsFromRolloutsRepo(latestReleaseVersionTag, pathToGitRepo); err != nil {
+		return false, fmt.Errorf("unable to copy rollouts CRDs: %w", err)
+	}
+
+	commands = [][]string{
+		{"go", "mod", "tidy"},
+		{"make", "generate", "manifests"},
+		{"make", "bundle"},
+		{"make", "fmt"},
+		{"git", "add", "--all"},
+		{"git", "commit", "-s", "-m", PRTitle + latestReleaseVersionTag},
+	}
+	if err := runCommandListWithWorkDir(pathToGitRepo, commands); err != nil {
+		return false, err
+	}
+
+	if !readOnly {
+		commands = [][]string{
+			{"git", "push", "-f", "--set-upstream", "origin", newBranchName},
+		}
+		if err := runCommandListWithWorkDir(pathToGitRepo, commands); err != nil {
+			return false, err
+		}
+	}
+
+	return false, nil
+
+}
+
+func copyCRDsFromRolloutsRepo(latestReleaseVersionTag string, pathToGitRepo string) error {
+
+	rolloutsRepoPath, err := checkoutRolloutsRepoIntoTempDir(latestReleaseVersionTag)
 	if err != nil {
 		return err
 	}
@@ -196,60 +252,38 @@ func createNewCommitAndBranch(latestReleaseVersionTag string, latestReleaseVersi
 
 	}
 
-	commands = [][]string{
-		{"go", "mod", "tidy"},
-		{"make", "generate", "manifests"},
-		{"make", "bundle"},
-		{"make", "fmt"},
-		{"git", "add", "--all"},
-		{"git", "commit", "-s", "-m", PRTitle + latestReleaseVersionTag},
-	}
-	if err := runCommandListWithWorkDir(pathToGitRepo, commands); err != nil {
-		return err
-	}
-
-	if !readOnly {
-		commands = [][]string{
-			{"git", "push", "-f", "--set-upstream", "origin", newBranchName},
-		}
-		if err := runCommandListWithWorkDir(pathToGitRepo, commands); err != nil {
-			return err
-		}
-	}
-
 	return nil
-
 }
 
-func checkoutRolloutsRepo(latestReleaseVersionTag string) (string, error) {
+func checkoutRolloutsRepoIntoTempDir(latestReleaseVersionTag string) (string, error) {
 
 	tmpDir, err := os.MkdirTemp("", "argo-rollouts-src")
 	if err != nil {
 		return "", err
 	}
 
-	if _, _, err := runCommandWithWD(tmpDir, "git", "clone", "https://github.com/argoproj/argo-rollouts"); err != nil {
+	if _, _, err := runCommandWithWorkDir(tmpDir, "git", "clone", "https://github.com/argoproj/argo-rollouts"); err != nil {
 		return "", err
 	}
 
-	newWD := filepath.Join(tmpDir, "argo-rollouts")
+	newWorkDir := filepath.Join(tmpDir, "argo-rollouts")
 
 	commands := [][]string{
 		{"git", "checkout", latestReleaseVersionTag},
 	}
 
-	if err := runCommandListWithWorkDir(newWD, commands); err != nil {
+	if err := runCommandListWithWorkDir(newWorkDir, commands); err != nil {
 		return "", err
 	}
 
-	return newWD, nil
+	return newWorkDir, nil
 }
 
 func runCommandListWithWorkDir(workingDir string, commands [][]string) error {
 
 	for _, command := range commands {
 
-		_, _, err := runCommandWithWD(workingDir, command...)
+		_, _, err := runCommandWithWorkDir(workingDir, command...)
 		if err != nil {
 			return err
 		}
@@ -325,11 +359,39 @@ func regenerateArgoRolloutsE2ETestScriptMod(latestReleaseVersionTag string, path
 
 }
 
-func regenerateControllersDefaultGo(latestReleaseVersionTag string, latestReleaseVersionImage, pathToGitRepo string) error {
+// extractCurrentTargetVersionFromRepo read the contents of the argo-rollouts-manager repo and determine which argo-rollouts version is being targeted.
+func extractCurrentTargetVersionFromRepo(pathToGitRepo string) (string, error) {
 
+	// Style of text string to parse:
 	// DefaultArgoRolloutsVersion = "sha256:995450a0a7f7843d68e96d1a7f63422fa29b245c58f7b57dd0cf9cad72b8308f" //v1.4.1
 
-	path := filepath.Join(pathToGitRepo, "controllers/default.go")
+	path := filepath.Join(pathToGitRepo, controllersDefaultGo)
+
+	fileBytes, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+
+	for _, line := range strings.Split(string(fileBytes), "\n") {
+		if strings.Contains(line, "DefaultArgoRolloutsVersion") {
+
+			indexOfForwardSlash := strings.LastIndex(line, "/")
+			if indexOfForwardSlash != -1 {
+				return strings.TrimSpace(line[indexOfForwardSlash+1:]), nil
+			}
+
+		}
+	}
+
+	return "", fmt.Errorf("no version found in '" + controllersDefaultGo + "'")
+}
+
+func regenerateControllersDefaultGo(latestReleaseVersionTag string, latestReleaseVersionImage, pathToGitRepo string) error {
+
+	// Style of text string to replace:
+	// DefaultArgoRolloutsVersion = "sha256:995450a0a7f7843d68e96d1a7f63422fa29b245c58f7b57dd0cf9cad72b8308f" //v1.4.1
+
+	path := filepath.Join(pathToGitRepo, controllersDefaultGo)
 
 	fileBytes, err := os.ReadFile(path)
 	if err != nil {
@@ -358,7 +420,7 @@ func regenerateControllersDefaultGo(latestReleaseVersionTag string, latestReleas
 
 }
 
-func runCommandWithWD(workingDir string, cmdList ...string) (string, string, error) {
+func runCommandWithWorkDir(workingDir string, cmdList ...string) (string, string, error) {
 
 	fmt.Println(cmdList)
 

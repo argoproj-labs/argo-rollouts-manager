@@ -19,8 +19,15 @@ The Go code and script this in this directory will automatically open a pull req
 ### Configure and run the tool
 
 ```bash
+
+# Set required Environment Variables
 export GITHUB_FORK_USERNAME="(your username here)"
 export GH_TOKEN="(a GitHub personal access token that can clone/push/open PRs against argo-rollouts-manager repo)"
+
+# or, you can set these values in the settings.env file:
+#   cp settings_template.env settings.env
+# Then set env vars in settings.env (which is excluded in the .gitignore)
+
 ./init-repo.sh
 ./go-run.sh
 ```
