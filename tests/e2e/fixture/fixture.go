@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -28,39 +29,79 @@ const (
 	TestE2ENamespace = "argo-rollouts"
 )
 
-func EnsureCleanSlate() error {
-	return EnsureDestinationNamespaceExists(context.Background(), TestE2ENamespace)
+type Cleaner struct {
+	cxt       context.Context
+	k8sClient client.Client
 }
 
-func EnsureDestinationNamespaceExists(ctx context.Context, namespaceParam string) error {
-
-	config, err := GetSystemKubeConfig()
+func NewCleaner() (*Cleaner, error) {
+	k8sClient, err := GetE2ETestKubeClient()
 	if err != nil {
-		return fmt.Errorf("unable to retrieve valid Kubernetes context: %w", err)
+		return nil, err
 	}
 
-	k8sClient, err := GetKubeClient(config)
+	return &Cleaner{
+		cxt:       context.Background(),
+		k8sClient: k8sClient,
+	}, nil
+}
+
+func EnsureCleanSlate() error {
+	cleaner, err := NewCleaner()
 	if err != nil {
 		return err
 	}
 
-	if err := DeleteNamespace(ctx, namespaceParam, k8sClient); err != nil {
-		return fmt.Errorf("unable to delete namespace '%s': %v", namespaceParam, err)
+	err = cleaner.EnsureDestinationNamespaceExists(TestE2ENamespace)
+	if err != nil {
+		return err
+	}
+
+	err = cleaner.DeleteRolloutsClusterRoles()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (cleaner *Cleaner) EnsureDestinationNamespaceExists(namespaceParam string) error {
+	if err := cleaner.DeleteNamespace(namespaceParam); err != nil {
+		return fmt.Errorf("unable to delete namespace '%s': %w", namespaceParam, err)
 	}
 
 	namespaceToCreate := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
 		Name: namespaceParam,
 	}}
 
-	if err := k8sClient.Create(context.Background(), &namespaceToCreate); err != nil {
-		return fmt.Errorf("unable to create namespace '%s': %v", namespaceParam, err)
+	if err := cleaner.k8sClient.Create(cleaner.cxt, &namespaceToCreate); err != nil {
+		return fmt.Errorf("unable to create namespace '%s': %w", namespaceParam, err)
+	}
+
+	return nil
+}
+
+func (cleaner *Cleaner) DeleteRolloutsClusterRoles() error {
+	crList := rbacv1.ClusterRoleList{}
+	if err := cleaner.k8sClient.List(cleaner.cxt, &crList, &client.ListOptions{}); err != nil {
+		return err
+	}
+	for idx := range crList.Items {
+		sa := crList.Items[idx]
+		// Skip any CRs that DON'T contain argo-rollouts
+		if !strings.Contains(sa.Name, "argo-rollouts") {
+			continue
+		}
+		if err := cleaner.k8sClient.Delete(cleaner.cxt, &sa); err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
 // DeleteNamespace deletes a namespace, and waits for it to be reported as deleted.
-func DeleteNamespace(ctx context.Context, namespaceParam string, k8sClient client.Client) error {
+func (cleaner *Cleaner) DeleteNamespace(namespaceParam string) error {
 
 	// Delete the namespace:
 	// - Issue a request to Delete the namespace
@@ -73,14 +114,14 @@ func DeleteNamespace(ctx context.Context, namespaceParam string, k8sClient clien
 				Name: namespaceParam,
 			},
 		}
-		if err := k8sClient.Delete(ctx, &namespace); err != nil {
+		if err := cleaner.k8sClient.Delete(cleaner.cxt, &namespace); err != nil {
 			if !apierr.IsNotFound(err) {
 				GinkgoWriter.Printf("unable to delete namespace '%s': %v\n", namespaceParam, err)
 				return false, nil
 			}
 		}
 
-		if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(&namespace), &namespace); err != nil {
+		if err := cleaner.k8sClient.Get(cleaner.cxt, client.ObjectKeyFromObject(&namespace), &namespace); err != nil {
 			if apierr.IsNotFound(err) {
 				return true, nil
 			} else {
