@@ -237,9 +237,12 @@ var _ = Describe("RolloutManager tests", func() {
 					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rolloutManager.Namespace},
 				}
 				Eventually(&deployment, "10s", "1s").Should(k8s.ExistByName(k8sClient))
-				Expect(deployment.Spec.Template.Spec.Containers[0].Env).To(ContainElements(
-					corev1.EnvVar{Name: "EDITOR", Value: "emacs"},
-					corev1.EnvVar{Name: "LANG", Value: "en_CA.UTF-8"},
+				Expect(deployment.Spec.Template.Spec.Containers[0].Env).To(SatisfyAll(
+					HaveLen(2),
+					ContainElements(
+						corev1.EnvVar{Name: "EDITOR", Value: "emacs"},
+						corev1.EnvVar{Name: "LANG", Value: "en_CA.UTF-8"},
+					),
 				))
 
 				By("updating the deployment when the environment variables in the RolloutManager are updated")
@@ -254,9 +257,12 @@ var _ = Describe("RolloutManager tests", func() {
 				Eventually(func() []corev1.EnvVar {
 					Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&deployment), &deployment)).To(Succeed())
 					return deployment.Spec.Template.Spec.Containers[0].Env
-				}, "10s", "1s").Should(ContainElements(
-					corev1.EnvVar{Name: "LANG", Value: "en_US.UTF-8"},
-					corev1.EnvVar{Name: "TERM", Value: "xterm-256color"},
+				}, "10s", "1s").Should(SatisfyAll(
+					HaveLen(2),
+					ContainElements(
+						corev1.EnvVar{Name: "LANG", Value: "en_US.UTF-8"},
+						corev1.EnvVar{Name: "TERM", Value: "xterm-256color"},
+					),
 				))
 			})
 		})
