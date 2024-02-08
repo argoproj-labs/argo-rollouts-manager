@@ -2,10 +2,9 @@ package rollouts
 
 import (
 	"context"
-	"testing"
 
 	rolloutsmanagerv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
-	"github.com/stretchr/testify/assert"
+	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,9 +32,11 @@ func makeTestRolloutManager(opts ...rolloutManagerOpt) *rolloutsmanagerv1alpha1.
 	return a
 }
 
-func makeTestReconciler(t *testing.T, objs ...runtime.Object) *RolloutManagerReconciler {
+func makeTestReconciler(objs ...runtime.Object) *RolloutManagerReconciler {
 	s := scheme.Scheme
-	assert.NoError(t, rolloutsmanagerv1alpha1.AddToScheme(s))
+
+	err := rolloutsmanagerv1alpha1.AddToScheme(s)
+	Expect(err).ToNot(HaveOccurred())
 
 	cl := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(objs...).Build()
 	return &RolloutManagerReconciler{
