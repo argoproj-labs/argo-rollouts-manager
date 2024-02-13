@@ -35,7 +35,7 @@ var _ = Describe("RolloutManager tests", func() {
 			Expect(fixture.EnsureCleanSlate()).To(Succeed())
 
 			var err error
-			k8sClient, err = fixture.GetE2ETestKubeClient()
+			k8sClient, _, err = fixture.GetE2ETestKubeClient()
 			Expect(err).ToNot(HaveOccurred())
 			ctx = context.Background()
 
@@ -44,7 +44,9 @@ var _ = Describe("RolloutManager tests", func() {
 					Name:      "basic-rollouts-manager",
 					Namespace: fixture.TestE2ENamespace,
 				},
-				Spec: rolloutsmanagerv1alpha1.RolloutManagerSpec{},
+				Spec: rolloutsmanagerv1alpha1.RolloutManagerSpec{
+					NamespaceScoped: true,
+				},
 			}
 		})
 
@@ -55,90 +57,8 @@ var _ = Describe("RolloutManager tests", func() {
 				By("setting the phase to \"Available\"")
 				Eventually(rolloutManager, "60s", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
 
-				By("creating a service account")
-				sa := corev1.ServiceAccount{
-					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rolloutManager.Namespace},
-				}
-				Eventually(&sa, "10s", "1s").Should(k8s.ExistByName(k8sClient))
-
-				By("ensuring the service account has the correct labels")
-				ensureLabels(&sa.ObjectMeta)
-
-				By("creating a role")
-				role := rbacv1.Role{
-					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rolloutManager.Namespace},
-				}
-				Eventually(&role, "10s", "1s").Should(k8s.ExistByName(k8sClient))
-
-				By("ensuring the role has the correct labels")
-				ensureLabels(&role.ObjectMeta)
-
-				By("ensuring the role has the correct policy rules")
-				Expect(role.Rules).To(ConsistOf(controllers.GetPolicyRules()))
-
-				By("creating a role binding")
-				binding := rbacv1.RoleBinding{
-					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rolloutManager.Namespace},
-				}
-				Eventually(&binding, "10s", "1s").Should(k8s.ExistByName(k8sClient))
-
-				By("ensuring the role binding has the correct labels")
-				ensureLabels(&binding.ObjectMeta)
-
-				By("creating three cluster roles")
-				clusterRoleSuffixes := []string{"aggregate-to-admin", "aggregate-to-edit", "aggregate-to-view"}
-				for _, suffix := range clusterRoleSuffixes {
-					clusterRoleName := "argo-rollouts-" + suffix
-					clusterRole := rbacv1.ClusterRole{
-						ObjectMeta: metav1.ObjectMeta{Name: clusterRoleName},
-					}
-					Eventually(&clusterRole, "30s", "1s").Should(k8s.ExistByName(k8sClient))
-
-					Expect(len(binding.Labels)).To(Equal(3))
-					Expect(clusterRole.Labels["app.kubernetes.io/name"]).To(Equal(clusterRoleName))
-					Expect(clusterRole.Labels["app.kubernetes.io/part-of"]).To(Equal(controllers.DefaultArgoRolloutsResourceName))
-					Expect(clusterRole.Labels["app.kubernetes.io/component"]).To(Equal("aggregate-cluster-role"))
-					Expect(clusterRole.Labels["rbac.authorization.k8s.io/"+suffix]).To(Equal("true"))
-				}
-
-				By("creating a deployment")
-				deployment := appsv1.Deployment{
-					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rolloutManager.Namespace},
-				}
-				Eventually(&deployment, "10s", "1s").Should(k8s.ExistByName(k8sClient))
-
-				By("ensuring the deployment has the correct labels")
-				ensureLabels(&deployment.ObjectMeta)
-
-				By("creating a service")
-				service := corev1.Service{
-					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsMetricsServiceName, Namespace: rolloutManager.Namespace},
-				}
-				Eventually(&service, "10s", "1s").Should(k8s.ExistByName(k8sClient))
-
-				By("ensuring the service has the correct labels")
-				Expect(service.Labels["app.kubernetes.io/name"]).To(Equal(controllers.DefaultArgoRolloutsMetricsServiceName))
-				Expect(service.Labels["app.kubernetes.io/part-of"]).To(Equal(controllers.DefaultArgoRolloutsResourceName))
-				Expect(service.Labels["app.kubernetes.io/component"]).To(Equal("server"))
-
-				By("having the deployment become ready")
-				Eventually(func() bool {
-
-					depl := appsv1.Deployment{
-						ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rolloutManager.Namespace},
-					}
-					if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(&depl), &depl); err != nil {
-						return false
-					}
-
-					return depl.Status.ReadyReplicas == 1
-
-				}, "120s", "1s").Should(BeTrue())
-
-				By("creating a secret")
-				Eventually(&corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultRolloutsNotificationSecretName, Namespace: rolloutManager.Namespace},
-				}, "30s", "1s").Should(k8s.ExistByName(k8sClient))
+				By("Verify that expected resources are created.")
+				validateArgoRolloutManagerResources(ctx, rolloutManager, k8sClient, true)
 			})
 		})
 
@@ -199,8 +119,11 @@ var _ = Describe("RolloutManager tests", func() {
 						"--loglevel",
 						"error",
 					},
+					NamespaceScoped: true,
 				}
 				Expect(k8sClient.Create(ctx, &rolloutManager)).To(Succeed())
+				Eventually(rolloutManager, "1m", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
+
 				deployment := appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rolloutManager.Namespace},
 				}
@@ -214,6 +137,7 @@ var _ = Describe("RolloutManager tests", func() {
 						"--logformat",
 						"text",
 					},
+					NamespaceScoped: true,
 				}
 				Expect(k8sClient.Update(ctx, &rolloutManager)).To(Succeed())
 				Eventually(func() []string {
@@ -233,6 +157,8 @@ var _ = Describe("RolloutManager tests", func() {
 					},
 				}
 				Expect(k8sClient.Create(ctx, &rolloutManager)).To(Succeed())
+				Eventually(rolloutManager, "1m", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
+
 				deployment := appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rolloutManager.Namespace},
 				}
@@ -275,6 +201,7 @@ var _ = Describe("RolloutManager tests", func() {
 					Version: "latest",
 				}
 				Expect(k8sClient.Create(ctx, &rolloutManager)).To(Succeed())
+				Eventually(rolloutManager, "1m", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhasePending))
 
 				deployment := appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rolloutManager.Namespace},
@@ -300,11 +227,3 @@ var _ = Describe("RolloutManager tests", func() {
 		})
 	})
 })
-
-func ensureLabels(object *metav1.ObjectMeta) {
-	GinkgoHelper()
-	Expect(len(object.Labels)).To(Equal(3))
-	Expect(object.Labels["app.kubernetes.io/name"]).To(Equal(controllers.DefaultArgoRolloutsResourceName))
-	Expect(object.Labels["app.kubernetes.io/part-of"]).To(Equal(controllers.DefaultArgoRolloutsResourceName))
-	Expect(object.Labels["app.kubernetes.io/component"]).To(Equal(controllers.DefaultArgoRolloutsResourceName))
-}
