@@ -146,7 +146,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToAdminClusterRole(
 			Name: name,
 		},
 	}
-	setRolloutsAggregatedClusterRoleLabels(&clusterRole.ObjectMeta, name)
+	setRolloutsAggregatedClusterRoleLabels(&clusterRole.ObjectMeta, name, aggregationType)
 
 	if err := fetchObject(ctx, r.Client, cr.Namespace, clusterRole.Name, clusterRole); err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -180,7 +180,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToEditClusterRole(c
 			Name: name,
 		},
 	}
-	setRolloutsAggregatedClusterRoleLabels(&clusterRole.ObjectMeta, name)
+	setRolloutsAggregatedClusterRoleLabels(&clusterRole.ObjectMeta, name, aggregationType)
 
 	if err := fetchObject(ctx, r.Client, cr.Namespace, clusterRole.Name, clusterRole); err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -214,7 +214,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToViewClusterRole(c
 			Name: name,
 		},
 	}
-	setRolloutsAggregatedClusterRoleLabels(&clusterRole.ObjectMeta, name)
+	setRolloutsAggregatedClusterRoleLabels(&clusterRole.ObjectMeta, name, aggregationType)
 
 	if err := fetchObject(ctx, r.Client, cr.Namespace, clusterRole.Name, clusterRole); err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -395,13 +395,13 @@ func (r *RolloutManagerReconciler) deleteRolloutResources(ctx context.Context, c
 	return nil
 }
 
-func setRolloutsAggregatedClusterRoleLabels(obj *metav1.ObjectMeta, name string) {
+func setRolloutsAggregatedClusterRoleLabels(obj *metav1.ObjectMeta, name string, aggregationType string) {
 
 	obj.Labels = map[string]string{}
 	obj.Labels["app.kubernetes.io/component"] = "aggregate-cluster-role"
 	obj.Labels["app.kubernetes.io/name"] = name
 	obj.Labels["app.kubernetes.io/part-of"] = DefaultArgoRolloutsResourceName
-	obj.Labels["rbac.authorization.k8s.io/aggregate-to-admin"] = "true"
+	obj.Labels["rbac.authorization.k8s.io/"+aggregationType] = "true"
 }
 
 // getPolicyRules returns the policy rules for Argo Rollouts Role.
