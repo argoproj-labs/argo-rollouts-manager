@@ -8,9 +8,10 @@ import (
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
-	// . "github.com/onsi/gomega"
 
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -26,7 +27,9 @@ import (
 )
 
 const (
-	TestE2ENamespace = "argo-rollouts"
+	TestE2ENamespace     = "argo-rollouts"
+	NameSpaceLabelsKey   = "app"
+	NameSpaceLabelsValue = "rolloutsmanager-e2e-test"
 )
 
 type Cleaner struct {
@@ -35,7 +38,7 @@ type Cleaner struct {
 }
 
 func NewCleaner() (*Cleaner, error) {
-	k8sClient, err := GetE2ETestKubeClient()
+	k8sClient, _, err := GetE2ETestKubeClient()
 	if err != nil {
 		return nil, err
 	}
@@ -48,6 +51,11 @@ func NewCleaner() (*Cleaner, error) {
 
 func EnsureCleanSlate() error {
 	cleaner, err := NewCleaner()
+	if err != nil {
+		return err
+	}
+
+	err = cleaner.EnsureTestNamespaceDeleted()
 	if err != nil {
 		return err
 	}
@@ -138,50 +146,50 @@ func (cleaner *Cleaner) DeleteNamespace(namespaceParam string) error {
 	return nil
 }
 
-func GetE2ETestKubeClient() (client.Client, error) {
+func GetE2ETestKubeClient() (client.Client, *runtime.Scheme, error) {
 	config, err := GetSystemKubeConfig()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	k8sClient, err := GetKubeClient(config)
+	k8sClient, scheme, err := GetKubeClient(config)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return k8sClient, nil
+	return k8sClient, scheme, nil
 }
 
 // GetKubeClient returns a controller-runtime Client for accessing K8s API resources used by the controller.
-func GetKubeClient(config *rest.Config) (client.Client, error) {
+func GetKubeClient(config *rest.Config) (client.Client, *runtime.Scheme, error) {
 
 	scheme := runtime.NewScheme()
 
 	if err := rolloutsmanagerv1alpha1.AddToScheme(scheme); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if err := corev1.AddToScheme(scheme); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if err := apps.AddToScheme(scheme); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if err := rbacv1.AddToScheme(scheme); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if err := admissionv1.AddToScheme(scheme); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	k8sClient, err := client.New(config, client.Options{Scheme: scheme})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return k8sClient, nil
+	return k8sClient, scheme, nil
 
 }
 
@@ -198,4 +206,32 @@ func GetSystemKubeConfig() (*rest.Config, error) {
 		return nil, err
 	}
 	return restConfig, nil
+}
+
+func (cleaner *Cleaner) EnsureTestNamespaceDeleted() error {
+	nsList, err := ListNameSpaces(cleaner.cxt, cleaner.k8sClient)
+	if err != nil {
+		return fmt.Errorf("unable to delete test namespace: %w", err)
+	}
+
+	for _, namespace := range nsList.Items {
+		if err := cleaner.DeleteNamespace(namespace.Name); err != nil {
+			return fmt.Errorf("unable to delete namespace '%s': %w", namespace.Name, err)
+		}
+	}
+	return nil
+}
+
+func ListNameSpaces(ctx context.Context, k8sClient client.Client) (corev1.NamespaceList, error) {
+	nsList := corev1.NamespaceList{}
+	req, err := labels.NewRequirement(NameSpaceLabelsKey, selection.Equals, []string{NameSpaceLabelsValue})
+	if err != nil {
+		return nsList, fmt.Errorf("unable to set labels while fetching list of test namespace: %w", err)
+	}
+
+	err = k8sClient.List(ctx, &nsList, &client.ListOptions{LabelSelector: labels.NewSelector().Add(*req)})
+	if err != nil {
+		return nsList, fmt.Errorf("unable to fetch list of test namespace: %w", err)
+	}
+	return nsList, nil
 }

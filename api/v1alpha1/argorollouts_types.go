@@ -40,6 +40,9 @@ type RolloutManagerSpec struct {
 
 	// Version defines Argo Rollouts controller tag (optional)
 	Version string `json:"version,omitempty"`
+
+	// NamespaceScoped lets you specify if rollouts manager has to watch a namespace or the whole cluster
+	NamespaceScoped bool `json:"namespaceScoped,omitempty"`
 }
 
 // ArgoRolloutsNodePlacementSpec is used to specify NodeSelector and Tolerations for Rollouts workloads
@@ -64,6 +67,9 @@ type RolloutManagerStatus struct {
 	// Available: All of the resources for the RolloutManager are ready.
 	// Unknown: The state of the RolloutManager phase could not be obtained.
 	Phase RolloutControllerPhase `json:"phase,omitempty"`
+
+	// Conditions is an array of the RolloutManager's status conditions
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 type RolloutControllerPhase string
@@ -73,6 +79,16 @@ const (
 	PhasePending   RolloutControllerPhase = "Pending"
 	PhaseUnknown   RolloutControllerPhase = "Unknown"
 	PhaseFailure   RolloutControllerPhase = "Failure"
+)
+
+const (
+	RolloutManagerConditionType = "Reconciled"
+)
+
+const (
+	RolloutManagerReasonSuccess                             = "Success"
+	RolloutManagerReasonErrorOccurred                       = "ErrorOccurred"
+	RolloutManagerReasonMultipleClusterScopedRolloutManager = "MultipleClusterScopedRolloutManager"
 )
 
 //+kubebuilder:object:root=true
