@@ -14,9 +14,16 @@ jobs:
   lint_code:
     name: Run golangci-lint and gosec
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 'stable'
+
       - name: "run gosec"
         run: |
           cd $GITHUB_WORKSPACE
