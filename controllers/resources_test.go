@@ -3,9 +3,10 @@ package rollouts
 import (
 	"context"
 	"fmt"
-	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,199 +16,176 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func TestReconcileRolloutManager_verifyRolloutsResources(t *testing.T) {
+var _ = Describe("ReconcileRolloutManager tests", func() {
+	var ctx context.Context
+	var req reconcile.Request
+	var a *v1alpha1.RolloutManager
+	var r *RolloutManagerReconciler
 
-	ctx := context.Background()
-	a := makeTestRolloutManager()
+	BeforeEach(func() {
+		ctx = context.Background()
+		a = makeTestRolloutManager()
+		r = makeTestReconciler(a)
+		err := createNamespace(r, a.Namespace)
+		Expect(err).ToNot(HaveOccurred())
 
-	r := makeTestReconciler(t, a)
-	assert.NoError(t, createNamespace(r, a.Namespace))
+		req = reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      a.Name,
+				Namespace: a.Namespace,
+			},
+		}
+	})
 
-	req := reconcile.Request{
-		NamespacedName: types.NamespacedName{
-			Name:      a.Name,
+	It("Test to verify RolloutsResources", func() {
+		res, err := r.Reconcile(ctx, req)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.Requeue).Should(BeFalse(), "reconcile should not requeue request")
+
+		sa := &corev1.ServiceAccount{}
+		Expect(r.Client.Get(ctx, types.NamespacedName{
+			Name:      DefaultArgoRolloutsResourceName,
+			Namespace: testNamespace,
+		}, sa)).To(Succeed(), fmt.Sprintf("failed to find the rollouts serviceaccount: %#v\n", err))
+
+		role := &rbacv1.Role{}
+		Expect(r.Client.Get(ctx, types.NamespacedName{
+			Name:      DefaultArgoRolloutsResourceName,
+			Namespace: testNamespace,
+		}, role)).To(Succeed(), fmt.Sprintf("failed to find the rollouts role: %#v\n", err))
+
+		roleBinding := &rbacv1.RoleBinding{}
+		Expect(r.Client.Get(ctx, types.NamespacedName{
+			Name:      DefaultArgoRolloutsResourceName,
+			Namespace: testNamespace,
+		}, roleBinding)).To(Succeed(), "failed to find the rollouts rolebinding")
+
+		aggregateToAdminClusterRole := &rbacv1.ClusterRole{}
+		Expect(r.Client.Get(ctx, types.NamespacedName{
+			Name: "argo-rollouts-aggregate-to-admin",
+		}, aggregateToAdminClusterRole)).To(Succeed(), fmt.Sprintf("failed to find the aggregateToAdmin ClusterRole: %#v\n", err))
+
+		aggregateToEditClusterRole := &rbacv1.ClusterRole{}
+		Expect(r.Client.Get(ctx, types.NamespacedName{
+			Name: "argo-rollouts-aggregate-to-edit",
+		}, aggregateToEditClusterRole)).To(Succeed(), fmt.Sprintf("failed to find the aggregateToEdit ClusterRole: %#v\n", err))
+
+		aggregateToViewClusterRole := &rbacv1.ClusterRole{}
+		Expect(r.Client.Get(ctx, types.NamespacedName{
+			Name: "argo-rollouts-aggregate-to-view",
+		}, aggregateToViewClusterRole)).To(Succeed(), fmt.Sprintf("failed to find the aggregateToView ClusterRole: %#v\n", err))
+
+		service := &corev1.Service{}
+		Expect(r.Client.Get(ctx, types.NamespacedName{
+			Name:      DefaultArgoRolloutsMetricsServiceName,
 			Namespace: a.Namespace,
-		},
-	}
+		}, service)).To(Succeed(), fmt.Sprintf("failed to find the rollouts metrics service: %#v\n", err))
 
-	res, err := r.Reconcile(ctx, req)
-	assert.NoError(t, err)
-	if res.Requeue {
-		t.Fatal("reconcile requeued request")
-	}
-
-	sa := &corev1.ServiceAccount{}
-	if err = r.Client.Get(ctx, types.NamespacedName{
-		Name:      DefaultArgoRolloutsResourceName,
-		Namespace: testNamespace,
-	}, sa); err != nil {
-		t.Fatalf("failed to find the rollouts serviceaccount: %#v\n", err)
-	}
-
-	role := &rbacv1.Role{}
-	if err = r.Client.Get(ctx, types.NamespacedName{
-		Name:      DefaultArgoRolloutsResourceName,
-		Namespace: testNamespace,
-	}, role); err != nil {
-		t.Fatalf("failed to find the rollouts role: %#v\n", err)
-	}
-
-	rolebinding := &rbacv1.RoleBinding{}
-	if err = r.Client.Get(ctx, types.NamespacedName{
-		Name:      DefaultArgoRolloutsResourceName,
-		Namespace: testNamespace,
-	}, rolebinding); err != nil {
-		t.Fatalf("failed to find the rollouts rolebinding: %#v\n", err)
-	}
-
-	aggregateToAdminClusterRole := &rbacv1.ClusterRole{}
-	if err = r.Client.Get(ctx, types.NamespacedName{
-		Name: "argo-rollouts-aggregate-to-admin",
-	}, aggregateToAdminClusterRole); err != nil {
-		t.Fatalf("failed to find the aggregateToAdmin ClusterRole: %#v\n", err)
-	}
-
-	aggregateToEditClusterRole := &rbacv1.ClusterRole{}
-	if err = r.Client.Get(ctx, types.NamespacedName{
-		Name: "argo-rollouts-aggregate-to-edit",
-	}, aggregateToEditClusterRole); err != nil {
-		t.Fatalf("failed to find the aggregateToEdit ClusterRole: %#v\n", err)
-	}
-
-	aggregateToViewClusterRole := &rbacv1.ClusterRole{}
-	if err = r.Client.Get(ctx, types.NamespacedName{
-		Name: "argo-rollouts-aggregate-to-view",
-	}, aggregateToViewClusterRole); err != nil {
-		t.Fatalf("failed to find the aggregateToView ClusterRole: %#v\n", err)
-	}
-
-	service := &corev1.Service{}
-	if err = r.Client.Get(ctx, types.NamespacedName{
-		Name:      DefaultArgoRolloutsMetricsServiceName,
-		Namespace: a.Namespace,
-	}, service); err != nil {
-		t.Fatalf("failed to find the rollouts metrics service: %#v\n", err)
-	}
-
-	secret := &corev1.Secret{}
-	if err = r.Client.Get(ctx, types.NamespacedName{
-		Name:      DefaultRolloutsNotificationSecretName,
-		Namespace: a.Namespace,
-	}, secret); err != nil {
-		t.Fatalf("failed to find the rollouts secret: %#v\n", err)
-	}
-}
-
-func TestReconcileAggregateToAdminClusterRole(t *testing.T) {
-	a := makeTestRolloutManager()
-
-	r := makeTestReconciler(t, a)
-	assert.NoError(t, createNamespace(r, a.Namespace))
-
-	assert.NoError(t, r.reconcileRolloutsAggregateToAdminClusterRole(context.Background(), a))
-}
-
-func TestReconcileAggregateToEditClusterRole(t *testing.T) {
-	a := makeTestRolloutManager()
-
-	r := makeTestReconciler(t, a)
-	assert.NoError(t, createNamespace(r, a.Namespace))
-
-	assert.NoError(t, r.reconcileRolloutsAggregateToEditClusterRole(context.Background(), a))
-}
-
-func TestReconcileAggregateToViewClusterRole(t *testing.T) {
-	a := makeTestRolloutManager()
-
-	r := makeTestReconciler(t, a)
-	assert.NoError(t, createNamespace(r, a.Namespace))
-
-	assert.NoError(t, r.reconcileRolloutsAggregateToViewClusterRole(context.Background(), a))
-}
-
-func TestReconcileRolloutManager_CleanUp(t *testing.T) {
-
-	ctx := context.Background()
-	a := makeTestRolloutManager()
-
-	resources := []runtime.Object{a}
-
-	r := makeTestReconciler(t, resources...)
-	assert.NoError(t, createNamespace(r, a.Namespace))
-
-	req := reconcile.Request{
-		NamespacedName: types.NamespacedName{
-			Name:      a.Name,
+		secret := &corev1.Secret{}
+		Expect(r.Client.Get(ctx, types.NamespacedName{
+			Name:      DefaultRolloutsNotificationSecretName,
 			Namespace: a.Namespace,
-		},
-	}
-	res, err := r.Reconcile(ctx, req)
-	assert.NoError(t, err)
-	if res.Requeue {
-		t.Fatal("reconcile requeued request")
-	}
+		}, secret)).To(Succeed(), fmt.Sprintf("failed to find the rollouts secret: %#v\n", err))
+	})
 
-	err = r.Client.Delete(ctx, a)
-	assert.NoError(t, err)
+	It("ReconcileAggregate to adminClusterRole test", func() {
+		err := r.reconcileRolloutsAggregateToAdminClusterRole(context.Background(), a)
+		Expect(err).ToNot(HaveOccurred())
+	})
 
-	// check if rollouts resources are deleted
-	tt := []struct {
-		name     string
-		resource client.Object
-	}{
-		{
-			fmt.Sprintf("ServiceAccount %s", DefaultArgoRolloutsResourceName),
-			&corev1.ServiceAccount{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      DefaultArgoRolloutsResourceName,
-					Namespace: a.Namespace,
-				},
-			},
-		},
-		{
-			fmt.Sprintf("Role %s", DefaultArgoRolloutsResourceName),
-			&rbacv1.Role{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      DefaultArgoRolloutsResourceName,
-					Namespace: a.Namespace,
-				},
-			},
-		},
-		{
-			fmt.Sprintf("RoleBinding %s", DefaultArgoRolloutsResourceName),
-			&rbacv1.RoleBinding{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      DefaultArgoRolloutsResourceName,
-					Namespace: a.Namespace,
-				},
-			},
-		},
-		{
-			fmt.Sprintf("Secret %s", DefaultRolloutsNotificationSecretName),
-			&corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      DefaultRolloutsNotificationSecretName,
-					Namespace: a.Namespace,
-				},
-				Type: corev1.SecretTypeOpaque,
-			},
-		},
-		{
-			fmt.Sprintf("Service %s", DefaultArgoRolloutsResourceName),
-			&corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      DefaultArgoRolloutsResourceName,
-					Namespace: a.Namespace,
-				},
-			},
-		},
-	}
+	It("ReconcileAggregate to EditClusterRole test", func() {
+		err := r.reconcileRolloutsAggregateToEditClusterRole(context.Background(), a)
+		Expect(err).ToNot(HaveOccurred())
+	})
 
-	for _, test := range tt {
-		t.Run(test.name, func(t *testing.T) {
-			if err = fetchObject(ctx, r.Client, a.Namespace, test.name, test.resource); err == nil {
-				t.Errorf("Expected %s to be deleted", test.name)
-			}
-		})
-	}
-}
+	It("ReconcileAggregate to ViewClusterRole", func() {
+		err := r.reconcileRolloutsAggregateToViewClusterRole(context.Background(), a)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	Context("RolloutManager Cleaup tests", func() {
+		ctx = context.Background()
+		a = makeTestRolloutManager()
+
+		req = reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      a.Name,
+				Namespace: a.Namespace,
+			},
+		}
+		resources := []runtime.Object{a}
+
+		r := makeTestReconciler(resources...)
+		err := createNamespace(r, a.Namespace)
+		Expect(err).ToNot(HaveOccurred())
+
+		res, err := r.Reconcile(ctx, req)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(res.Requeue).Should(BeFalse(), "reconcile should not requeue request")
+
+		err = r.Client.Delete(ctx, a)
+		Expect(err).ToNot(HaveOccurred())
+
+		tt := []struct {
+			name     string
+			resource client.Object
+		}{
+			{
+				fmt.Sprintf("ServiceAccount %s", DefaultArgoRolloutsResourceName),
+				&corev1.ServiceAccount{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      DefaultArgoRolloutsResourceName,
+						Namespace: a.Namespace,
+					},
+				},
+			},
+			{
+				fmt.Sprintf("Role %s", DefaultArgoRolloutsResourceName),
+				&rbacv1.Role{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      DefaultArgoRolloutsResourceName,
+						Namespace: a.Namespace,
+					},
+				},
+			},
+			{
+				fmt.Sprintf("RoleBinding %s", DefaultArgoRolloutsResourceName),
+				&rbacv1.RoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      DefaultArgoRolloutsResourceName,
+						Namespace: a.Namespace,
+					},
+				},
+			},
+			{
+				fmt.Sprintf("Secret %s", DefaultRolloutsNotificationSecretName),
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      DefaultRolloutsNotificationSecretName,
+						Namespace: a.Namespace,
+					},
+					Type: corev1.SecretTypeOpaque,
+				},
+			},
+			{
+				fmt.Sprintf("Service %s", DefaultArgoRolloutsResourceName),
+				&corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      DefaultArgoRolloutsResourceName,
+						Namespace: a.Namespace,
+					},
+				},
+			},
+		}
+
+		for _, test := range tt {
+			When(test.name, func() {
+				It("ReconcileRolloutManager CleanUp Test for "+test.name+".", func() {
+					err := fetchObject(ctx, r.Client, a.Namespace, test.name, test.resource)
+					Expect(err).To(HaveOccurred(), fmt.Sprintf("Expected %s to be deleted", test.name))
+				})
+			})
+		}
+	})
+
+})
