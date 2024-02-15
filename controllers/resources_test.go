@@ -26,8 +26,7 @@ var _ = Describe("ReconcileRolloutManager tests", func() {
 		ctx = context.Background()
 		a = makeTestRolloutManager()
 		r = makeTestReconciler(a)
-		err := createNamespace(r, a.Namespace)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(createNamespace(r, a.Namespace)).To(Succeed())
 
 		req = reconcile.Request{
 			NamespacedName: types.NamespacedName{
@@ -89,18 +88,15 @@ var _ = Describe("ReconcileRolloutManager tests", func() {
 	})
 
 	It("ReconcileAggregate to adminClusterRole test", func() {
-		err := r.reconcileRolloutsAggregateToAdminClusterRole(context.Background(), a)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(r.reconcileRolloutsAggregateToAdminClusterRole(context.Background(), a)).To(Succeed())
 	})
 
 	It("ReconcileAggregate to EditClusterRole test", func() {
-		err := r.reconcileRolloutsAggregateToEditClusterRole(context.Background(), a)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(r.reconcileRolloutsAggregateToEditClusterRole(context.Background(), a)).To(Succeed())
 	})
 
 	It("ReconcileAggregate to ViewClusterRole", func() {
-		err := r.reconcileRolloutsAggregateToViewClusterRole(context.Background(), a)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(r.reconcileRolloutsAggregateToViewClusterRole(context.Background(), a)).To(Succeed())
 	})
 
 	Context("RolloutManager Cleaup tests", func() {
@@ -116,15 +112,13 @@ var _ = Describe("ReconcileRolloutManager tests", func() {
 		resources := []runtime.Object{a}
 
 		r := makeTestReconciler(resources...)
-		err := createNamespace(r, a.Namespace)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(createNamespace(r, a.Namespace)).To(Succeed())
 
 		res, err := r.Reconcile(ctx, req)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(res.Requeue).Should(BeFalse(), "reconcile should not requeue request")
 
-		err = r.Client.Delete(ctx, a)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(r.Client.Delete(ctx, a)).To(Succeed())
 
 		tt := []struct {
 			name     string
@@ -181,8 +175,7 @@ var _ = Describe("ReconcileRolloutManager tests", func() {
 		for _, test := range tt {
 			When(test.name, func() {
 				It("ReconcileRolloutManager CleanUp Test for "+test.name+".", func() {
-					err := fetchObject(ctx, r.Client, a.Namespace, test.name, test.resource)
-					Expect(err).To(HaveOccurred(), fmt.Sprintf("Expected %s to be deleted", test.name))
+					Expect(fetchObject(ctx, r.Client, a.Namespace, test.name, test.resource)).ToNot(Succeed(), fmt.Sprintf("Expected %s to be deleted", test.name))
 				})
 			})
 		}

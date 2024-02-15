@@ -19,9 +19,9 @@ const (
 	DefaultRolloutsSelectorKey = "app.kubernetes.io/name"
 
 	// OpenShiftRolloutPluginName is the plugin name for Openshift Route Plugin
-	OpenShiftRolloutPluginName = "openshift-route-plugin"
+	OpenShiftRolloutPluginName = "argoproj-labs/openshift-route-plugin"
 	// OpenShiftRolloutPluginPath is the path on the rollout controller pod where the plugin will be mounted
-	OpenShiftRolloutPluginPath = "/plugin/rollouts-plugin-trafficrouter-openshift"
+	OpenShiftRolloutPluginPath = "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-openshift"
 	// DefaultRolloutsConfigMapName is the default name of the ConfigMap that contains the Rollouts controller configuration
 	DefaultRolloutsConfigMapName = "argo-rollouts-config"
 )

@@ -45,13 +45,11 @@ func (r *RolloutManagerReconciler) reconcileRolloutsManager(ctx context.Context,
 		return err
 	}
 
-	// TODO: #22 - Re-enable this once ConfigMap reconciliation is fixed:
-
-	// // reconcile configMap for plugins
-	// log.Info("reconciling configMap for plugins")
-	// if err := r.reconcileConfigMap(ctx, cr); err != nil {
-	// 	return err
-	// }
+	// reconcile configMap for plugins
+	log.Info("reconciling configMap for plugins")
+	if err := r.reconcileConfigMap(ctx, cr); err != nil {
+		return err
+	}
 
 	log.Info("reconciling rollouts deployment")
 	if err := r.reconcileRolloutsDeployment(ctx, cr, sa); err != nil {
