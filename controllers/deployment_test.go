@@ -15,6 +15,7 @@ var _ = Describe("Deployment Test", func() {
 	var ctx context.Context
 	var a *v1alpha1.RolloutManager
 	var r *RolloutManagerReconciler
+	var sa *corev1.ServiceAccount
 
 	BeforeEach(func() {
 		ctx = context.Background()
@@ -22,90 +23,106 @@ var _ = Describe("Deployment Test", func() {
 
 		r = makeTestReconciler(a)
 		Expect(createNamespace(r, a.Namespace)).To(Succeed())
-	})
 
-	It("should create a new deployment if it does not exist", func() {
-		desiredDeployment := &appsv1.Deployment{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      DefaultArgoRolloutsResourceName,
-				Namespace: a.Namespace,
-			},
-		}
-
-		Expect(r.reconcileRolloutsDeployment(ctx, a, &corev1.ServiceAccount{})).To(Succeed())
-
-		By("fetch the Deployment")
-		fetchedDeployment := &appsv1.Deployment{}
-		Expect(fetchObject(ctx, r.Client, a.Namespace, desiredDeployment.Name, fetchedDeployment)).To(Succeed())
-
-		By("verify that the fetched Deployment matches the desired one")
-		Expect(fetchedDeployment.Name).To(Equal(desiredDeployment.Name))
-
-	})
-
-	It("should update the deployment if it already exists", func() {
-		runAsNonRoot := true
-		sa := &corev1.ServiceAccount{
+		sa = &corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      DefaultArgoRolloutsResourceName,
 				Namespace: a.Namespace,
 			},
 		}
 		Expect(r.Client.Create(ctx, sa)).To(Succeed())
+	})
 
+	It("should create a new deployment if it does not exist", func() {
+		Expect(r.reconcileRolloutsDeployment(ctx, a, sa)).To(Succeed())
+
+		By("fetch the Deployment")
+		fetchedDeployment := &appsv1.Deployment{}
+		Expect(fetchObject(ctx, r.Client, a.Namespace, DefaultArgoRolloutsResourceName, fetchedDeployment)).To(Succeed())
+
+		expectedDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, "tmp", "linux", DefaultArgoRolloutsResourceName, a)
+
+		By("verify that the fetched Deployment matches the desired one")
+		Expect(fetchedDeployment.Name).To(Equal(expectedDeployment.Name))
+		Expect(fetchedDeployment.Labels).To(Equal(expectedDeployment.Labels))
+		Expect(fetchedDeployment.Spec.Template.Spec.ServiceAccountName).To(Equal(expectedDeployment.Spec.Template.Spec.ServiceAccountName))
+		Expect(fetchedDeployment.Spec.Template.Labels).To(Equal(expectedDeployment.Spec.Template.Labels))
+		Expect(fetchedDeployment.Spec.Selector).To(Equal(expectedDeployment.Spec.Selector))
+		Expect(fetchedDeployment.Spec.Template.Spec.NodeSelector).To(Equal(expectedDeployment.Spec.Template.Spec.NodeSelector))
+		Expect(fetchedDeployment.Spec.Template.Spec.Tolerations).To(Equal(expectedDeployment.Spec.Template.Spec.Tolerations))
+		Expect(fetchedDeployment.Spec.Template.Spec.SecurityContext).To(Equal(expectedDeployment.Spec.Template.Spec.SecurityContext))
+		Expect(fetchedDeployment.Spec.Template.Spec.Volumes).To(Equal(expectedDeployment.Spec.Template.Spec.Volumes))
+	})
+
+	It("should update the deployment with default values if deployment already exists", func() {
 		By("create a Deployment")
-		existingDeployment := &appsv1.Deployment{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      DefaultArgoRolloutsResourceName,
-				Namespace: a.Namespace,
-			},
-		}
-		setRolloutsLabels(&existingDeployment.ObjectMeta)
-		existingDeployment.Spec = appsv1.DeploymentSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					DefaultRolloutsSelectorKey: DefaultArgoRolloutsResourceName,
-				},
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						DefaultRolloutsSelectorKey: DefaultArgoRolloutsResourceName,
-					},
-				},
-				Spec: corev1.PodSpec{
-					NodeSelector: map[string]string{
-						"kubernetes.io/os": "linux",
-					},
-					Containers: []corev1.Container{
-						rolloutsContainer(a),
-					},
-					ServiceAccountName: sa.Name,
-					SecurityContext: &corev1.PodSecurityContext{
-						RunAsNonRoot: &runAsNonRoot,
-					},
-				},
-			},
-		}
+		existingDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, "test-resource-name", "tmp-test", "linux-test", sa.Name, a)
 
 		Expect(r.Client.Create(ctx, existingDeployment)).To(Succeed())
 		Expect(r.reconcileRolloutsDeployment(ctx, a, sa)).To(Succeed())
 
 		By("fetch the Deployment")
 		fetchedDeployment := &appsv1.Deployment{}
-		Expect(fetchObject(ctx, r.Client, a.Namespace, existingDeployment.Name, fetchedDeployment)).To(Succeed())
+		Expect(fetchObject(ctx, r.Client, a.Namespace, DefaultArgoRolloutsResourceName, fetchedDeployment)).To(Succeed())
+
+		expectedDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, "tmp", "linux", sa.Name, a)
 
 		By("verify that the fetched Deployment matches the existing one")
-		Expect(fetchedDeployment.Name).To(Equal(existingDeployment.Name))
-		Expect(fetchedDeployment.Labels).To(Equal(existingDeployment.Labels))
-		Expect(fetchedDeployment.Spec.Template.Spec.ServiceAccountName).To(Equal(existingDeployment.Spec.Template.Spec.ServiceAccountName))
-		Expect(fetchedDeployment.Spec.Template.Labels).To(Equal(existingDeployment.Spec.Template.Labels))
-		Expect(fetchedDeployment.Spec.Selector).To(Equal(existingDeployment.Spec.Selector))
-		Expect(fetchedDeployment.Spec.Template.Spec.NodeSelector).To(Equal(existingDeployment.Spec.Template.Spec.NodeSelector))
-		Expect(fetchedDeployment.Spec.Template.Spec.Tolerations).To(Equal(existingDeployment.Spec.Template.Spec.Tolerations))
-		Expect(fetchedDeployment.Spec.Template.Spec.SecurityContext).To(Equal(existingDeployment.Spec.Template.Spec.SecurityContext))
-		Expect(fetchedDeployment.Spec.Template.Spec.Volumes).To(Equal(existingDeployment.Spec.Template.Spec.Volumes))
+		Expect(fetchedDeployment.Name).To(Equal(expectedDeployment.Name))
+		Expect(fetchedDeployment.Labels).To(Equal(expectedDeployment.Labels))
+		Expect(fetchedDeployment.Spec.Template.Spec.ServiceAccountName).To(Equal(expectedDeployment.Spec.Template.Spec.ServiceAccountName))
+		Expect(fetchedDeployment.Spec.Template.Labels).To(Equal(expectedDeployment.Spec.Template.Labels))
+		Expect(fetchedDeployment.Spec.Selector).To(Equal(expectedDeployment.Spec.Selector))
+		Expect(fetchedDeployment.Spec.Template.Spec.NodeSelector).To(Equal(expectedDeployment.Spec.Template.Spec.NodeSelector))
+		Expect(fetchedDeployment.Spec.Template.Spec.Tolerations).To(Equal(expectedDeployment.Spec.Template.Spec.Tolerations))
+		Expect(fetchedDeployment.Spec.Template.Spec.SecurityContext).To(Equal(expectedDeployment.Spec.Template.Spec.SecurityContext))
+		Expect(fetchedDeployment.Spec.Template.Spec.Volumes).To(Equal(expectedDeployment.Spec.Template.Spec.Volumes))
 
 	})
 
 })
+
+func deploymentCR(name string, namespace string, label string, volumeName string, nodeSelector string, serviceAccount string, a *v1alpha1.RolloutManager) *appsv1.Deployment {
+	runAsNonRoot := true
+	deploymentCR := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+	setRolloutsLabels(&deploymentCR.ObjectMeta)
+	deploymentCR.Spec = appsv1.DeploymentSpec{
+		Selector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				DefaultRolloutsSelectorKey: label,
+			},
+		},
+		Template: corev1.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					DefaultRolloutsSelectorKey: label,
+				},
+			},
+			Spec: corev1.PodSpec{
+				Volumes: []corev1.Volume{
+					{
+						Name: volumeName,
+					},
+				},
+				NodeSelector: map[string]string{
+					"kubernetes.io/os": nodeSelector,
+				},
+				Containers: []corev1.Container{
+					rolloutsContainer(a),
+				},
+				ServiceAccountName: serviceAccount,
+				SecurityContext: &corev1.PodSecurityContext{
+					RunAsNonRoot: &runAsNonRoot,
+				},
+			},
+		},
+	}
+
+	return deploymentCR
+
+}

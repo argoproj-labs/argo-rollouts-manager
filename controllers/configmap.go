@@ -12,6 +12,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const TrafficRouterPluginKey = "trafficRouterPlugins"
+
 // Reconcile the Rollouts Default Config Map.
 func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager) error {
 
@@ -27,7 +29,7 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr *r
 	trafficRouterPlugins := []types.PluginItem{
 		{
 			Name:     OpenShiftRolloutPluginName,
-			Location: OpenShiftRolloutPluginPath,
+			Location: r.OpenShiftRoutePluginURL,
 		},
 	}
 	pluginString, err := yaml.Marshal(trafficRouterPlugins)
@@ -35,7 +37,7 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr *r
 		return fmt.Errorf("error marshalling trafficRouterPlugin to string %s", err)
 	}
 	desiredConfigMap.Data = map[string]string{
-		"trafficRouterPlugins": string(pluginString),
+		TrafficRouterPluginKey: string(pluginString),
 	}
 
 	actualConfigMap := &corev1.ConfigMap{}
@@ -50,7 +52,7 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr *r
 	}
 
 	var actualTrafficRouterPlugins []types.PluginItem
-	if err = yaml.Unmarshal([]byte(actualConfigMap.Data["trafficRouterPlugins"]), &actualTrafficRouterPlugins); err != nil {
+	if err = yaml.Unmarshal([]byte(actualConfigMap.Data[TrafficRouterPluginKey]), &actualTrafficRouterPlugins); err != nil {
 		return fmt.Errorf("failed to unmarshal traffic router plugins from ConfigMap: %s", err)
 	}
 
@@ -68,7 +70,7 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr *r
 		return fmt.Errorf("error marshalling trafficRouterPlugin to string %s", err)
 	}
 
-	actualConfigMap.Data["trafficRouterPlugins"] = string(pluginString)
+	actualConfigMap.Data[TrafficRouterPluginKey] = string(pluginString)
 
 	return r.Client.Update(ctx, actualConfigMap)
 }

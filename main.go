@@ -91,8 +91,9 @@ func main() {
 	}
 
 	if err = (&controllers.RolloutManagerReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:                  mgr.GetClient(),
+		Scheme:                  mgr.GetScheme(),
+		OpenShiftRoutePluginURL: "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-openshift",
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RolloutManager")
 		os.Exit(1)
