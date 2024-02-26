@@ -25,26 +25,39 @@ var _ = Describe("ConfigMap Test", func() {
 		Expect(createNamespace(r, a.Namespace)).To(Succeed())
 	})
 
-	It("Test to verify that the default ConfigMap is created if it is not present", func() {
-		desiredConfigMap := &corev1.ConfigMap{
+	It("verifies that the default ConfigMap is created if it is not present", func() {
+		expectedConfigMap := &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: DefaultRolloutsConfigMapName,
 			},
 		}
 
+		By("Call reconcileConfigMap")
 		Expect(r.reconcileConfigMap(ctx, a)).To(Succeed())
 
-		By("Fetch the ConfigMap")
-		fetchedConfigMap := &corev1.ConfigMap{}
-		Expect(fetchObject(ctx, r.Client, a.Namespace, desiredConfigMap.Name, fetchedConfigMap)).To(Succeed())
-
 		By("Verify that the fetched ConfigMap matches the desired one")
-		Expect(fetchedConfigMap.Name).To(Equal(desiredConfigMap.Name))
-		Expect(fetchedConfigMap.Data[TrafficRouterPluginKey]).To(ContainSubstring(OpenShiftRolloutPluginName))
+
+		fetchedConfigMap := &corev1.ConfigMap{}
+		Expect(fetchObject(ctx, r.Client, a.Namespace, expectedConfigMap.Name, fetchedConfigMap)).To(Succeed())
+
+		Expect(fetchedConfigMap.Name).To(Equal(expectedConfigMap.Name))
+		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(OpenShiftRolloutPluginName))
+		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(r.OpenShiftRoutePluginLocation))
+
+		By("Call reconcileConfigMap again")
+		Expect(r.reconcileConfigMap(ctx, a)).To(Succeed())
+
+		By("verifying that the data is still present")
+		Expect(fetchedConfigMap.Name).To(Equal(expectedConfigMap.Name))
+		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(OpenShiftRolloutPluginName))
+		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(r.OpenShiftRoutePluginLocation))
+
 	})
 
-	It("Test to verify the presence of the ConfigMap and updates the traffic router plugins", func() {
-		desiredConfigMap := &corev1.ConfigMap{
+	It("verifies that the config map reconciler will not overwrite a custom plugin that is added to the ConfigMap by the user", func() {
+
+		// By("creating a ConfigMap containing default Openshift")
+		expectedConfigMap := &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      DefaultRolloutsConfigMapName,
 				Namespace: a.Namespace,
@@ -54,56 +67,53 @@ var _ = Describe("ConfigMap Test", func() {
 			},
 		}
 
-		trafficRouterPlugins := []types.PluginItem{
-			{
-				Name:     OpenShiftRolloutPluginName,
-				Location: r.OpenShiftRoutePluginURL,
-			},
-		}
-		pluginString, err := yaml.Marshal(trafficRouterPlugins)
-		Expect(err).ToNot(HaveOccurred())
-
-		desiredConfigMap.Data = map[string]string{
-			TrafficRouterPluginKey: string(pluginString),
-		}
-
-		By("test to verify when Openshift Route Plugin already present")
-		Expect(r.Client.Create(ctx, desiredConfigMap)).To(Succeed())
+		By("calling reconcileConfigMap, which will add the default plugin to the ConfigMap")
 		Expect(r.reconcileConfigMap(ctx, a)).To(Succeed())
 
-		By("Fetch the ConfigMap")
+		By("fetching the ConfigMap")
 		fetchedConfigMap := &corev1.ConfigMap{}
-		Expect(fetchObject(ctx, r.Client, a.Namespace, desiredConfigMap.Name, fetchedConfigMap)).To(Succeed())
-		Expect(fetchedConfigMap.Name).To(Equal(desiredConfigMap.Name))
-		Expect(fetchedConfigMap.Data[TrafficRouterPluginKey]).To(ContainSubstring(OpenShiftRolloutPluginName))
+		Expect(fetchObject(ctx, r.Client, a.Namespace, expectedConfigMap.Name, fetchedConfigMap)).To(Succeed())
+		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(OpenShiftRolloutPluginName))
+		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).ToNot(ContainSubstring("test/plugin"))
 
-		By("update trafficRouterPlugins to test the update plugin logic")
-		trafficRouterPlugins = []types.PluginItem{
+		By("adding a new trafficRouter plugin to test the update plugin logic")
+		trafficRouterPlugins := []types.PluginItem{
 			{
 				Name:     "test/plugin",
 				Location: "https://test-path",
 			},
 		}
-		pluginString, err = yaml.Marshal(trafficRouterPlugins)
-		Expect(err).ToNot(HaveOccurred())
 
-		desiredConfigMap.Data = map[string]string{
-			TrafficRouterPluginKey: string(pluginString),
+		newConfigMap := fetchedConfigMap.DeepCopy()
+		{
+			pluginString, err := yaml.Marshal(trafficRouterPlugins)
+			Expect(err).ToNot(HaveOccurred())
+
+			newConfigMap.Data = map[string]string{
+				TrafficRouterPluginConfigMapKey: string(pluginString),
+			}
 		}
 
-		By("Fetch the ConfigMap")
-		Expect(fetchObject(ctx, r.Client, a.Namespace, desiredConfigMap.Name, fetchedConfigMap)).To(Succeed())
+		By("updating the ConfigMap to contain only a user provided plugin")
+		Expect(r.Client.Update(ctx, newConfigMap)).To(Succeed())
 
-		Expect(r.Client.Update(ctx, desiredConfigMap)).To(Succeed())
+		By("calling reconcileConfigMap")
 		Expect(r.reconcileConfigMap(ctx, a)).To(Succeed())
 
-		By("Fetch the ConfigMap")
-		Expect(fetchObject(ctx, r.Client, a.Namespace, desiredConfigMap.Name, fetchedConfigMap)).To(Succeed())
+		By("verifing that when ConfigMap is reconciled, it contains both plugins")
 
-		By("Verify that the fetched ConfigMap is updated with the existing plugin")
-		Expect(fetchedConfigMap.Data[TrafficRouterPluginKey]).To(ContainSubstring("test/plugin"))
-		Expect(fetchedConfigMap.Data[TrafficRouterPluginKey]).To(ContainSubstring(OpenShiftRolloutPluginName))
-		Expect(fetchedConfigMap.Data[TrafficRouterPluginKey]).To(ContainSubstring(r.OpenShiftRoutePluginURL))
+		Expect(fetchObject(ctx, r.Client, a.Namespace, expectedConfigMap.Name, fetchedConfigMap)).To(Succeed())
+		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring("test/plugin"))
+		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(OpenShiftRolloutPluginName))
+		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(r.OpenShiftRoutePluginLocation))
+
+		By("calling reconcileConfigMap again, to verify nothing changes when reconcile is called again")
+		Expect(r.reconcileConfigMap(ctx, a)).To(Succeed())
+
+		Expect(fetchObject(ctx, r.Client, a.Namespace, expectedConfigMap.Name, fetchedConfigMap)).To(Succeed())
+		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring("test/plugin"))
+		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(OpenShiftRolloutPluginName))
+		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(r.OpenShiftRoutePluginLocation))
 
 	})
 })

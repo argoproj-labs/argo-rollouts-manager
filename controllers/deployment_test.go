@@ -34,6 +34,8 @@ var _ = Describe("Deployment Test", func() {
 	})
 
 	It("should create a new deployment if it does not exist", func() {
+
+		By("calling reconcileRolloutsDeployment")
 		Expect(r.reconcileRolloutsDeployment(ctx, a, sa)).To(Succeed())
 
 		By("fetch the Deployment")
@@ -54,11 +56,14 @@ var _ = Describe("Deployment Test", func() {
 		Expect(fetchedDeployment.Spec.Template.Spec.Volumes).To(Equal(expectedDeployment.Spec.Template.Spec.Volumes))
 	})
 
-	It("should update the deployment with default values if deployment already exists", func() {
-		By("create a Deployment")
+	It("should update the Deployment back to default values, if deployment already exists and has been modified away from default", func() {
+
+		By("create a new Deployment with custom values")
 		existingDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, "test-resource-name", "tmp-test", "linux-test", sa.Name, a)
 
 		Expect(r.Client.Create(ctx, existingDeployment)).To(Succeed())
+
+		By("calling reconcileRolloutsDeployment")
 		Expect(r.reconcileRolloutsDeployment(ctx, a, sa)).To(Succeed())
 
 		By("fetch the Deployment")
@@ -67,7 +72,7 @@ var _ = Describe("Deployment Test", func() {
 
 		expectedDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, "tmp", "linux", sa.Name, a)
 
-		By("verify that the fetched Deployment matches the existing one")
+		By("verify that the Deployment has been reconciled back to default values")
 		Expect(fetchedDeployment.Name).To(Equal(expectedDeployment.Name))
 		Expect(fetchedDeployment.Labels).To(Equal(expectedDeployment.Labels))
 		Expect(fetchedDeployment.Spec.Template.Spec.ServiceAccountName).To(Equal(expectedDeployment.Spec.Template.Spec.ServiceAccountName))
@@ -82,7 +87,7 @@ var _ = Describe("Deployment Test", func() {
 
 })
 
-func deploymentCR(name string, namespace string, label string, volumeName string, nodeSelector string, serviceAccount string, a *v1alpha1.RolloutManager) *appsv1.Deployment {
+func deploymentCR(name string, namespace string, label string, volumeName string, nodeSelector string, serviceAccount string, rolloutManager *v1alpha1.RolloutManager) *appsv1.Deployment {
 	runAsNonRoot := true
 	deploymentCR := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -113,7 +118,7 @@ func deploymentCR(name string, namespace string, label string, volumeName string
 					"kubernetes.io/os": nodeSelector,
 				},
 				Containers: []corev1.Container{
-					rolloutsContainer(a),
+					rolloutsContainer(rolloutManager),
 				},
 				ServiceAccountName: serviceAccount,
 				SecurityContext: &corev1.PodSecurityContext{

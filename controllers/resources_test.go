@@ -100,25 +100,7 @@ var _ = Describe("ReconcileRolloutManager tests", func() {
 	})
 
 	Context("RolloutManager Cleaup tests", func() {
-		ctx = context.Background()
 		a = makeTestRolloutManager()
-
-		req = reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name:      a.Name,
-				Namespace: a.Namespace,
-			},
-		}
-		resources := []runtime.Object{a}
-
-		r := makeTestReconciler(resources...)
-		Expect(createNamespace(r, a.Namespace)).To(Succeed())
-
-		res, err := r.Reconcile(ctx, req)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(res.Requeue).Should(BeFalse(), "reconcile should not requeue request")
-
-		Expect(r.Client.Delete(ctx, a)).To(Succeed())
 
 		tt := []struct {
 			name     string
@@ -174,7 +156,27 @@ var _ = Describe("ReconcileRolloutManager tests", func() {
 
 		for _, test := range tt {
 			When(test.name, func() {
-				It("ReconcileRolloutManager CleanUp Test for "+test.name+".", func() {
+				It("Cleans up all resources created for RolloutManager", func() {
+
+					ctx := context.Background()
+					req := reconcile.Request{
+						NamespacedName: types.NamespacedName{
+							Name:      a.Name,
+							Namespace: a.Namespace,
+						},
+					}
+					resources := []runtime.Object{a}
+
+					r := makeTestReconciler(resources...)
+					err := createNamespace(r, a.Namespace)
+					Expect(err).ToNot(HaveOccurred())
+
+					res, err := r.Reconcile(ctx, req)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(res.Requeue).Should(BeFalse(), "reconcile should not requeue request")
+
+					err = r.Client.Delete(ctx, a)
+					Expect(err).ToNot(HaveOccurred())
 					Expect(fetchObject(ctx, r.Client, a.Namespace, test.name, test.resource)).ToNot(Succeed(), fmt.Sprintf("Expected %s to be deleted", test.name))
 				})
 			})

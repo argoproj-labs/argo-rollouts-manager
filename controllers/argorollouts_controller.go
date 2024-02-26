@@ -37,8 +37,8 @@ var _ reconcile.Reconciler = &RolloutManagerReconciler{}
 // RolloutManagerReconciler reconciles a RolloutManager object
 type RolloutManagerReconciler struct {
 	client.Client
-	Scheme                  *runtime.Scheme
-	OpenShiftRoutePluginURL string
+	Scheme                       *runtime.Scheme
+	OpenShiftRoutePluginLocation string
 }
 
 var log = logr.Log.WithName("rollouts-controller")

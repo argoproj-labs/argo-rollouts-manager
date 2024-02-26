@@ -12,10 +12,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const TrafficRouterPluginKey = "trafficRouterPlugins"
+// From https://argo-rollouts.readthedocs.io/en/stable/features/traffic-management/plugins/
+const TrafficRouterPluginConfigMapKey = "trafficRouterPlugins"
 
 // Reconcile the Rollouts Default Config Map.
 func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager) error {
+
+	if r.OpenShiftRoutePluginLocation == "" { // sanity test the plugin value
+		return fmt.Errorf("OpenShift Route Plugin location is not set")
+	}
 
 	desiredConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -29,7 +34,7 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr *r
 	trafficRouterPlugins := []types.PluginItem{
 		{
 			Name:     OpenShiftRolloutPluginName,
-			Location: r.OpenShiftRoutePluginURL,
+			Location: r.OpenShiftRoutePluginLocation,
 		},
 	}
 	pluginString, err := yaml.Marshal(trafficRouterPlugins)
@@ -37,7 +42,7 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr *r
 		return fmt.Errorf("error marshalling trafficRouterPlugin to string %s", err)
 	}
 	desiredConfigMap.Data = map[string]string{
-		TrafficRouterPluginKey: string(pluginString),
+		TrafficRouterPluginConfigMapKey: string(pluginString),
 	}
 
 	actualConfigMap := &corev1.ConfigMap{}
@@ -52,7 +57,7 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr *r
 	}
 
 	var actualTrafficRouterPlugins []types.PluginItem
-	if err = yaml.Unmarshal([]byte(actualConfigMap.Data[TrafficRouterPluginKey]), &actualTrafficRouterPlugins); err != nil {
+	if err = yaml.Unmarshal([]byte(actualConfigMap.Data[TrafficRouterPluginConfigMapKey]), &actualTrafficRouterPlugins); err != nil {
 		return fmt.Errorf("failed to unmarshal traffic router plugins from ConfigMap: %s", err)
 	}
 
@@ -70,7 +75,7 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr *r
 		return fmt.Errorf("error marshalling trafficRouterPlugin to string %s", err)
 	}
 
-	actualConfigMap.Data[TrafficRouterPluginKey] = string(pluginString)
+	actualConfigMap.Data[TrafficRouterPluginConfigMapKey] = string(pluginString)
 
 	return r.Client.Update(ctx, actualConfigMap)
 }
