@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	MultipleRMsNotAllowed = "When there exists a cluster-scoped RolloutManager on the cluster, there may not exist any namespace-scoped RolloutManagers."
+	UnsupportedRolloutManagerConfiguration = "when there exists a cluster-scoped RolloutManager on the cluster, there may not exist any other RolloutManagers on the cluster: only a single cluster-scoped RolloutManager, or multple namespace-scoped RolloutManagers, are supported, but not both"
 )
 
 func setRolloutsLabels(obj *metav1.ObjectMeta) {
@@ -168,7 +168,7 @@ func checkForExistingRolloutManager(ctx context.Context, client client.Client, c
 			if err := client.Status().Update(ctx, cr); err != nil {
 				return fmt.Errorf("error updating the RolloutManager CR status: %w", err)
 			}
-			return fmt.Errorf(MultipleRMsNotAllowed)
+			return fmt.Errorf(UnsupportedRolloutManagerConfiguration)
 		}
 	}
 	// either there are no existing rollout managers or all are namespace scoped, so continue reconciliation of this CR
@@ -176,7 +176,7 @@ func checkForExistingRolloutManager(ctx context.Context, client client.Client, c
 }
 
 func multipleRolloutManagersExist(err error) bool {
-	return err.Error() == MultipleRMsNotAllowed
+	return err.Error() == UnsupportedRolloutManagerConfiguration
 }
 
 // insertOrUpdateConditionsInSlice is a generic function for inserting/updating metav1.Condition into a slice of []metav1.Condition
@@ -229,7 +229,7 @@ func updateStatusConditionOfRolloutManager(ctx context.Context, newCondition met
 		rm.Status.Conditions = newConditions
 
 		if err := k8sClient.Status().Update(ctx, rm); err != nil {
-			log.Error(err, "unable to update RolloutManager status condition.")
+			log.Error(err, "unable to update RolloutManager status condition")
 			return err
 		}
 	}
@@ -252,6 +252,16 @@ func createCondition(message string, reason ...string) metav1.Condition {
 	}
 
 	if len(reason) > 0 {
+
+		if len(reason) > 1 { // Only 0 or 1 reasons are supported.
+			return metav1.Condition{
+				Type:    rolloutsmanagerv1alpha1.RolloutManagerConditionType,
+				Reason:  rolloutsmanagerv1alpha1.RolloutManagerReasonErrorOccurred,
+				Message: "An internal error occurred",
+				Status:  metav1.ConditionTrue,
+			}
+		}
+
 		return metav1.Condition{
 			Type:    rolloutsmanagerv1alpha1.RolloutManagerConditionType,
 			Reason:  reason[0],

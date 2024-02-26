@@ -61,14 +61,14 @@ var _ = Describe("checkForExistingRolloutManager tests", func() {
 	When("Multiple rolloutsManager are created and all are namespace scoped RMs.", func() {
 		It("should not return error for any of them, because only one cluster scoped RM or all namespace scoped RMs are allowed.", func() {
 
-			By("1st RM : Create namespace scoped RM.")
+			By("1st RM: Create namespace scoped RM.")
 			rolloutsManager.Spec.NamespaceScoped = true
 			Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
 
-			By("1st RM : Verify there is no error returned, as only one RM is created yet.")
+			By("1st RM: Verify there is no error returned, as only one RM is created yet.")
 			Expect(checkForExistingRolloutManager(ctx, k8sClient, &rolloutsManager, log)).To(Succeed())
 
-			By("2nd RM : Create namespace scoped RM.")
+			By("2nd RM: Create namespace scoped RM.")
 			rolloutsManager2 := rolloutsmanagerv1alpha1.RolloutManager{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-rm-2",
@@ -80,10 +80,10 @@ var _ = Describe("checkForExistingRolloutManager tests", func() {
 			}
 			Expect(k8sClient.Create(ctx, &rolloutsManager2)).To(Succeed())
 
-			By("2nd RM : Verify there is no error returned, as all namespace scoped RMs are created.")
+			By("2nd RM: Verify there is no error returned, as all namespace scoped RMs are created.")
 			Expect(checkForExistingRolloutManager(ctx, k8sClient, &rolloutsManager2, log)).To(Succeed())
 
-			By("1st RM : Recheck and it should still work, as all namespace scoped RMs are created.")
+			By("1st RM: Recheck and it should still work, as all namespace scoped RMs are created.")
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: rolloutsManager.Name, Namespace: rolloutsManager.Namespace}, &rolloutsManager)).To(Succeed())
 			Expect(checkForExistingRolloutManager(ctx, k8sClient, &rolloutsManager, log)).To(Succeed())
 		})
@@ -92,13 +92,13 @@ var _ = Describe("checkForExistingRolloutManager tests", func() {
 	When("Multiple rolloutsManager are created, including cluster scoped RMs.", func() {
 		It("should return error for all of them, because only one cluster scoped RM or all namespace scoped RMs are allowed.", func() {
 
-			By("1st RM : Create cluster scoped RM.")
+			By("1st RM: Create cluster scoped RM.")
 			Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
 
-			By("1st RM : Verify there is no error returned, as only one RM is created yet.")
+			By("1st RM: Verify there is no error returned, as only one RM is created yet.")
 			Expect(checkForExistingRolloutManager(ctx, k8sClient, &rolloutsManager, log)).To(Succeed())
 
-			By("2nd RM : Create namespace scoped RM.")
+			By("2nd RM: Create namespace scoped RM.")
 			rolloutsManager2 := rolloutsmanagerv1alpha1.RolloutManager{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-rm-2",
@@ -110,14 +110,14 @@ var _ = Describe("checkForExistingRolloutManager tests", func() {
 			}
 			Expect(k8sClient.Create(ctx, &rolloutsManager2)).To(Succeed())
 
-			By("2nd RM : It should return error.")
+			By("2nd RM: It should return error.")
 			err := checkForExistingRolloutManager(ctx, k8sClient, &rolloutsManager2, log)
 			Expect(err).To(HaveOccurred())
 			Expect(multipleRolloutManagersExist(err)).To(BeTrue())
 			Expect(rolloutsManager2.Status.Phase).To(Equal(rolloutsmanagerv1alpha1.PhaseFailure))
 			Expect(rolloutsManager2.Status.RolloutController).To(Equal(rolloutsmanagerv1alpha1.PhaseFailure))
 
-			By("1st RM : Recheck 1st RM and it should also have error now. since multiple RMs are created.")
+			By("1st RM: Recheck 1st RM and it should also have error now. since multiple RMs are created.")
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: rolloutsManager2.Name, Namespace: rolloutsManager2.Namespace}, &rolloutsManager2)).To(Succeed())
 
 			err = checkForExistingRolloutManager(ctx, k8sClient, &rolloutsManager, log)

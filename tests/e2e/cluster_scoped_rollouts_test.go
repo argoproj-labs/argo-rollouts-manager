@@ -40,10 +40,10 @@ var _ = Describe("Cluster Scoped RolloutManager tests", func() {
 			Expect(fixture.EnsureCleanSlate()).To(Succeed())
 
 			k8sClient, scheme, err = fixture.GetE2ETestKubeClient()
-			Expect(err).To(Succeed())
+			Expect(err).ToNot(HaveOccurred())
 
 			err = rv1alpha1.AddToScheme(scheme)
-			Expect(err).To(Succeed())
+			Expect(err).ToNot(HaveOccurred())
 
 			ctx = context.Background()
 		})
@@ -60,13 +60,13 @@ var _ = Describe("Cluster Scoped RolloutManager tests", func() {
 
 			By("Create cluster scoped RolloutManager in default namespace.")
 			rolloutsManager, err := createRolloutManager(ctx, k8sClient, "test-rollouts-manager-1", fixture.TestE2ENamespace, false)
-			Expect(err).To(Succeed())
+			Expect(err).ToNot(HaveOccurred())
 
 			By("Verify that RolloutManager is successfully created.")
 			Eventually(rolloutsManager, "1m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseAvailable))
 
 			By("Verify that Status.Condition is set.")
-			Eventually(rolloutsManager, "1m", "1s").Should(rmFixture.HaveConditions(
+			Eventually(rolloutsManager, "1m", "1s").Should(rmFixture.HaveCondition(
 				metav1.Condition{
 					Type:    rmv1alpha1.RolloutManagerConditionType,
 					Status:  metav1.ConditionTrue,
@@ -101,13 +101,13 @@ var _ = Describe("Cluster Scoped RolloutManager tests", func() {
 
 			By("Create cluster scoped RolloutManager.")
 			rolloutsManager, err := createRolloutManager(ctx, k8sClient, "test-rollouts-manager-1", nsName1, false)
-			Expect(err).To(Succeed())
+			Expect(err).ToNot(HaveOccurred())
 
 			By("Verify that RolloutManager is successfully created.")
 			Eventually(rolloutsManager, "1m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseAvailable))
 
 			By("Verify that Status.Condition is set.")
-			Eventually(rolloutsManager, "1m", "1s").Should(rmFixture.HaveConditions(
+			Eventually(rolloutsManager, "1m", "1s").Should(rmFixture.HaveCondition(
 				metav1.Condition{
 					Type:    rmv1alpha1.RolloutManagerConditionType,
 					Status:  metav1.ConditionTrue,
@@ -142,13 +142,13 @@ var _ = Describe("Cluster Scoped RolloutManager tests", func() {
 
 			By("Create cluster scoped RolloutManager.")
 			rolloutsManager, err := createRolloutManager(ctx, k8sClient, "test-rollouts-manager-1", nsName1, false)
-			Expect(err).To(Succeed())
+			Expect(err).ToNot(HaveOccurred())
 
 			By("Verify that RolloutManager is successfully created.")
 			Eventually(rolloutsManager, "1m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseAvailable))
 
 			By("Verify that Status.Condition is set.")
-			Eventually(rolloutsManager, "1m", "1s").Should(rmFixture.HaveConditions(
+			Eventually(rolloutsManager, "1m", "1s").Should(rmFixture.HaveCondition(
 				metav1.Condition{
 					Type:    rmv1alpha1.RolloutManagerConditionType,
 					Status:  metav1.ConditionTrue,
@@ -161,16 +161,16 @@ var _ = Describe("Cluster Scoped RolloutManager tests", func() {
 
 			By("Verify argo rollout controller able to reconcile CR of multiple namespaces.")
 
-			By("1st rollout : Create a different namespace for rollout.")
+			By("1st rollout: Create a different namespace for rollout.")
 			Expect(createNamespace(ctx, k8sClient, nsName2)).To(Succeed())
 
-			By("1st rollout : Create active and preview services in 1st namespace.")
+			By("1st rollout: Create active and preview services in 1st namespace.")
 			validateArgoRolloutsResources(ctx, k8sClient, nsName2, labels, 31000, 32000)
 
-			By("2nd rollout : Create a another namespace for 2nd rollout.")
+			By("2nd rollout: Create a another namespace for 2nd rollout.")
 			Expect(createNamespace(ctx, k8sClient, nsName3)).To(Succeed())
 
-			By("2nd rollout : Create active and preview services in 2nd namespace.")
+			By("2nd rollout: Create active and preview services in 2nd namespace.")
 			validateArgoRolloutsResources(ctx, k8sClient, nsName3, labels, 31001, 32002)
 		})
 
@@ -186,13 +186,13 @@ var _ = Describe("Cluster Scoped RolloutManager tests", func() {
 
 			By("Create cluster scoped RolloutManager in a namespace.")
 			rolloutsManagerCl, err := createRolloutManager(ctx, k8sClient, "test-rollouts-manager-1", fixture.TestE2ENamespace, false)
-			Expect(err).To(Succeed())
+			Expect(err).ToNot(HaveOccurred())
 
 			By("Verify that RolloutManager is successfully created.")
 			Eventually(rolloutsManagerCl, "1m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseAvailable))
 
 			By("Verify that Status.Condition is set.")
-			Eventually(rolloutsManagerCl, "1m", "1s").Should(rmFixture.HaveConditions(
+			Eventually(rolloutsManagerCl, "1m", "1s").Should(rmFixture.HaveCondition(
 				metav1.Condition{
 					Type:    rmv1alpha1.RolloutManagerConditionType,
 					Status:  metav1.ConditionTrue,
@@ -205,18 +205,18 @@ var _ = Describe("Cluster Scoped RolloutManager tests", func() {
 
 			By("Create namespace scoped RolloutManager in different namespace.")
 			rolloutsManagerNs, err := createRolloutManager(ctx, k8sClient, "test-rollouts-manager-2", nsName, true)
-			Expect(err).To(Succeed())
+			Expect(err).ToNot(HaveOccurred())
 
 			By("Verify that RolloutManager is not working.")
 			Eventually(rolloutsManagerNs, "1m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseFailure))
 
 			By("Verify that Status.Condition is having error message.")
-			Eventually(rolloutsManagerNs, "1m", "1s").Should(rmFixture.HaveConditions(
+			Eventually(rolloutsManagerNs, "1m", "1s").Should(rmFixture.HaveCondition(
 				metav1.Condition{
 					Type:    rmv1alpha1.RolloutManagerConditionType,
 					Status:  metav1.ConditionFalse,
 					Reason:  rmv1alpha1.RolloutManagerReasonMultipleClusterScopedRolloutManager,
-					Message: controllers.MultipleRMsNotAllowed,
+					Message: controllers.UnsupportedRolloutManagerConfiguration,
 				}))
 
 			By("Update cluster scoped RolloutManager, after reconciliation it should also stop working.")
@@ -229,12 +229,12 @@ var _ = Describe("Cluster Scoped RolloutManager tests", func() {
 			Eventually(rolloutsManagerCl, "1m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseFailure))
 
 			By("Verify that Status.Condition is now having error message.")
-			Eventually(rolloutsManagerCl, "3m", "1s").Should(rmFixture.HaveConditions(
+			Eventually(rolloutsManagerCl, "3m", "1s").Should(rmFixture.HaveCondition(
 				metav1.Condition{
 					Type:    rmv1alpha1.RolloutManagerConditionType,
 					Status:  metav1.ConditionFalse,
 					Reason:  rmv1alpha1.RolloutManagerReasonMultipleClusterScopedRolloutManager,
-					Message: controllers.MultipleRMsNotAllowed,
+					Message: controllers.UnsupportedRolloutManagerConfiguration,
 				}))
 		})
 
@@ -250,13 +250,13 @@ var _ = Describe("Cluster Scoped RolloutManager tests", func() {
 
 			By("Create cluster scoped RolloutManager in a namespace.")
 			rolloutsManagerCl, err := createRolloutManager(ctx, k8sClient, "test-rollouts-manager-1", fixture.TestE2ENamespace, false)
-			Expect(err).To(Succeed())
+			Expect(err).ToNot(HaveOccurred())
 
 			By("Verify that RolloutManager is successfully created.")
 			Eventually(rolloutsManagerCl, "1m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseAvailable))
 
 			By("Verify that Status.Condition is set.")
-			Eventually(rolloutsManagerCl, "1m", "1s").Should(rmFixture.HaveConditions(
+			Eventually(rolloutsManagerCl, "1m", "1s").Should(rmFixture.HaveCondition(
 				metav1.Condition{
 					Type:    rmv1alpha1.RolloutManagerConditionType,
 					Status:  metav1.ConditionTrue,
@@ -269,38 +269,38 @@ var _ = Describe("Cluster Scoped RolloutManager tests", func() {
 
 			By("Create cluster scoped RolloutManager in different namespace.")
 			rolloutsManagerNs, err := createRolloutManager(ctx, k8sClient, "test-rollouts-manager-2", nsName, false)
-			Expect(err).To(Succeed())
+			Expect(err).ToNot(HaveOccurred())
 
 			By("Verify that RolloutManager is not working.")
 			Eventually(rolloutsManagerNs, "1m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseFailure))
 
 			By("Verify that Status.Condition is having error message.")
-			Eventually(rolloutsManagerNs, "1m", "1s").Should(rmFixture.HaveConditions(
+			Eventually(rolloutsManagerNs, "1m", "1s").Should(rmFixture.HaveCondition(
 				metav1.Condition{
 					Type:    rmv1alpha1.RolloutManagerConditionType,
 					Status:  metav1.ConditionFalse,
 					Reason:  rmv1alpha1.RolloutManagerReasonMultipleClusterScopedRolloutManager,
-					Message: controllers.MultipleRMsNotAllowed,
+					Message: controllers.UnsupportedRolloutManagerConfiguration,
 				}))
 
 			By("Update first RolloutManager, after reconciliation it should also stop working.")
 
 			err = k8sClient.Get(ctx, client.ObjectKeyFromObject(&rolloutsManagerCl), &rolloutsManagerCl)
-			Expect(err).To(Succeed())
+			Expect(err).ToNot(HaveOccurred())
 			rolloutsManagerCl.Spec.Env = append(rolloutsManagerCl.Spec.Env, corev1.EnvVar{Name: "test-name", Value: "test-value"})
 			err = k8sClient.Update(ctx, &rolloutsManagerCl)
-			Expect(err).To(Succeed())
+			Expect(err).ToNot(HaveOccurred())
 
 			By("Verify that now first RolloutManager is also not working.")
 			Eventually(rolloutsManagerCl, "1m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseFailure))
 
 			By("Verify that Status.Condition is now having error message.")
-			Eventually(rolloutsManagerCl, "3m", "1s").Should(rmFixture.HaveConditions(
+			Eventually(rolloutsManagerCl, "3m", "1s").Should(rmFixture.HaveCondition(
 				metav1.Condition{
 					Type:    rmv1alpha1.RolloutManagerConditionType,
 					Status:  metav1.ConditionFalse,
 					Reason:  rmv1alpha1.RolloutManagerReasonMultipleClusterScopedRolloutManager,
-					Message: controllers.MultipleRMsNotAllowed,
+					Message: controllers.UnsupportedRolloutManagerConfiguration,
 				}))
 		})
 
@@ -316,13 +316,13 @@ var _ = Describe("Cluster Scoped RolloutManager tests", func() {
 
 			By("Create namespace scoped RolloutManager in a namespace.")
 			rolloutsManagerNs, err := createRolloutManager(ctx, k8sClient, "test-rollouts-manager-1", fixture.TestE2ENamespace, true)
-			Expect(err).To(Succeed())
+			Expect(err).ToNot(HaveOccurred())
 
 			By("Verify that RolloutManager is successfully created.")
 			Eventually(rolloutsManagerNs, "1m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseAvailable))
 
 			By("Verify that Status.Condition is set.")
-			Eventually(rolloutsManagerNs, "1m", "1s").Should(rmFixture.HaveConditions(
+			Eventually(rolloutsManagerNs, "1m", "1s").Should(rmFixture.HaveCondition(
 				metav1.Condition{
 					Type:    rmv1alpha1.RolloutManagerConditionType,
 					Status:  metav1.ConditionTrue,
@@ -335,38 +335,38 @@ var _ = Describe("Cluster Scoped RolloutManager tests", func() {
 
 			By("Create cluster scoped RolloutManager in different namespace.")
 			rolloutsManagerCl, err := createRolloutManager(ctx, k8sClient, "test-rollouts-manager-2", nsName, false)
-			Expect(err).To(Succeed())
+			Expect(err).ToNot(HaveOccurred())
 
 			By("Verify that RolloutManager is not working.")
 			Eventually(rolloutsManagerCl, "1m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseFailure))
 
 			By("Verify that Status.Condition is having error message.")
-			Eventually(rolloutsManagerCl, "1m", "1s").Should(rmFixture.HaveConditions(
+			Eventually(rolloutsManagerCl, "1m", "1s").Should(rmFixture.HaveCondition(
 				metav1.Condition{
 					Type:    rmv1alpha1.RolloutManagerConditionType,
 					Status:  metav1.ConditionFalse,
 					Reason:  rmv1alpha1.RolloutManagerReasonMultipleClusterScopedRolloutManager,
-					Message: controllers.MultipleRMsNotAllowed,
+					Message: controllers.UnsupportedRolloutManagerConfiguration,
 				}))
 
 			By("Update namespace scoped RolloutManager, after reconciliation it should also stop working.")
 
 			err = k8sClient.Get(ctx, client.ObjectKeyFromObject(&rolloutsManagerNs), &rolloutsManagerNs)
-			Expect(err).To(Succeed())
+			Expect(err).ToNot(HaveOccurred())
 			rolloutsManagerNs.Spec.Env = append(rolloutsManagerNs.Spec.Env, corev1.EnvVar{Name: "test-name", Value: "test-value"})
 			err = k8sClient.Update(ctx, &rolloutsManagerNs)
-			Expect(err).To(Succeed())
+			Expect(err).ToNot(HaveOccurred())
 
 			By("Verify that now namespace scoped RolloutManager is also not working.")
 			Eventually(rolloutsManagerNs, "1m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseFailure))
 
 			By("Verify that Status.Condition is now having error message.")
-			Eventually(rolloutsManagerNs, "3m", "1s").Should(rmFixture.HaveConditions(
+			Eventually(rolloutsManagerNs, "3m", "1s").Should(rmFixture.HaveCondition(
 				metav1.Condition{
 					Type:    rmv1alpha1.RolloutManagerConditionType,
 					Status:  metav1.ConditionFalse,
 					Reason:  rmv1alpha1.RolloutManagerReasonMultipleClusterScopedRolloutManager,
-					Message: controllers.MultipleRMsNotAllowed,
+					Message: controllers.UnsupportedRolloutManagerConfiguration,
 				}))
 		})
 	})
@@ -376,7 +376,7 @@ func createNamespace(ctx context.Context, k8sClient client.Client, name string) 
 	return k8sClient.Create(ctx,
 		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
-			Labels: map[string]string{fixture.NameSpaceLabelsKey: fixture.NameSpaceLabelsValue},
+			Labels: map[string]string{fixture.NamespaceLabelsKey: fixture.NamespaceLabelsValue},
 		}})
 }
 
@@ -505,16 +505,16 @@ func validateArgoRolloutsResources(ctx context.Context, k8sClient client.Client,
 
 	By("Create active and preview services in new namespace")
 	rolloutServiceActive, err := createService(ctx, k8sClient, "rollout-bluegreen-active", nsName, port1, labels)
-	Expect(err).To(Succeed())
+	Expect(err).ToNot(HaveOccurred())
 	Eventually(&rolloutServiceActive, "10s", "1s").Should(k8s.ExistByName(k8sClient))
 
 	rolloutServicePreview, err := createService(ctx, k8sClient, "rollout-bluegreen-preview", nsName, port2, labels)
-	Expect(err).To(Succeed())
+	Expect(err).ToNot(HaveOccurred())
 	Eventually(&rolloutServicePreview, "10s", "1s").Should(k8s.ExistByName(k8sClient))
 
 	By("Create Argo Rollout CR in new namespace and check it is reconciled successfully.")
 	rollout, err := createArgoRollout(ctx, k8sClient, "simple-rollout", nsName, rolloutServiceActive.Name, rolloutServicePreview.Name, labels)
-	Expect(err).To(Succeed())
+	Expect(err).ToNot(HaveOccurred())
 	Eventually(func() bool {
 		if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(&rollout), &rollout); err != nil {
 			return false

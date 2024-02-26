@@ -53,7 +53,7 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr *r
 			log.Info("configMap not found, creating default configmap with openshift route plugin information")
 			return r.Client.Create(ctx, desiredConfigMap)
 		}
-		return fmt.Errorf("failed to get the serviceAccount associated with %s : %s", desiredConfigMap.Name, err)
+		return fmt.Errorf("failed to get the serviceAccount associated with %s: %s", desiredConfigMap.Name, err)
 	}
 
 	var actualTrafficRouterPlugins []types.PluginItem

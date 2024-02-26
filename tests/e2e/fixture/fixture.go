@@ -28,8 +28,8 @@ import (
 
 const (
 	TestE2ENamespace     = "argo-rollouts"
-	NameSpaceLabelsKey   = "app"
-	NameSpaceLabelsValue = "rolloutsmanager-e2e-test"
+	NamespaceLabelsKey   = "app"
+	NamespaceLabelsValue = "rolloutsmanager-e2e-test"
 )
 
 type Cleaner struct {
@@ -37,7 +37,7 @@ type Cleaner struct {
 	k8sClient client.Client
 }
 
-func NewCleaner() (*Cleaner, error) {
+func newCleaner() (*Cleaner, error) {
 	k8sClient, _, err := GetE2ETestKubeClient()
 	if err != nil {
 		return nil, err
@@ -50,22 +50,22 @@ func NewCleaner() (*Cleaner, error) {
 }
 
 func EnsureCleanSlate() error {
-	cleaner, err := NewCleaner()
+	cleaner, err := newCleaner()
 	if err != nil {
 		return err
 	}
 
-	err = cleaner.EnsureTestNamespaceDeleted()
+	err = cleaner.ensureTestNamespaceDeleted()
 	if err != nil {
 		return err
 	}
 
-	err = cleaner.EnsureDestinationNamespaceExists(TestE2ENamespace)
+	err = cleaner.ensureDestinationNamespaceExists(TestE2ENamespace)
 	if err != nil {
 		return err
 	}
 
-	err = cleaner.DeleteRolloutsClusterRoles()
+	err = cleaner.deleteRolloutsClusterRoles()
 	if err != nil {
 		return err
 	}
@@ -73,8 +73,8 @@ func EnsureCleanSlate() error {
 	return nil
 }
 
-func (cleaner *Cleaner) EnsureDestinationNamespaceExists(namespaceParam string) error {
-	if err := cleaner.DeleteNamespace(namespaceParam); err != nil {
+func (cleaner *Cleaner) ensureDestinationNamespaceExists(namespaceParam string) error {
+	if err := cleaner.deleteNamespace(namespaceParam); err != nil {
 		return fmt.Errorf("unable to delete namespace '%s': %w", namespaceParam, err)
 	}
 
@@ -89,7 +89,7 @@ func (cleaner *Cleaner) EnsureDestinationNamespaceExists(namespaceParam string) 
 	return nil
 }
 
-func (cleaner *Cleaner) DeleteRolloutsClusterRoles() error {
+func (cleaner *Cleaner) deleteRolloutsClusterRoles() error {
 	crList := rbacv1.ClusterRoleList{}
 	if err := cleaner.k8sClient.List(cleaner.cxt, &crList, &client.ListOptions{}); err != nil {
 		return err
@@ -108,8 +108,8 @@ func (cleaner *Cleaner) DeleteRolloutsClusterRoles() error {
 	return nil
 }
 
-// DeleteNamespace deletes a namespace, and waits for it to be reported as deleted.
-func (cleaner *Cleaner) DeleteNamespace(namespaceParam string) error {
+// deleteNamespace deletes a namespace, and waits for it to be reported as deleted.
+func (cleaner *Cleaner) deleteNamespace(namespaceParam string) error {
 
 	// Delete the namespace:
 	// - Issue a request to Delete the namespace
@@ -147,12 +147,12 @@ func (cleaner *Cleaner) DeleteNamespace(namespaceParam string) error {
 }
 
 func GetE2ETestKubeClient() (client.Client, *runtime.Scheme, error) {
-	config, err := GetSystemKubeConfig()
+	config, err := getSystemKubeConfig()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	k8sClient, scheme, err := GetKubeClient(config)
+	k8sClient, scheme, err := getKubeClient(config)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -160,8 +160,8 @@ func GetE2ETestKubeClient() (client.Client, *runtime.Scheme, error) {
 	return k8sClient, scheme, nil
 }
 
-// GetKubeClient returns a controller-runtime Client for accessing K8s API resources used by the controller.
-func GetKubeClient(config *rest.Config) (client.Client, *runtime.Scheme, error) {
+// getKubeClient returns a controller-runtime Client for accessing K8s API resources used by the controller.
+func getKubeClient(config *rest.Config) (client.Client, *runtime.Scheme, error) {
 
 	scheme := runtime.NewScheme()
 
@@ -194,7 +194,7 @@ func GetKubeClient(config *rest.Config) (client.Client, *runtime.Scheme, error) 
 }
 
 // Retrieve the system-level Kubernetes config (e.g. ~/.kube/config or service account config from volume)
-func GetSystemKubeConfig() (*rest.Config, error) {
+func getSystemKubeConfig() (*rest.Config, error) {
 
 	overrides := clientcmd.ConfigOverrides{}
 
@@ -208,23 +208,23 @@ func GetSystemKubeConfig() (*rest.Config, error) {
 	return restConfig, nil
 }
 
-func (cleaner *Cleaner) EnsureTestNamespaceDeleted() error {
-	nsList, err := ListNameSpaces(cleaner.cxt, cleaner.k8sClient)
+func (cleaner *Cleaner) ensureTestNamespaceDeleted() error {
+	nsList, err := listE2ETestNamespaces(cleaner.cxt, cleaner.k8sClient)
 	if err != nil {
 		return fmt.Errorf("unable to delete test namespace: %w", err)
 	}
 
 	for _, namespace := range nsList.Items {
-		if err := cleaner.DeleteNamespace(namespace.Name); err != nil {
+		if err := cleaner.deleteNamespace(namespace.Name); err != nil {
 			return fmt.Errorf("unable to delete namespace '%s': %w", namespace.Name, err)
 		}
 	}
 	return nil
 }
 
-func ListNameSpaces(ctx context.Context, k8sClient client.Client) (corev1.NamespaceList, error) {
+func listE2ETestNamespaces(ctx context.Context, k8sClient client.Client) (corev1.NamespaceList, error) {
 	nsList := corev1.NamespaceList{}
-	req, err := labels.NewRequirement(NameSpaceLabelsKey, selection.Equals, []string{NameSpaceLabelsValue})
+	req, err := labels.NewRequirement(NamespaceLabelsKey, selection.Equals, []string{NamespaceLabelsValue})
 	if err != nil {
 		return nsList, fmt.Errorf("unable to set labels while fetching list of test namespace: %w", err)
 	}
