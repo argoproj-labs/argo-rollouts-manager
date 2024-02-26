@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 	rolloutsmanagerv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 	"github.com/argoproj-labs/argo-rollouts-manager/tests/e2e/fixture/k8s"
 	. "github.com/onsi/ginkgo/v2"
@@ -23,7 +22,7 @@ import (
 var _ = Describe("RolloutManagerReconciler tests", func() {
 	var (
 		ctx context.Context
-		rm  *v1alpha1.RolloutManager
+		rm  *rolloutsmanagerv1alpha1.RolloutManager
 	)
 
 	BeforeEach(func() {
@@ -164,7 +163,7 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 		Expect(r.Client.Get(ctx, types.NamespacedName{Name: rm2.Name, Namespace: rm2.Namespace}, rm2)).To(Succeed())
 		Expect(rm2.Status.Conditions[0].Type == rolloutsmanagerv1alpha1.RolloutManagerConditionType &&
 			rm2.Status.Conditions[0].Reason == rolloutsmanagerv1alpha1.RolloutManagerReasonMultipleClusterScopedRolloutManager &&
-			rm2.Status.Conditions[0].Message == MultipleRMsNotAllowed &&
+			rm2.Status.Conditions[0].Message == UnsupportedRolloutManagerConfiguration &&
 			rm2.Status.Conditions[0].Status == metav1.ConditionFalse).To(BeTrue())
 	})
 })

@@ -44,17 +44,17 @@ func HavePhase(phase rolloutsmanagerv1alpha1.RolloutControllerPhase) matcher.Gom
 	})
 }
 
-func HaveConditions(expected metav1.Condition) matcher.GomegaMatcher {
+func HaveCondition(expected metav1.Condition) matcher.GomegaMatcher {
 	return fetchRolloutManager(func(app rolloutsmanagerv1alpha1.RolloutManager) bool {
 
 		if len(app.Status.Conditions) == 0 {
-			fmt.Println("HaveConditions: Conditions is nil")
+			fmt.Println("HaveCondition: Conditions is nil")
 			return false
 		}
 
 		for _, condition := range app.Status.Conditions {
 			if condition.Type == expected.Type {
-				fmt.Println("HaveConditions:", "expected: ", expected, "actual: ", condition)
+				fmt.Println("HaveCondition:", "expected: ", expected, "actual: ", condition)
 				return condition.Type == expected.Type &&
 					condition.Status == expected.Status &&
 					condition.Reason == expected.Reason &&
