@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
-	"slices"
+	"sort"
 	"strings"
 	"time"
 )
@@ -112,7 +112,7 @@ func main() {
 		mapKeys = append(mapKeys, key)
 	}
 
-	slices.Sort(mapKeys)
+	sort.Strings(mapKeys)
 
 	atLeastOneTestFailure := false
 
