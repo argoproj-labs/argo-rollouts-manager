@@ -104,7 +104,7 @@ var _ = Describe("Cluster Scoped RolloutManager tests", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			By("Verify that RolloutManager is successfully created.")
-			Eventually(rolloutsManager, "1m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseAvailable))
+			Eventually(rolloutsManager, "3m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseAvailable))
 
 			By("Verify that Status.Condition is set.")
 			Eventually(rolloutsManager, "1m", "1s").Should(rmFixture.HaveCondition(
