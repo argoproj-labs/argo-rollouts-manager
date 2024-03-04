@@ -94,7 +94,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	openShiftRoutePluginLocation := os.Getenv("OPENSHIFT_ROUTE_PLUGIN_URL")
+	openShiftRoutePluginLocation := os.Getenv("OPENSHIFT_ROUTE_PLUGIN_LOCATION")
 
 	if openShiftRoutePluginLocation == "" {
 		openShiftRoutePluginLocation = DefaultOpenShiftRoutePluginURL
