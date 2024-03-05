@@ -40,8 +40,9 @@ func makeTestReconciler(objs ...runtime.Object) *RolloutManagerReconciler {
 
 	cl := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(objs...).Build()
 	return &RolloutManagerReconciler{
-		Client: cl,
-		Scheme: s,
+		Client:                       cl,
+		Scheme:                       s,
+		OpenShiftRoutePluginLocation: "file://non-empty-test-url", // Set a non-real, non-empty value for unit tests: override this to test a specific value
 	}
 }
 

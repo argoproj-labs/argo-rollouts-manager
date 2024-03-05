@@ -49,6 +49,10 @@ func init() {
 	//+kubebuilder:scaffold:scheme
 }
 
+const (
+	DefaultOpenShiftRoutePluginURL = "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-openshift/releases/download/commit-2749e0ac96ba00ce6f4af19dc6d5358048227d77/rollouts-plugin-trafficrouter-openshift-linux-amd64"
+)
+
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
@@ -90,9 +94,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	openShiftRoutePluginLocation := os.Getenv("OPENSHIFT_ROUTE_PLUGIN_LOCATION")
+
+	if openShiftRoutePluginLocation == "" {
+		openShiftRoutePluginLocation = DefaultOpenShiftRoutePluginURL
+	}
+
 	if err = (&controllers.RolloutManagerReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:                       mgr.GetClient(),
+		Scheme:                       mgr.GetScheme(),
+		OpenShiftRoutePluginLocation: openShiftRoutePluginLocation,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RolloutManager")
 		os.Exit(1)

@@ -16,11 +16,8 @@ var _ = Describe("RolloutManager Test", func() {
 		a := makeTestRolloutManager()
 
 		r := makeTestReconciler(a)
-		err := createNamespace(r, a.Namespace)
-		Expect(err).ToNot(HaveOccurred())
-
-		err = r.reconcileStatus(ctx, a)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(createNamespace(r, a.Namespace)).To(Succeed())
+		Expect(r.reconcileStatus(ctx, a)).To(Succeed())
 
 		By("When deployment for rollout controller does not exist")
 		Expect(a.Status.RolloutController).To(Equal(rolloutsmanagerv1alpha1.PhaseFailure))
@@ -34,11 +31,8 @@ var _ = Describe("RolloutManager Test", func() {
 			},
 		}
 
-		err = r.Client.Create(ctx, deploy)
-		Expect(err).ToNot(HaveOccurred())
-
-		err = r.reconcileStatus(ctx, a)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(r.Client.Create(ctx, deploy)).To(Succeed())
+		Expect(r.reconcileStatus(ctx, a)).To(Succeed())
 
 		Expect(a.Status.RolloutController).To(Equal(rolloutsmanagerv1alpha1.PhaseUnknown))
 		Expect(a.Status.Phase).To(Equal(rolloutsmanagerv1alpha1.PhaseUnknown))
@@ -48,24 +42,19 @@ var _ = Describe("RolloutManager Test", func() {
 		deploy.Status.ReadyReplicas = 0
 		deploy.Spec.Replicas = &requiredReplicas
 
-		err = r.Client.Update(ctx, deploy)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(r.Client.Update(ctx, deploy)).To(Succeed())
 
-		err = r.reconcileStatus(ctx, a)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(r.reconcileStatus(ctx, a)).To(Succeed())
 
 		Expect(a.Status.RolloutController).To(Equal(rolloutsmanagerv1alpha1.PhasePending))
 		Expect(a.Status.Phase).To(Equal(rolloutsmanagerv1alpha1.PhasePending))
 
-		// When deployment exists and required number of replicas are up and running.
+		By("When deployment exists and required number of replicas are up and running.")
 		deploy.Status.ReadyReplicas = 1
 		deploy.Spec.Replicas = &requiredReplicas
 
-		err = r.Client.Update(ctx, deploy)
-		Expect(err).ToNot(HaveOccurred())
-
-		err = r.reconcileStatus(ctx, a)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(r.Client.Update(ctx, deploy)).To(Succeed())
+		Expect(r.reconcileStatus(ctx, a)).To(Succeed())
 
 		Expect(a.Status.RolloutController).To(Equal(rolloutsmanagerv1alpha1.PhaseAvailable))
 		Expect(a.Status.Phase).To(Equal(rolloutsmanagerv1alpha1.PhaseAvailable))

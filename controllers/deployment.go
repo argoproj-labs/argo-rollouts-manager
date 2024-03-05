@@ -24,6 +24,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(ctx context.Conte
 			Namespace: cr.Namespace,
 		},
 	}
+
 	setRolloutsLabels(&desiredDeployment.ObjectMeta)
 
 	desiredDeployment.Spec = appsv1.DeploymentSpec{
@@ -65,8 +66,15 @@ func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(ctx context.Conte
 		rolloutsContainer(cr),
 	}
 
+	desiredPodSpec.Volumes = []corev1.Volume{
+		{
+			Name: "tmp",
+		},
+	}
+
 	// If the deployment for rollouts does not exist, create one.
 	actualDeployment := &appsv1.Deployment{}
+
 	if err := fetchObject(ctx, r.Client, cr.Namespace, DefaultArgoRolloutsResourceName, actualDeployment); err != nil {
 		if !errors.IsNotFound(err) {
 			return fmt.Errorf("failed to get the deployment %s : %s", DefaultArgoRolloutsResourceName, err)
@@ -82,7 +90,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(ctx context.Conte
 	actualPodSpec := actualDeployment.Spec.Template.Spec
 
 	// If the Deployment already exists, make sure the values we care about are correct.
-	deploymentsDifferent := !reflect.DeepEqual(actualPodSpec.Containers[0], desiredPodSpec.Containers) ||
+	deploymentsDifferent := !reflect.DeepEqual(actualPodSpec.Containers, desiredPodSpec.Containers) ||
 		actualPodSpec.ServiceAccountName != desiredPodSpec.ServiceAccountName ||
 		!reflect.DeepEqual(actualDeployment.Labels, desiredDeployment.Labels) ||
 		!reflect.DeepEqual(actualDeployment.Spec.Template.Labels, desiredDeployment.Spec.Template.Labels) ||
@@ -166,6 +174,12 @@ func rolloutsContainer(cr *rolloutsmanagerv1alpha1.RolloutManager) corev1.Contai
 			AllowPrivilegeEscalation: boolPtr(false),
 			ReadOnlyRootFilesystem:   boolPtr(false),
 			RunAsNonRoot:             boolPtr(true),
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				MountPath: "/home/argo-rollouts/plugin-bin",
+				Name:      "tmp",
+			},
 		},
 	}
 
