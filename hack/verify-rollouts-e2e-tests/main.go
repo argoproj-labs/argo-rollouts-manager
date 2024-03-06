@@ -10,17 +10,19 @@ import (
 
 func main() {
 
-	// As of February 2024 (Rollouts v1.6.6):
+	// As of March 2024 (Rollouts v1.6.6):
 	//
 	// Always fail:
 	// - TestAPISIXCanarySetHeaderStep
 	// - TestExperimentWithDryRunMetrics (also fails when running upstream rollouts as a container)
 	// - TestControllerMetrics (also fails when running upstream rollouts as a container)
 	//
+	// Often fail:
+	// - TestBlueGreenPromoteFull
+	//
 	// Intermittently fail:
 	// - TestCanaryDynamicStableScale
 	// - TestCanaryScaleDownOnAbort
-	// - TestBlueGreenPromoteFull
 	// - TestALBExperimentStepNoSetWeight
 	// - TestALBExperimentStep
 	// - TestALBExperimentStepNoSetWeightMultiIngress
@@ -33,6 +35,7 @@ func main() {
 		"TestAPISIXSuite/TestAPISIXCanarySetHeaderStep",
 		"TestExperimentSuite/TestExperimentWithDryRunMetrics",
 		"TestFunctionalSuite/TestControllerMetrics",
+		"TestFunctionalSuite/TestBlueGreenPromoteFull",
 	}
 
 	// DONE 6 runs, 144 tests, 6 skipped, 47 failures in 2279.668s
@@ -53,57 +56,11 @@ func main() {
 	fmt.Println()
 
 	// 2) Parse E2E test log, skipping any tests that we expect to fail
-	testsExpectedToFailMap := map[string]any{}
-
-	for _, testExpectedToFail := range testsExpectedToFailList {
-		testsExpectedToFailMap[testExpectedToFail] = ""
-	}
-
-	// map: name of failed test -> list of failed test runs
-	testResults := map[string][]string{}
-
-	for _, line := range fileContents {
-
-		failPrefix := "=== FAIL: test/e2e"
-
-		var testName string
-
-		if strings.HasPrefix(line, failPrefix) {
-			// example: === FAIL: test/e2e TestFunctionalSuite/TestBlueGreenPromoteFull (unknown)
-
-			testName = line[len(failPrefix)+1 : strings.Index(line, "(")-1]
-
-			if !strings.Contains(testName, "/") {
-				// Ignore the fail reported for the suite: we only care about individual test fails
-				continue
-			}
-
-		} else if strings.HasPrefix(line, "PASS") {
-			// example: PASS test/e2e.TestCanarySuite/TestCanaryDynamicStableScale (20.91s)
-
-			roundBraceIndex := strings.Index(line, "(")
-
-			if roundBraceIndex == -1 {
-				continue
-			}
-
-			testName = line[strings.Index(line, ".")+1 : roundBraceIndex-1]
-
-		} else {
-			continue
-		}
-
-		if _, exists := testsExpectedToFailMap[testName]; exists {
-			// Ignore tests that are expected to fail
-			continue
-		}
-
-		if !strings.Contains(testName, "/") {
-			// Skip suite-only results
-			continue
-		}
-
-		testResults[testName] = append(testResults[testName], line)
+	// - map: name of test -> list of test run lines
+	testResults, err := parseTestResultsFromFile(fileContents, testsExpectedToFailList)
+	if err != nil {
+		reportErrorAndExit(err)
+		return
 	}
 
 	// 3) Report unexpected failed tests, in alphabetical order
@@ -114,7 +71,12 @@ func main() {
 
 	sort.Strings(mapKeys)
 
-	atLeastOneTestFailure := false
+	if len(mapKeys) == 0 { // sanity test
+		reportErrorAndExit(fmt.Errorf("no test results found"))
+		return
+	}
+
+	atLeastOneTestPermFail := false
 
 	for _, testName := range mapKeys {
 
@@ -138,18 +100,94 @@ func main() {
 			}
 
 			fmt.Println()
-			atLeastOneTestFailure = true
+			atLeastOneTestPermFail = true
 
 		}
 
 	}
 
 	// 4) Exit with error code 1 if there was at least one unexpected test failure.
-	if atLeastOneTestFailure {
+	if atLeastOneTestPermFail {
 		reportErrorAndExit(fmt.Errorf("at least one test failure occurred"))
 		return
 	}
 
+}
+
+// parseTestResultsFromFile parses the E2E test log, skipping any tests that we expect to fail, and storing the results in a map
+func parseTestResultsFromFile(fileContents []string, testsExpectedToFailList []string) (map[string][]string, error) {
+
+	atLeastOnePassSeen := false
+	atLeastOneFailSeen := false
+
+	testResults := map[string][]string{}
+
+	testsExpectedToFailMap := map[string]any{}
+
+	for _, testExpectedToFail := range testsExpectedToFailList {
+		testsExpectedToFailMap[testExpectedToFail] = ""
+	}
+
+	for _, line := range fileContents {
+
+		testSlashE2EText := "test/e2e"
+
+		if !strings.Contains(line, testSlashE2EText) {
+			continue
+		}
+
+		var testName string
+
+		if strings.HasPrefix(line, "===") && strings.Contains(line, "FAIL") {
+			// example: === FAIL: test/e2e TestFunctionalSuite/TestBlueGreenPromoteFull (unknown)
+			//
+			// Unfortunately, the FAIL line is surrounded by invisible ANSI colour whitespace, so we can't scan for it directly.
+			// - we instead check for ===, FAIL, and the test/e2e string.
+
+			testName = line[strings.Index(line, testSlashE2EText)+len(testSlashE2EText)+1 : strings.Index(line, "(")-1]
+			testName = strings.TrimSpace(testName)
+
+			if !strings.Contains(testName, "/") {
+				// Ignore the fail reported for the suite: we only care about individual test fails
+				continue
+			}
+
+			atLeastOneFailSeen = true
+
+		} else if strings.Contains(line, "PASS") && strings.Contains(line, ".") {
+			// example: PASS test/e2e.TestCanarySuite/TestCanaryDynamicStableScale (20.91s)
+
+			roundBraceIndex := strings.Index(line, "(")
+
+			if roundBraceIndex == -1 {
+				continue
+			}
+
+			testName = line[strings.Index(line, ".")+1 : roundBraceIndex-1]
+			atLeastOnePassSeen = true
+
+		} else {
+			continue
+		}
+
+		if _, exists := testsExpectedToFailMap[testName]; exists {
+			// Ignore tests that are expected to fail
+			continue
+		}
+
+		if !strings.Contains(testName, "/") {
+			// Skip suite-only results
+			continue
+		}
+
+		testResults[testName] = append(testResults[testName], line)
+	}
+
+	if !atLeastOneFailSeen || !atLeastOnePassSeen { // sanity test: BOTH a pass and fail should have occurred in the log.
+		return nil, fmt.Errorf("there may be something wrong with the parser: we expect to see both at least one pass, and at least one fail, in the parsed output: %v %v", atLeastOneFailSeen, atLeastOnePassSeen)
+	}
+
+	return testResults, nil
 }
 
 // waitAndGetE2EFileContents waits for the last line of the file to start with 'DONE' before returning the contents
