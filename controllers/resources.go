@@ -15,7 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-// Reconciles rollouts serviceaccount.
+// Reconciles Rollouts ServiceAccount.
 func (r *RolloutManagerReconciler) reconcileRolloutsServiceAccount(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager) (*corev1.ServiceAccount, error) {
 
 	sa := &corev1.ServiceAccount{
@@ -28,7 +28,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsServiceAccount(ctx context.C
 
 	if err := fetchObject(ctx, r.Client, cr.Namespace, sa.Name, sa); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("failed to get the serviceAccount associated with %s: %s", sa.Name, err)
+			return nil, fmt.Errorf("failed to get the ServiceAccount associated with %s: %s", sa.Name, err)
 		}
 
 		if err := controllerutil.SetControllerReference(cr, sa, r.Scheme); err != nil {
@@ -45,7 +45,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsServiceAccount(ctx context.C
 	return sa, nil
 }
 
-// Reconciles rollouts role.
+// Reconciles Rollouts Role.
 func (r *RolloutManagerReconciler) reconcileRolloutsRole(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager) (*rbacv1.Role, error) {
 
 	expectedPolicyRules := GetPolicyRules()
@@ -60,7 +60,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRole(ctx context.Context, cr
 
 	if err := fetchObject(ctx, r.Client, cr.Namespace, role.Name, role); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("failed to reconcile the role for the service account associated with %s: %s", role.Name, err)
+			return nil, fmt.Errorf("failed to reconcile the Role for the ServiceAccount associated with %s: %s", role.Name, err)
 		}
 
 		if err = controllerutil.SetControllerReference(cr, role, r.Scheme); err != nil {
@@ -72,7 +72,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRole(ctx context.Context, cr
 		return role, r.Client.Create(ctx, role)
 	}
 
-	// Reconcile if the role already exists and modified.
+	// Reconcile if the Role already exists and modified.
 	if !reflect.DeepEqual(role.Rules, expectedPolicyRules) {
 		log.Info(fmt.Sprintf("PolicyRules of Role %s do not match the expected state, hence updating it", role.Name))
 		role.Rules = expectedPolicyRules
@@ -82,8 +82,8 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRole(ctx context.Context, cr
 	return role, nil
 }
 
-// Reconciles argo-rollouts clusterRole.
-func (r *RolloutManagerReconciler) reconcileRolloutsClusterRole(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager) (*rbacv1.ClusterRole, error) {
+// Reconciles Rollouts ClusterRole.
+func (r *RolloutManagerReconciler) reconcileRolloutsClusterRole(ctx context.Context) (*rbacv1.ClusterRole, error) {
 
 	expectedPolicyRules := GetPolicyRules()
 
@@ -96,7 +96,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsClusterRole(ctx context.Cont
 
 	if err := fetchObject(ctx, r.Client, "", clusterRole.Name, clusterRole); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("failed to reconcile the ClusterRole for the ServiceAccount associated with %s: %w", clusterRole.Name, err)
+			return nil, fmt.Errorf("failed to Reconcile the ClusterRole for the ServiceAccount associated with %s: %w", clusterRole.Name, err)
 		}
 
 		log.Info(fmt.Sprintf("Creating ClusterRole %s", clusterRole.Name))
@@ -104,7 +104,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsClusterRole(ctx context.Cont
 		return clusterRole, r.Client.Create(ctx, clusterRole)
 	}
 
-	// Reconcile if the clusterRole already exists and modified.
+	// Reconcile if the ClusterRole already exists and modified.
 	if !reflect.DeepEqual(clusterRole.Rules, expectedPolicyRules) {
 		log.Info(fmt.Sprintf("PolicyRules of ClusterRole %s do not match the expected state, hence updating it", clusterRole.Name))
 		clusterRole.Rules = expectedPolicyRules
@@ -114,7 +114,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsClusterRole(ctx context.Cont
 	return clusterRole, nil
 }
 
-// Reconcile rollouts rolebinding.
+// Reconcile Rollouts RoleBinding.
 func (r *RolloutManagerReconciler) reconcileRolloutsRoleBinding(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager, role *rbacv1.Role, sa *corev1.ServiceAccount) error {
 
 	if role == nil {
@@ -149,10 +149,10 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRoleBinding(ctx context.Cont
 
 	actualRoleBinding := &rbacv1.RoleBinding{}
 
-	// Fetch the rolebinding if exists and store that in actualRoleBinding.
+	// Fetch the RoleBinding if exists and store that in actualRoleBinding.
 	if err := fetchObject(ctx, r.Client, cr.Namespace, expectedRoleBinding.Name, actualRoleBinding); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to get the rolebinding associated with %s: %s", expectedRoleBinding.Name, err)
+			return fmt.Errorf("failed to get the RoleBinding associated with %s: %s", expectedRoleBinding.Name, err)
 		}
 
 		if err := controllerutil.SetControllerReference(cr, expectedRoleBinding, r.Scheme); err != nil {
@@ -163,7 +163,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRoleBinding(ctx context.Cont
 		return r.Client.Create(ctx, expectedRoleBinding)
 	}
 
-	// Reconcile if the role already exists and modified.
+	// Reconcile if the RoleBinding already exists and modified.
 	if !reflect.DeepEqual(expectedRoleBinding.Subjects, actualRoleBinding.Subjects) {
 		log.Info(fmt.Sprintf("Subjects of RoleBinding %s do not match the expected state, hence updating it", actualRoleBinding.Name))
 		actualRoleBinding.Subjects = expectedRoleBinding.Subjects
@@ -175,8 +175,8 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRoleBinding(ctx context.Cont
 	return nil
 }
 
-// Reconcile rollouts clusterRoleBinding.
-func (r *RolloutManagerReconciler) reconcileRolloutsClusterRoleBinding(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager, clusterRole *rbacv1.ClusterRole, sa *corev1.ServiceAccount) error {
+// Reconcile Rollouts ClusterRoleBinding.
+func (r *RolloutManagerReconciler) reconcileRolloutsClusterRoleBinding(ctx context.Context, clusterRole *rbacv1.ClusterRole, sa *corev1.ServiceAccount) error {
 
 	if clusterRole == nil {
 		return fmt.Errorf("received ClusterRole is nil while reconciling ClusterRoleBinding")
@@ -209,7 +209,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsClusterRoleBinding(ctx conte
 
 	actualClusterRoleBinding := &rbacv1.ClusterRoleBinding{}
 
-	// Fetch the clusterRoleBinding if exists and store that in actualClusterRoleBinding.
+	// Fetch the ClusterRoleBinding if exists and store that in actualClusterRoleBinding.
 	if err := fetchObject(ctx, r.Client, "", expectedClusterRoleBinding.Name, actualClusterRoleBinding); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to get the ClusterRoleBinding associated with %s: %s", expectedClusterRoleBinding.Name, err)
@@ -219,7 +219,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsClusterRoleBinding(ctx conte
 		return r.Client.Create(ctx, expectedClusterRoleBinding)
 	}
 
-	// Reconcile if the clusterRoleBinding already exists and modified.
+	// Reconcile if the ClusterRoleBinding already exists and modified.
 	if !reflect.DeepEqual(expectedClusterRoleBinding.Subjects, actualClusterRoleBinding.Subjects) {
 		log.Info(fmt.Sprintf("Subjects of ClusterRoleBinding %s do not match the expected state, hence updating it", expectedClusterRoleBinding.Name))
 		actualClusterRoleBinding.Subjects = expectedClusterRoleBinding.Subjects
@@ -232,7 +232,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsClusterRoleBinding(ctx conte
 }
 
 // Reconciles aggregate-to-admin ClusterRole.
-func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToAdminClusterRole(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager) error {
+func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToAdminClusterRole(ctx context.Context) error {
 
 	var aggregationType string = "aggregate-to-admin"
 	name := fmt.Sprintf("%s-%s", DefaultArgoRolloutsResourceName, aggregationType)
@@ -256,7 +256,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToAdminClusterRole(
 		return r.Client.Create(ctx, clusterRole)
 	}
 
-	// Reconcile if the aggregated role already exists and modified.
+	// Reconcile if the aggregated CusterRole already exists and modified.
 	if !reflect.DeepEqual(clusterRole.Rules, expectedPolicyRules) {
 		log.Info(fmt.Sprintf("PolicyRules of ClusterRole %s do not match the expected state, hence updating it", clusterRole.Name))
 		clusterRole.Rules = expectedPolicyRules
@@ -267,7 +267,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToAdminClusterRole(
 }
 
 // Reconciles aggregate-to-edit ClusterRole.
-func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToEditClusterRole(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager) error {
+func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToEditClusterRole(ctx context.Context) error {
 
 	var aggregationType string = "aggregate-to-edit"
 	name := fmt.Sprintf("%s-%s", DefaultArgoRolloutsResourceName, aggregationType)
@@ -291,7 +291,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToEditClusterRole(c
 		return r.Client.Create(ctx, clusterRole)
 	}
 
-	// Reconcile if the aggregated role already exists and modified.
+	// Reconcile if the aggregated ClusterRole already exists and modified.
 	if !reflect.DeepEqual(clusterRole.Rules, expectedPolicyRules) {
 		log.Info(fmt.Sprintf("PolicyRules of ClusterRole %s do not match the expected state, hence updating it", clusterRole.Name))
 		clusterRole.Rules = expectedPolicyRules
@@ -302,7 +302,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToEditClusterRole(c
 }
 
 // Reconciles aggregate-to-view ClusterRole.
-func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToViewClusterRole(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager) error {
+func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToViewClusterRole(ctx context.Context) error {
 
 	var aggregationType string = "aggregate-to-view"
 	name := fmt.Sprintf("%s-%s", DefaultArgoRolloutsResourceName, aggregationType)
@@ -326,7 +326,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToViewClusterRole(c
 		return r.Client.Create(ctx, clusterRole)
 	}
 
-	// Reconcile if the aggregated role already exists and modified.
+	// Reconcile if the aggregated ClusterRole already exists and modified.
 	if !reflect.DeepEqual(clusterRole.Rules, expectedPolicyRules) {
 		log.Info(fmt.Sprintf("PolicyRules of ClusterRole %s do not match the expected state, hence updating it", clusterRole.Name))
 		clusterRole.Rules = expectedPolicyRules
@@ -336,7 +336,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToViewClusterRole(c
 	return nil
 }
 
-// Reconcile rollouts metrics service.
+// Reconcile Rollouts Metrics Service.
 func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager) error {
 
 	expectedSvc := &corev1.Service{
@@ -346,7 +346,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.C
 		},
 	}
 	setRolloutsLabels(&expectedSvc.ObjectMeta)
-	// overwrite the annotations for rollouts metrics service
+	// overwrite the annotations for Rollouts Metrics Service
 	expectedSvc.ObjectMeta.Labels["app.kubernetes.io/name"] = DefaultArgoRolloutsMetricsServiceName
 	expectedSvc.ObjectMeta.Labels["app.kubernetes.io/component"] = "server"
 
@@ -365,10 +365,10 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.C
 
 	actualSvc := &corev1.Service{}
 
-	// Fetch the service if exists and store that in actualSvc.
+	// Fetch the Service if exists and store that in actualSvc.
 	if err := fetchObject(ctx, r.Client, cr.Namespace, expectedSvc.Name, actualSvc); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to get the service %s: %s", expectedSvc.Name, err)
+			return fmt.Errorf("failed to get the Service %s: %s", expectedSvc.Name, err)
 		}
 
 		if err := controllerutil.SetControllerReference(cr, expectedSvc, r.Scheme); err != nil {
@@ -388,7 +388,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.C
 	return nil
 }
 
-// Reconciles secrets for rollouts controller
+// Reconciles Secrets for Rollouts controller
 func (r *RolloutManagerReconciler) reconcileRolloutsSecrets(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager) error {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{

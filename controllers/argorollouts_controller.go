@@ -40,6 +40,10 @@ type RolloutManagerReconciler struct {
 	client.Client
 	Scheme                       *runtime.Scheme
 	OpenShiftRoutePluginLocation string
+
+	// NamespaceScopedArgoRolloutsController is used to configure scope of Argo Rollouts controller
+	// If value is true then deploy namespace-scoped Argo Rollouts controller else cluster-scoped
+	NamespaceScopedArgoRolloutsController bool
 }
 
 var log = logr.Log.WithName("rollouts-controller")

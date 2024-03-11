@@ -19,6 +19,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
+
+	utils "github.com/argoproj-labs/argo-rollouts-manager/tests/e2e"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
@@ -27,20 +29,21 @@ var k8sClient client.Client
 var testEnv *envtest.Environment
 
 var _ = BeforeSuite(func() {
+
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true), zap.Level(zapcore.DebugLevel)))
 
 	By("bootstrapping test environment")
 	useActualCluster := true
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{
-			filepath.Join("../..", "config", "crd", "bases"),
+			filepath.Join("../../..", "config", "crd", "bases"),
 		},
 		UseExistingCluster:    &useActualCluster, // use an actual OpenShift cluster specified in kubeconfig
 		ErrorIfCRDPathMissing: true,
 	}
 
-	// Set the environment variable for namespace scope of Rollouts
-	Expect(os.Setenv(controllers.NamespaceScopedArgoRolloutsController, "true")).To(Succeed())
+	// Set the environment variable for cluster scope of Rollouts
+	Expect(os.Setenv(controllers.NamespaceScopedArgoRolloutsController, "false")).To(Succeed())
 
 	cfg, err := testEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
@@ -86,7 +89,7 @@ var _ = BeforeSuite(func() {
 	openShiftRoutePluginLocation := os.Getenv("OPENSHIFT_ROUTE_PLUGIN_LOCATION")
 
 	if openShiftRoutePluginLocation == "" {
-		openShiftRoutePluginLocation = DefaultOpenShiftRoutePluginURL
+		openShiftRoutePluginLocation = utils.DefaultOpenShiftRoutePluginURL
 	}
 
 	err = (&controllers.RolloutManagerReconciler{
@@ -114,10 +117,7 @@ var _ = AfterSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 })
 
-func TestArgoRolloutsManager(t *testing.T) {
-	suiteConfig, _ := GinkgoConfiguration()
-
+func TestClusterScoped(t *testing.T) {
 	RegisterFailHandler(Fail)
-
-	RunSpecs(t, "argo-rollouts-manager suite", suiteConfig)
+	RunSpecs(t, "ClusterScoped Suite")
 }

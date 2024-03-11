@@ -27,10 +27,12 @@ import (
 )
 
 const (
-	TestE2ENamespace     = "argo-rollouts"
-	NamespaceLabelsKey   = "app"
-	NamespaceLabelsValue = "rolloutsmanager-e2e-test"
+	TestE2ENamespace = "argo-rollouts"
+	LabelsKey        = "app"
+	LabelsValue      = "test-argo-app"
 )
+
+var NamespaceLabels = map[string]string{LabelsKey: LabelsValue}
 
 type Cleaner struct {
 	cxt       context.Context
@@ -55,12 +57,14 @@ func EnsureCleanSlate() error {
 		return err
 	}
 
+	// delete namespaces created during test are deleted
 	err = cleaner.ensureTestNamespaceDeleted()
 	if err != nil {
 		return err
 	}
 
-	err = cleaner.ensureDestinationNamespaceExists(TestE2ENamespace)
+	// create default namespace used for Rollouts controller
+	err = cleaner.ensureRlloutNamespaceExists(TestE2ENamespace)
 	if err != nil {
 		return err
 	}
@@ -73,7 +77,7 @@ func EnsureCleanSlate() error {
 	return nil
 }
 
-func (cleaner *Cleaner) ensureDestinationNamespaceExists(namespaceParam string) error {
+func (cleaner *Cleaner) ensureRlloutNamespaceExists(namespaceParam string) error {
 	if err := cleaner.deleteNamespace(namespaceParam); err != nil {
 		return fmt.Errorf("unable to delete namespace '%s': %w", namespaceParam, err)
 	}
@@ -208,12 +212,16 @@ func getSystemKubeConfig() (*rest.Config, error) {
 	return restConfig, nil
 }
 
+// Delete all namespaces having a specific label used to identify namespaces that are created by e2e tests.
 func (cleaner *Cleaner) ensureTestNamespaceDeleted() error {
+
+	// fetch all namespaces having given label
 	nsList, err := listE2ETestNamespaces(cleaner.cxt, cleaner.k8sClient)
 	if err != nil {
 		return fmt.Errorf("unable to delete test namespace: %w", err)
 	}
 
+	// delete selected namespaces
 	for _, namespace := range nsList.Items {
 		if err := cleaner.deleteNamespace(namespace.Name); err != nil {
 			return fmt.Errorf("unable to delete namespace '%s': %w", namespace.Name, err)
@@ -222,13 +230,17 @@ func (cleaner *Cleaner) ensureTestNamespaceDeleted() error {
 	return nil
 }
 
+// Retrieve list of namespaces having a specific label used to identify namespaces that are created by e2e tests.
 func listE2ETestNamespaces(ctx context.Context, k8sClient client.Client) (corev1.NamespaceList, error) {
 	nsList := corev1.NamespaceList{}
-	req, err := labels.NewRequirement(NamespaceLabelsKey, selection.Equals, []string{NamespaceLabelsValue})
+
+	// set e2e label
+	req, err := labels.NewRequirement(LabelsKey, selection.Equals, []string{LabelsValue})
 	if err != nil {
 		return nsList, fmt.Errorf("unable to set labels while fetching list of test namespace: %w", err)
 	}
 
+	// fetch all namespaces having given label
 	err = k8sClient.List(ctx, &nsList, &client.ListOptions{LabelSelector: labels.NewSelector().Add(*req)})
 	if err != nil {
 		return nsList, fmt.Errorf("unable to fetch list of test namespace: %w", err)

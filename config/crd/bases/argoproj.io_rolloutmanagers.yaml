@@ -155,8 +155,8 @@ spec:
                 description: Image defines Argo Rollouts controller image (optional)
                 type: string
               namespaceScoped:
-                description: NamespaceScoped lets you specify if rollouts manager
-                  has to watch a namespace or the whole cluster
+                description: NamespaceScoped lets you specify if RolloutManager has
+                  to watch a namespace or the whole cluster
                 type: boolean
               nodePlacement:
                 description: NodePlacement defines NodeSelectors and Taints for Rollouts
