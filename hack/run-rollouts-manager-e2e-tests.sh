@@ -10,7 +10,7 @@ cd "$SCRIPTPATH/.."
 set -o pipefail
 set -ex
 
-go test -v -p=1 -timeout=10m -race -count=1 -coverprofile=coverage.out ./tests/e2e
+go test -v -p=1 -timeout=30m -race -count=1 -coverprofile=coverage.out ./tests/e2e/...
 
 set +e
 

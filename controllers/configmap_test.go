@@ -100,7 +100,7 @@ var _ = Describe("ConfigMap Test", func() {
 		By("calling reconcileConfigMap")
 		Expect(r.reconcileConfigMap(ctx, a)).To(Succeed())
 
-		By("verifing that when ConfigMap is reconciled, it contains both plugins")
+		By("verifying that when ConfigMap is reconciled, it contains both plugins")
 
 		Expect(fetchObject(ctx, r.Client, a.Namespace, expectedConfigMap.Name, fetchedConfigMap)).To(Succeed())
 		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring("test/plugin"))
