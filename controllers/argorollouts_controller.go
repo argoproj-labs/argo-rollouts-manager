@@ -79,7 +79,7 @@ var log = logr.Log.WithName("rollouts-controller")
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *RolloutManagerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	reqLogger := logr.FromContext(ctx, "Request.Namespace", req.Namespace, "Request.Name", req.Name)
-	reqLogger.Info("Reconciling Rollout Managers")
+	reqLogger.Info("Reconciling RolloutManager")
 
 	// Fetch the RolloutManager instance
 	rollouts := &rolloutsmanagerv1alpha1.RolloutManager{}

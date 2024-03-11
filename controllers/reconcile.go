@@ -52,7 +52,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsManager(ctx context.Context,
 	}
 
 	log.Info("reconciling rollouts deployment")
-	if err := r.reconcileRolloutsDeployment(ctx, cr, sa); err != nil {
+	if err := r.reconcileRolloutsDeployment(ctx, cr, *sa); err != nil {
 		return err
 	}
 

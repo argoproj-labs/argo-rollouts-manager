@@ -107,9 +107,14 @@ test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -coverprofile cover.out `go list ./... | grep -v 'tests/e2e'`
 	
 
+.PHONY: start-e2e
+start-e2e: ## Start the operator, to run the e2e tests
+	hack/start-rollouts-manager-for-e2e-tests.sh
+
+
 .PHONY: test-e2e
 test-e2e: ## Run operator e2e tests
-	go test -v -p=1 -timeout=10m -race -count=1 -coverprofile=coverage.out ./tests/e2e
+	hack/run-rollouts-manager-e2e-tests.sh
 
 ##@ Build
 

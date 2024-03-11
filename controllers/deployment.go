@@ -15,10 +15,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-// Reconcile the Rollouts controller deployment.
-func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager, sa *corev1.ServiceAccount) error {
+func generateDesiredRolloutsDeployment(cr rolloutsmanagerv1alpha1.RolloutManager, sa corev1.ServiceAccount) appsv1.Deployment {
+
+	// NOTE: When updating this function, ensure that normalizeDeployment is updated as well. See that function for details.
+
 	// Configuration for the desired deployment
-	desiredDeployment := &appsv1.Deployment{
+	desiredDeployment := appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultArgoRolloutsResourceName,
 			Namespace: cr.Namespace,
@@ -72,50 +74,113 @@ func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(ctx context.Conte
 		},
 	}
 
+	return desiredDeployment
+}
+
+// Reconcile the Rollouts controller deployment.
+func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager, sa corev1.ServiceAccount) error {
+
+	desiredDeployment := generateDesiredRolloutsDeployment(*cr, sa)
+
+	normalizedDesiredDeployment, err := normalizeDeployment(desiredDeployment)
+	if err != nil {
+		// If you see this warning in the logs, verify that normalizedDeployment is fully consistent with generateDesiredRolloutsDeployment. See normalizeDeployment for details.
+		log.Error(fmt.Errorf("unexpected fail on normalizing generated rollouts Deployment"), "", "err", err)
+		// We intentionally continue without returning, as the error is non-fatal at runtime
+	}
+
+	if !reflect.DeepEqual(normalizedDesiredDeployment, desiredDeployment) { // sanity test to verify that generateDesiredRolloutsDeployments and normalizeDeployment are consistent.
+		// If you see this warning in the logs, verify that normalizedDeployment is fully consistent with generateDesiredRolloutsDeployment. See normalizeDeployment for details.
+		deploymentsDifferent := identifyDeploymentDifference(normalizedDesiredDeployment, desiredDeployment)
+		log.Error(fmt.Errorf("normalized form of desired Deployment was not equal: %v", deploymentsDifferent), "")
+		// We intentionally continue without returning, as the error is non-fatal at runtime
+	}
+
 	// If the deployment for rollouts does not exist, create one.
 	actualDeployment := &appsv1.Deployment{}
 
 	if err := fetchObject(ctx, r.Client, cr.Namespace, DefaultArgoRolloutsResourceName, actualDeployment); err != nil {
 		if !errors.IsNotFound(err) {
-			return fmt.Errorf("failed to get the deployment %s : %s", DefaultArgoRolloutsResourceName, err)
+			return fmt.Errorf("failed to get the Deployment %s: %s", DefaultArgoRolloutsResourceName, err)
 		}
 
-		if err := controllerutil.SetControllerReference(cr, desiredDeployment, r.Scheme); err != nil {
+		if err := controllerutil.SetControllerReference(cr, &desiredDeployment, r.Scheme); err != nil {
 			return err
 		}
-		log.Info(fmt.Sprintf("Creating deployment %s", DefaultArgoRolloutsResourceName))
-		return r.Client.Create(ctx, desiredDeployment)
+		log.Info(fmt.Sprintf("Creating Deployment %s", DefaultArgoRolloutsResourceName))
+		return r.Client.Create(ctx, &desiredDeployment)
 	}
 
-	actualPodSpec := actualDeployment.Spec.Template.Spec
+	normalizedActualDeployment, err := normalizeDeployment(*actualDeployment)
 
-	// If the Deployment already exists, make sure the values we care about are correct.
-	deploymentsDifferent := !reflect.DeepEqual(actualPodSpec.Containers, desiredPodSpec.Containers) ||
-		actualPodSpec.ServiceAccountName != desiredPodSpec.ServiceAccountName ||
-		!reflect.DeepEqual(actualDeployment.Labels, desiredDeployment.Labels) ||
-		!reflect.DeepEqual(actualDeployment.Spec.Template.Labels, desiredDeployment.Spec.Template.Labels) ||
-		!reflect.DeepEqual(actualDeployment.Spec.Selector, desiredDeployment.Spec.Selector) ||
-		!reflect.DeepEqual(actualDeployment.Spec.Template.Spec.NodeSelector, desiredDeployment.Spec.Template.Spec.NodeSelector) ||
-		!reflect.DeepEqual(actualDeployment.Spec.Template.Spec.Tolerations, desiredDeployment.Spec.Template.Spec.Tolerations) ||
-		!reflect.DeepEqual(actualPodSpec.SecurityContext, desiredPodSpec.SecurityContext) ||
-		!reflect.DeepEqual(actualDeployment.Spec.Template.Spec.Volumes, desiredDeployment.Spec.Template.Spec.Volumes)
+	if err != nil || !reflect.DeepEqual(normalizedActualDeployment, normalizedDesiredDeployment) {
 
-	if deploymentsDifferent {
-		actualDeployment.Spec.Template.Spec.Containers = desiredPodSpec.Containers
-		actualDeployment.Spec.Template.Spec.ServiceAccountName = desiredPodSpec.ServiceAccountName
+		deploymentsDifferent := identifyDeploymentDifference(normalizedActualDeployment, normalizedDesiredDeployment)
+
+		log.Info("updating Deployment due to detected difference: " + deploymentsDifferent)
+
+		actualDeployment.Spec.Template.Spec.Containers = desiredDeployment.Spec.Template.Spec.Containers
+		actualDeployment.Spec.Template.Spec.ServiceAccountName = desiredDeployment.Spec.Template.Spec.ServiceAccountName
 		actualDeployment.Labels = desiredDeployment.Labels
 		actualDeployment.Spec.Template.Labels = desiredDeployment.Spec.Template.Labels
 		actualDeployment.Spec.Selector = desiredDeployment.Spec.Selector
 		actualDeployment.Spec.Template.Spec.NodeSelector = desiredDeployment.Spec.Template.Spec.NodeSelector
 		actualDeployment.Spec.Template.Spec.Tolerations = desiredDeployment.Spec.Template.Spec.Tolerations
-		actualDeployment.Spec.Template.Spec.SecurityContext = desiredPodSpec.SecurityContext
+		actualDeployment.Spec.Template.Spec.SecurityContext = desiredDeployment.Spec.Template.Spec.SecurityContext
 		actualDeployment.Spec.Template.Spec.Volumes = desiredDeployment.Spec.Template.Spec.Volumes
 		return r.Client.Update(ctx, actualDeployment)
 	}
 	return nil
 }
 
-func rolloutsContainer(cr *rolloutsmanagerv1alpha1.RolloutManager) corev1.Container {
+// identifyDeploymentDifference is a simple comparison of the contents of two deployments, returning "" if they are the same, otherwise returning the name of the field that changed.
+func identifyDeploymentDifference(x appsv1.Deployment, y appsv1.Deployment) string {
+
+	xPodSpec := x.Spec.Template.Spec
+	yPodSpec := y.Spec.Template.Spec
+
+	if !reflect.DeepEqual(xPodSpec.Containers, yPodSpec.Containers) {
+		return "Spec.Template.Spec.Containers"
+	}
+
+	if xPodSpec.ServiceAccountName != yPodSpec.ServiceAccountName {
+		return "ServiceAccountName"
+	}
+
+	if !reflect.DeepEqual(x.Labels, y.Labels) {
+		return "Labels"
+	}
+
+	if !reflect.DeepEqual(x.Spec.Template.Labels, y.Spec.Template.Labels) {
+		return ".Spec.Template.Labels"
+	}
+
+	if !reflect.DeepEqual(x.Spec.Selector, y.Spec.Selector) {
+		return ".Spec.Selector"
+	}
+
+	if !reflect.DeepEqual(x.Spec.Template.Spec.NodeSelector, y.Spec.Template.Spec.NodeSelector) {
+		return "Spec.Template.Spec.NodeSelector"
+	}
+
+	if !reflect.DeepEqual(x.Spec.Template.Spec.Tolerations, y.Spec.Template.Spec.Tolerations) {
+		return "Spec.Template.Spec.Tolerations"
+	}
+
+	if !reflect.DeepEqual(xPodSpec.SecurityContext, yPodSpec.SecurityContext) {
+		return "Spec.Template.Spec.SecurityContext"
+	}
+
+	if !reflect.DeepEqual(x.Spec.Template.Spec.Volumes, y.Spec.Template.Spec.Volumes) {
+		return "Spec.Template.Spec.Volumes"
+	}
+
+	return ""
+}
+
+func rolloutsContainer(cr rolloutsmanagerv1alpha1.RolloutManager) corev1.Container {
+
+	// NOTE: When updating this function, ensure that normalizeDeployment is updated as well. See that function for details.
 
 	// Global proxy env vars go firstArgoRollouts
 	rolloutsEnv := cr.Spec.Env
@@ -185,13 +250,179 @@ func rolloutsContainer(cr *rolloutsmanagerv1alpha1.RolloutManager) corev1.Contai
 
 }
 
+// One of the goals of an operator is to reconcile the live state of a resource on the cluster, with a target state for that resource. However, one of the challenges in doing so is that some fields of the resource will naturally differ from the values that are generated: for example, some field have default values which are only set after creation. This can make it challenging to compare the live/target status. Various strategies exist to handle.
+//
+// The strategy used in this file is implemented here in normalizeDeployment: normalizeDeployment will created a normalized representation of any input Deployment: the normal form will only contains fields which are relevant/useful to the operator. All other fields will be ingorewd.
+//
+// You can then use:
+//
+//	reflect.DeepEqual( normalizeDeployment( /* desired deployment */), normalizeDeployment( /* actual deployment from k8s*/))
+//
+// To determine if the actual deployment from k8s needs to be updated.
+//
+// NOTE: When updating 'generateDesiredRolloutsDeployment', ensure this function is updated as well.
+// - Specifically, in generateDesiredRolloutsDeployment, if a new field of Deployment is modified, it should be added to the copy logic here.
+func normalizeDeployment(inputParam appsv1.Deployment) (appsv1.Deployment, error) {
+
+	input := inputParam.DeepCopy()
+
+	res := appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      input.ObjectMeta.Name,
+			Namespace: input.ObjectMeta.Namespace,
+			Labels:    input.ObjectMeta.Labels,
+		},
+	}
+
+	if input.Spec.Selector == nil {
+		return appsv1.Deployment{}, fmt.Errorf("missing .spec.selector")
+	}
+
+	inputSpecSecurityContext := input.Spec.Template.Spec.SecurityContext
+
+	if inputSpecSecurityContext == nil {
+		return appsv1.Deployment{}, fmt.Errorf("missing .spec.template.spec.securityContext")
+	}
+
+	inputSpecVolumes := input.Spec.Template.Spec.Volumes
+	if inputSpecVolumes == nil || len(inputSpecVolumes) != 1 {
+		return appsv1.Deployment{}, fmt.Errorf("missing .spec.template.spec.volumes")
+	}
+
+	res.Spec = appsv1.DeploymentSpec{
+		Selector: &metav1.LabelSelector{
+			MatchLabels: input.Spec.Selector.MatchLabels,
+		},
+		Template: corev1.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: input.Spec.Template.Labels,
+			},
+			Spec: corev1.PodSpec{
+				NodeSelector:       input.Spec.Template.Spec.NodeSelector,
+				Tolerations:        input.Spec.Template.Spec.Tolerations,
+				ServiceAccountName: input.Spec.Template.Spec.ServiceAccountName,
+				SecurityContext: &corev1.PodSecurityContext{
+					RunAsNonRoot: input.Spec.Template.Spec.SecurityContext.RunAsNonRoot,
+				},
+				Volumes: []corev1.Volume{{
+					Name: inputSpecVolumes[0].Name,
+				}},
+			},
+		},
+	}
+
+	if len(input.Spec.Template.Spec.Containers) != 1 {
+		return appsv1.Deployment{}, fmt.Errorf("incorrect number of .spec.template.spec.containers")
+	}
+
+	inputContainer := input.Spec.Template.Spec.Containers[0]
+	inputLivenessProbe := inputContainer.LivenessProbe
+	inputPorts := inputContainer.Ports
+	inputReadinessProbe := inputContainer.ReadinessProbe
+	inputSecurityContext := inputContainer.SecurityContext
+	inputVolumeMounts := inputContainer.VolumeMounts
+
+	if inputLivenessProbe == nil {
+		return appsv1.Deployment{}, fmt.Errorf("incorrect liveness probe")
+	}
+
+	if inputReadinessProbe == nil {
+		return appsv1.Deployment{}, fmt.Errorf("incorrect readiness probe")
+	}
+
+	if inputReadinessProbe.ProbeHandler.HTTPGet == nil {
+		return appsv1.Deployment{}, fmt.Errorf("incorrect http get in readiness probe")
+	}
+
+	if inputPorts == nil || len(inputPorts) != 2 {
+		return appsv1.Deployment{}, fmt.Errorf("incorrect input ports")
+	}
+
+	if inputSecurityContext == nil || inputSecurityContext.Capabilities == nil {
+		return appsv1.Deployment{}, fmt.Errorf("incorrect security context")
+	}
+
+	if inputVolumeMounts == nil || len(inputVolumeMounts) != 1 {
+		return appsv1.Deployment{}, fmt.Errorf("incorrect volume mounts")
+	}
+
+	// String slices need to be converted to nil, because reflect.DeepEqual(nil, []string{}) is false, despite being functionally the same, here.
+	if len(inputContainer.Args) == 0 {
+		inputContainer.Args = make([]string, 0)
+	}
+
+	if len(inputContainer.Env) == 0 {
+		inputContainer.Env = make([]corev1.EnvVar, 0)
+	}
+
+	res.Spec.Template.Spec.Containers = []corev1.Container{{
+		Args:            inputContainer.Args,
+		Env:             inputContainer.Env,
+		Image:           inputContainer.Image,
+		ImagePullPolicy: inputContainer.ImagePullPolicy,
+		LivenessProbe: &corev1.Probe{
+			FailureThreshold: inputLivenessProbe.FailureThreshold,
+			ProbeHandler: corev1.ProbeHandler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: inputLivenessProbe.ProbeHandler.HTTPGet.Path,
+					Port: inputLivenessProbe.ProbeHandler.HTTPGet.Port,
+				},
+			},
+			InitialDelaySeconds: inputLivenessProbe.InitialDelaySeconds,
+			PeriodSeconds:       inputLivenessProbe.PeriodSeconds,
+			SuccessThreshold:    inputLivenessProbe.SuccessThreshold,
+			TimeoutSeconds:      inputLivenessProbe.TimeoutSeconds,
+		},
+		Name: inputContainer.Name,
+		Ports: []corev1.ContainerPort{
+			{
+				ContainerPort: inputPorts[0].ContainerPort,
+				Name:          inputPorts[0].Name,
+			},
+			{
+				ContainerPort: inputPorts[1].ContainerPort,
+				Name:          inputPorts[1].Name,
+			},
+		},
+		ReadinessProbe: &corev1.Probe{
+			FailureThreshold: inputReadinessProbe.FailureThreshold,
+			ProbeHandler: corev1.ProbeHandler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: inputReadinessProbe.ProbeHandler.HTTPGet.Path,
+					Port: inputReadinessProbe.ProbeHandler.HTTPGet.Port,
+				},
+			},
+			InitialDelaySeconds: inputReadinessProbe.InitialDelaySeconds,
+			PeriodSeconds:       inputReadinessProbe.PeriodSeconds,
+			SuccessThreshold:    inputReadinessProbe.SuccessThreshold,
+			TimeoutSeconds:      inputReadinessProbe.TimeoutSeconds,
+		},
+		SecurityContext: &corev1.SecurityContext{
+			Capabilities: &corev1.Capabilities{
+				Drop: inputSecurityContext.Capabilities.Drop,
+			},
+			AllowPrivilegeEscalation: inputSecurityContext.AllowPrivilegeEscalation,
+			ReadOnlyRootFilesystem:   inputSecurityContext.ReadOnlyRootFilesystem,
+			RunAsNonRoot:             inputSecurityContext.RunAsNonRoot,
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      inputVolumeMounts[0].Name,
+				MountPath: inputVolumeMounts[0].MountPath,
+			}},
+	}}
+
+	return res, nil
+
+}
+
 // boolPtr returns a pointer to val
 func boolPtr(val bool) *bool {
 	return &val
 }
 
 // Returns the container image for rollouts controller.
-func getRolloutsContainerImage(cr *rolloutsmanagerv1alpha1.RolloutManager) string {
+func getRolloutsContainerImage(cr rolloutsmanagerv1alpha1.RolloutManager) string {
 	defaultImg, defaultTag := false, false
 
 	img := cr.Spec.Image
@@ -215,7 +446,7 @@ func getRolloutsContainerImage(cr *rolloutsmanagerv1alpha1.RolloutManager) strin
 }
 
 // getRolloutsCommand will return the command for the Rollouts controller component.
-func getRolloutsCommandArgs(cr *rolloutsmanagerv1alpha1.RolloutManager) []string {
+func getRolloutsCommandArgs(cr rolloutsmanagerv1alpha1.RolloutManager) []string {
 	args := make([]string, 0)
 
 	args = append(args, "--namespaced")
