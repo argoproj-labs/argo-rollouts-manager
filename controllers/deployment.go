@@ -326,6 +326,10 @@ func normalizeDeployment(inputParam appsv1.Deployment) (appsv1.Deployment, error
 		return appsv1.Deployment{}, fmt.Errorf("incorrect liveness probe")
 	}
 
+	if inputLivenessProbe.ProbeHandler.HTTPGet == nil {
+		return appsv1.Deployment{}, fmt.Errorf("incorrect http get in liveness probe")
+	}
+
 	if inputReadinessProbe == nil {
 		return appsv1.Deployment{}, fmt.Errorf("incorrect readiness probe")
 	}
