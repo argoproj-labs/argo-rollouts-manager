@@ -4,8 +4,8 @@ CURRENT_ROLLOUTS_VERSION=v1.6.6
 
 function cleanup {
   echo "* Cleaning up"
-	killall main
-  killall go
+  killall main || true
+  killall go || true
 }
 
 set -x
@@ -37,16 +37,22 @@ kubectl config set-context --current --namespace=argo-rollouts
 
 # 3) Build, install, and start the argo-rollouts-manager controller
 cd $SCRIPT_DIR/..
-make generate fmt vet install
 
-set +e
 
-rm -f /tmp/e2e-operator-run.log || true
-go run ./main.go 2>&1 | tee /tmp/e2e-operator-run.log &
+# Only start the controller if SKIP_RUN_STEP is empty
+# - Otherwise, we assume that Argo Rollouts operator is already installed and running (for example, via OpenShift GitOps)
+if [ -z "$SKIP_RUN_STEP" ]; then
+  make generate fmt vet install
 
-set -e
+  set +e
 
-# 4) Install Argo Rollouts into the Namespace via RolloutManater CR
+  rm -f /tmp/e2e-operator-run.log || true
+  go run ./main.go 2>&1 | tee /tmp/e2e-operator-run.log &
+
+  set -e
+fi
+
+# 4) Install Argo Rollouts into the Namespace via RolloutManager CR
 
 cd $TMP_DIR/argo-rollouts
 

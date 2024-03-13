@@ -45,9 +45,7 @@ jobs:
           go mod download
       - name: Run the operator locally
         run: |
-          set -o pipefail
-          make install generate fmt vet
-          go run ./main.go 2>&1 | tee /tmp/e2e-operator-run.log &
+          make start-e2e &
       - name: Run tests
         run: |
           set -o pipefail

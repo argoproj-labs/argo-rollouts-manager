@@ -190,9 +190,12 @@ func parseTestResultsFromFile(fileContents []string, testsExpectedToFailList []s
 	return testResults, nil
 }
 
-// waitAndGetE2EFileContents waits for the last line of the file to start with 'DONE' before returning the contents
-// This allows us to avoid a race condition with tee where the file contents of the file may not have been fully flushed.
+// waitAndGetE2EFileContents waits for one of the last 50 lines of the file to start with 'DONE' before returning the contents.
+// This allows us to avoid a race condition with tee where the file contents of the file may not have been fully written.
 func waitAndGetE2EFileContents(testsE2EResultsLogPath string) ([]string, error) {
+
+	// Return whatever we have after 1 minute has elapsed
+	expireTime := time.Now().Add(1 * time.Minute)
 
 	for {
 
@@ -201,16 +204,26 @@ func waitAndGetE2EFileContents(testsE2EResultsLogPath string) ([]string, error) 
 			return []string{}, err
 		}
 
-		lastLine := fileLines[len(fileLines)-1]
+		lineIndexStart := len(fileLines) - 50
+		if lineIndexStart < 0 {
+			lineIndexStart = 0
+		}
 
-		// example: DONE 6 runs, 144 tests, 6 skipped, 47 failures in 2279.668s
-		if strings.HasPrefix(lastLine, "DONE ") {
-			fmt.Println("E2E tests file is complete:", lastLine)
+		for _, line := range fileLines[lineIndexStart:] {
+			// example line: DONE 6 runs, 144 tests, 6 skipped, 47 failures in 2279.668s
+			if strings.HasPrefix(line, "DONE ") {
+				fmt.Println("E2E tests file is complete:", line)
+				return fileLines, nil
+			}
+		}
+
+		if time.Now().After(expireTime) {
+			fmt.Println("E2E tests file timed out waiting. Previous X lines were:", fileLines[lineIndexStart:])
 			return fileLines, nil
 		}
 
 		// Otherwise, wait a second then check again.
-		fmt.Println("* Waiting for E2E test file to be complete:", lastLine)
+		fmt.Println("* Waiting for E2E test file to be complete")
 		time.Sleep(time.Second)
 	}
 
