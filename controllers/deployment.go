@@ -350,7 +350,7 @@ func normalizeDeployment(inputParam appsv1.Deployment) (appsv1.Deployment, error
 		return appsv1.Deployment{}, fmt.Errorf("incorrect volume mounts")
 	}
 
-	// String slices need to be converted to nil, because reflect.DeepEqual(nil, []string{}) is false, despite being functionally the same, here.
+	// Nil string slices need to be converted to empty string slices, because  reflect.DeepEqual(nil, []string{}) is false, despite being functionally the same, here.
 	if len(inputContainer.Args) == 0 {
 		inputContainer.Args = make([]string, 0)
 	}

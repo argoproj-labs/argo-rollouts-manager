@@ -210,11 +210,16 @@ func waitAndGetE2EFileContents(testsE2EResultsLogPath string) ([]string, error) 
 		}
 
 		for _, line := range fileLines[lineIndexStart:] {
-			// example: DONE 6 runs, 144 tests, 6 skipped, 47 failures in 2279.668s
-			if strings.HasPrefix(line, "DONE ") || time.Now().After(expireTime) {
+			// example line: DONE 6 runs, 144 tests, 6 skipped, 47 failures in 2279.668s
+			if strings.HasPrefix(line, "DONE ") {
 				fmt.Println("E2E tests file is complete:", line)
 				return fileLines, nil
 			}
+		}
+
+		if time.Now().After(expireTime) {
+			fmt.Println("E2E tests file timed out waiting. Previous X lines were:", fileLines[lineIndexStart:])
+			return fileLines, nil
 		}
 
 		// Otherwise, wait a second then check again.

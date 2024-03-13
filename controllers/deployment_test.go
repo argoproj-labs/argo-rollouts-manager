@@ -139,13 +139,13 @@ var _ = Describe("Deployment Test", func() {
 			By("ensuring the reconcileRolloutsDeployment will detect and revert the change")
 			{
 				By("calling reconcileRolloutsDeployment to create a default Deployment")
-				reconciledDepl := appsv1.Deployment{
+				expectedDepl := appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{Name: DefaultArgoRolloutsResourceName, Namespace: a.Namespace},
 				}
 				Expect(r.reconcileRolloutsDeployment(context.Background(), a, *sa)).To(Succeed())
-				Expect(r.Client.Get(context.Background(), client.ObjectKeyFromObject(&reconciledDepl), &reconciledDepl)).To(Succeed())
-				updatedDepl := reconciledDepl.DeepCopy()
-				Expect(areEqual(*updatedDepl, reconciledDepl)).To(BeTrue(), "copy should be same as original")
+				Expect(r.Client.Get(context.Background(), client.ObjectKeyFromObject(&expectedDepl), &expectedDepl)).To(Succeed())
+				updatedDepl := expectedDepl.DeepCopy()
+				Expect(areEqual(*updatedDepl, expectedDepl)).To(BeTrue(), "copy should be same as original")
 
 				By("updating the Deployment using the function, and then updating the cluster resource")
 				fxn(updatedDepl)
@@ -158,7 +158,7 @@ var _ = Describe("Deployment Test", func() {
 				Expect(r.Client.Get(context.Background(), client.ObjectKeyFromObject(&updatedDeplFromClient), &updatedDeplFromClient)).To(Succeed())
 				Expect(areEqual(*updatedDepl, updatedDeplFromClient)).To(BeTrue(), "resource on cluster should match the resource we called Update with")
 
-				Expect(areEqual(updatedDeplFromClient, reconciledDepl)).ToNot(BeTrue(), "resource on cluster should NOT match the original Deployment that was created by the call to reconcileRolloutsDeployment")
+				Expect(areEqual(updatedDeplFromClient, expectedDepl)).ToNot(BeTrue(), "resource on cluster should NOT match the original Deployment that was created by the call to reconcileRolloutsDeployment")
 
 				By("calling reconcileRolloutsDeployment again, it should revert the change back to default")
 				Expect(r.reconcileRolloutsDeployment(context.Background(), a, *sa)).To(Succeed())
@@ -169,7 +169,7 @@ var _ = Describe("Deployment Test", func() {
 
 				By("retrieving the Deployment version from the cluster")
 				Expect(r.Client.Get(context.Background(), client.ObjectKeyFromObject(&finalDeplFromClient), &finalDeplFromClient)).To(Succeed())
-				Expect(areEqual(finalDeplFromClient, reconciledDepl)).To(BeTrue(), "version from cluster should have been reconciled back to the default")
+				Expect(areEqual(finalDeplFromClient, expectedDepl)).To(BeTrue(), "version from cluster should have been reconciled back to the default")
 
 			}
 
