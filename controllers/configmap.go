@@ -61,10 +61,25 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr *r
 		return fmt.Errorf("failed to unmarshal traffic router plugins from ConfigMap: %s", err)
 	}
 
-	for _, plugin := range actualTrafficRouterPlugins {
+	// Check if the plugin already exists and if the URL is different, update the ConfigMap
+	for i, plugin := range actualTrafficRouterPlugins {
 		if plugin.Name == OpenShiftRolloutPluginName {
-			// Openshift Route Plugin already present, nothing to do
-			return nil
+			if plugin.Location != r.OpenShiftRoutePluginLocation {
+				actualTrafficRouterPlugins[i].Location = r.OpenShiftRoutePluginLocation
+				pluginBytes, err := yaml.Marshal(actualTrafficRouterPlugins)
+				if err != nil {
+					return fmt.Errorf("error marshalling trafficRouterPlugin to string %s", err)
+				}
+
+				actualConfigMap.Data = map[string]string{
+					TrafficRouterPluginConfigMapKey: string(pluginBytes),
+				}
+
+				return r.Client.Update(ctx, actualConfigMap)
+			} else {
+				// Plugin URL is the same, nothing to do
+				return nil
+			}
 		}
 	}
 

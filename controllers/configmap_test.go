@@ -115,5 +115,16 @@ var _ = Describe("ConfigMap Test", func() {
 		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(OpenShiftRolloutPluginName))
 		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(r.OpenShiftRoutePluginLocation))
 
+		// overriding this value with new test url to verify whether it updated the existing configMap with the new url
+		r.OpenShiftRoutePluginLocation = "test-updated-url"
+
+		By("calling reconcileConfigMap")
+		Expect(r.reconcileConfigMap(ctx, a)).To(Succeed())
+
+		Expect(fetchObject(ctx, r.Client, a.Namespace, expectedConfigMap.Name, fetchedConfigMap)).To(Succeed())
+		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring("test/plugin"))
+		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(OpenShiftRolloutPluginName))
+		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring("test-updated-url"))
+
 	})
 })
