@@ -97,11 +97,19 @@ func main() {
 		openShiftRoutePluginLocation = controllers.DefaultOpenShiftRoutePluginURL
 	}
 
+	isNamespaceScoped := strings.ToLower(os.Getenv(controllers.NamespaceScopedArgoRolloutsController)) == "true"
+
+	if isNamespaceScoped {
+		setupLog.Info("Running in namespaced-scoped mode")
+	} else {
+		setupLog.Info("Running in cluster-scoped mode")
+	}
+
 	if err = (&controllers.RolloutManagerReconciler{
 		Client:                                mgr.GetClient(),
 		Scheme:                                mgr.GetScheme(),
 		OpenShiftRoutePluginLocation:          openShiftRoutePluginLocation,
-		NamespaceScopedArgoRolloutsController: strings.ToLower(os.Getenv(controllers.NamespaceScopedArgoRolloutsController)) == "true",
+		NamespaceScopedArgoRolloutsController: isNamespaceScoped,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RolloutManager")
 		os.Exit(1)

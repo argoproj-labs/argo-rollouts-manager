@@ -5,6 +5,8 @@
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 VERSION ?= 0.0.1
 
+NAMESPACE_SCOPED_ARGO_ROLLOUTS ?= false
+
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
 # To re-generate a bundle for other specific channels without changing the standard setup, you can:
@@ -102,6 +104,8 @@ fmt: ## Run go fmt against code.
 vet: ## Run go vet against code.
 	go vet ./...
 
+##@ Test
+
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -coverprofile cover.out `go list ./... | grep -v 'tests/e2e'`
@@ -109,12 +113,43 @@ test: manifests generate fmt vet envtest ## Run tests.
 
 .PHONY: start-e2e
 start-e2e: ## Start the operator, to run the e2e tests
-	hack/start-rollouts-manager-for-e2e-tests.sh
-
+	NAMESPACE_SCOPED_ARGO_ROLLOUTS=$(NAMESPACE_SCOPED_ARGO_ROLLOUTS) hack/start-rollouts-manager-for-e2e-tests.sh
 
 .PHONY: test-e2e
 test-e2e: ## Run operator e2e tests
-	hack/run-rollouts-manager-e2e-tests.sh
+	NAMESPACE_SCOPED_ARGO_ROLLOUTS=$(NAMESPACE_SCOPED_ARGO_ROLLOUTS) hack/run-rollouts-manager-e2e-tests.sh
+
+
+
+.PHONY: start-e2e-namespace-scoped
+start-e2e-namespace-scoped: ## Start the operator, to run the e2e tests
+	NAMESPACE_SCOPED_ARGO_ROLLOUTS=true hack/start-rollouts-manager-for-e2e-tests.sh
+
+.PHONY: start-e2e-cluster-scoped
+start-e2e-cluster-scoped: ## Start the operator, to run the e2e tests
+	NAMESPACE_SCOPED_ARGO_ROLLOUTS=false hack/start-rollouts-manager-for-e2e-tests.sh
+
+
+.PHONY: start-e2e-namespace-scoped-bg
+start-e2e-namespace-scoped-bg: ## Start the operator, to run the e2e tests
+	RUN_IN_BACKGROUND=true NAMESPACE_SCOPED_ARGO_ROLLOUTS=true hack/start-rollouts-manager-for-e2e-tests.sh
+
+.PHONY: start-e2e-cluster-scoped-bg 
+start-e2e-cluster-scoped-bg: ## Start the operator, to run the e2e tests
+	RUN_IN_BACKGROUND=true NAMESPACE_SCOPED_ARGO_ROLLOUTS=false hack/start-rollouts-manager-for-e2e-tests.sh
+
+
+.PHONY: test-e2e-namespace-scoped
+test-e2e-namespace-scoped: ## Run operator e2e tests
+	NAMESPACE_SCOPED_ARGO_ROLLOUTS=true hack/run-rollouts-manager-e2e-tests.sh
+
+.PHONY: test-e2e-cluster-scoped
+test-e2e-cluster-scoped: ## Run operator e2e tests
+	NAMESPACE_SCOPED_ARGO_ROLLOUTS=false hack/run-rollouts-manager-e2e-tests.sh
+
+.PHONY: start-test-e2e-all
+start-test-e2e-all: start-e2e-namespace-scoped-bg test-e2e-namespace-scoped start-e2e-cluster-scoped-bg test-e2e-cluster-scoped
+
 
 ##@ Build
 
@@ -124,7 +159,7 @@ build: manifests generate fmt vet ## Build manager binary.
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
-	go run ./main.go
+	NAMESPACE_SCOPED_ARGO_ROLLOUTS=$(NAMESPACE_SCOPED_ARGO_ROLLOUTS) go run ./main.go
 
 # If you wish built the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64 ). However, you must enable docker buildKit for it.
