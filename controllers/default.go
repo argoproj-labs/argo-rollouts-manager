@@ -23,4 +23,6 @@ const (
 
 	// DefaultRolloutsConfigMapName is the default name of the ConfigMap that contains the Rollouts controller configuration
 	DefaultRolloutsConfigMapName = "argo-rollouts-config"
+
+	DefaultOpenShiftRoutePluginURL = "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-openshift/releases/download/commit-2749e0ac96ba00ce6f4af19dc6d5358048227d77/rollouts-plugin-trafficrouter-openshift-linux-amd64"
 )
