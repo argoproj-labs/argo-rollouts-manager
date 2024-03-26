@@ -5,7 +5,9 @@ import (
 
 	rolloutsmanagerv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 	. "github.com/onsi/gomega"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
+	crdv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -36,6 +38,12 @@ func makeTestReconciler(objs ...runtime.Object) *RolloutManagerReconciler {
 	s := scheme.Scheme
 
 	err := rolloutsmanagerv1alpha1.AddToScheme(s)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = monitoringv1.AddToScheme(s)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = crdv1.AddToScheme(s)
 	Expect(err).ToNot(HaveOccurred())
 
 	cl := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(objs...).Build()
