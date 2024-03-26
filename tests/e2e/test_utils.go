@@ -24,10 +24,9 @@ import (
 )
 
 const (
-	DefaultOpenShiftRoutePluginURL = "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-openshift/releases/download/commit-2749e0ac96ba00ce6f4af19dc6d5358048227d77/rollouts-plugin-trafficrouter-openshift-linux-amd64"
-	RolloutsActiveServiceName      = "rollout-bluegreen-active"
-	RolloutsPreviewServiceName     = "rollout-bluegreen-preview"
-	RolloutsName                   = "simple-rollout"
+	RolloutsActiveServiceName  = "rollout-bluegreen-active"
+	RolloutsPreviewServiceName = "rollout-bluegreen-preview"
+	RolloutsName               = "simple-rollout"
 )
 
 // Create namespace for tests having a specific label for identification

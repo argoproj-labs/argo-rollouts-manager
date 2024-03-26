@@ -43,9 +43,6 @@ jobs:
       - name: Download Go dependencies
         run: |
           go mod download
-      - name: Run the operator locally
-        run: |
-          make start-e2e &
       - name: Run tests
         run: |
           set -o pipefail

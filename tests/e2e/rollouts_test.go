@@ -131,15 +131,21 @@ var _ = Describe("RolloutManager tests", func() {
 				Expect(deployment.Spec.Template.Spec.Containers[0].Args).To(Equal([]string{"--namespaced", "--loglevel", "error"}))
 
 				By("updating the deployment when the argument in the RolloutManager is updated")
-				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&rolloutManager), &rolloutManager)).To(Succeed())
-				rolloutManager.Spec = rolloutsmanagerv1alpha1.RolloutManagerSpec{
-					ExtraCommandArgs: []string{
-						"--logformat",
-						"text",
-					},
-					NamespaceScoped: true,
-				}
-				Expect(k8sClient.Update(ctx, &rolloutManager)).To(Succeed())
+
+				err := k8s.UpdateWithoutConflict(ctx, &rolloutManager, k8sClient, func(obj client.Object) {
+					goObj, ok := obj.(*rolloutsmanagerv1alpha1.RolloutManager)
+					Expect(ok).To(BeTrue())
+
+					goObj.Spec = rolloutsmanagerv1alpha1.RolloutManagerSpec{
+						ExtraCommandArgs: []string{
+							"--logformat",
+							"text",
+						},
+						NamespaceScoped: true,
+					}
+				})
+				Expect(err).ToNot(HaveOccurred())
+
 				Eventually(func() []string {
 					Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&deployment), &deployment)).To(Succeed())
 					return deployment.Spec.Template.Spec.Containers[0].Args
@@ -172,13 +178,18 @@ var _ = Describe("RolloutManager tests", func() {
 				))
 
 				By("updating the deployment when the environment variables in the RolloutManager are updated")
-				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&rolloutManager), &rolloutManager)).To(Succeed())
-				rolloutManager.Spec.Env = []corev1.EnvVar{
-					{Name: "LANG", Value: "en_US.UTF-8"},
-					{Name: "TERM", Value: "xterm-256color"},
-				}
 
-				Expect(k8sClient.Update(ctx, &rolloutManager)).To(Succeed())
+				err := k8s.UpdateWithoutConflict(ctx, &rolloutManager, k8sClient, func(obj client.Object) {
+					goObj, ok := obj.(*rolloutsmanagerv1alpha1.RolloutManager)
+					Expect(ok).To(BeTrue())
+
+					goObj.Spec.Env = []corev1.EnvVar{
+						{Name: "LANG", Value: "en_US.UTF-8"},
+						{Name: "TERM", Value: "xterm-256color"},
+					}
+				})
+				Expect(err).ToNot(HaveOccurred())
+
 				Eventually(func() []corev1.EnvVar {
 					Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&deployment), &deployment)).To(Succeed())
 					return deployment.Spec.Template.Spec.Containers[0].Env
@@ -211,12 +222,16 @@ var _ = Describe("RolloutManager tests", func() {
 				Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal(expectedVersion))
 
 				By("updating the deployment when the image in the RolloutManager is updated")
-				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&rolloutManager), &rolloutManager)).To(Succeed())
 
-				rolloutManager.Spec.Image = controllers.DefaultArgoRolloutsImage
-				rolloutManager.Spec.Version = controllers.DefaultArgoRolloutsVersion
+				err := k8s.UpdateWithoutConflict(ctx, &rolloutManager, k8sClient, func(obj client.Object) {
+					goObj, ok := obj.(*rolloutsmanagerv1alpha1.RolloutManager)
+					Expect(ok).To(BeTrue())
+					goObj.Spec.Image = controllers.DefaultArgoRolloutsImage
+					goObj.Spec.Version = controllers.DefaultArgoRolloutsVersion
 
-				Expect(k8sClient.Update(ctx, &rolloutManager)).To(Succeed())
+				})
+				Expect(err).ToNot(HaveOccurred())
+
 				expectedVersion = controllers.DefaultArgoRolloutsImage + ":" + controllers.DefaultArgoRolloutsVersion
 				Eventually(func() string {
 					Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&deployment), &deployment)).To(Succeed())
