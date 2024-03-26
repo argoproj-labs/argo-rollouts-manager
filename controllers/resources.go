@@ -24,7 +24,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsServiceAccount(ctx context.C
 			Namespace: cr.Namespace,
 		},
 	}
-	setRolloutsLabels(&sa.ObjectMeta)
+	setRolloutsLabelsAndAnnotations(&sa.ObjectMeta, cr)
 
 	if err := fetchObject(ctx, r.Client, cr.Namespace, sa.Name, sa); err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -56,7 +56,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRole(ctx context.Context, cr
 			Namespace: cr.Namespace,
 		},
 	}
-	setRolloutsLabels(&role.ObjectMeta)
+	setRolloutsLabelsAndAnnotations(&role.ObjectMeta, cr)
 
 	if err := fetchObject(ctx, r.Client, cr.Namespace, role.Name, role); err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -89,7 +89,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRoleBinding(ctx context.Cont
 			Namespace: cr.Namespace,
 		},
 	}
-	setRolloutsLabels(&expectedRoleBinding.ObjectMeta)
+	setRolloutsLabelsAndAnnotations(&expectedRoleBinding.ObjectMeta, cr)
 
 	expectedRoleBinding.RoleRef = rbacv1.RoleRef{
 		APIGroup: rbacv1.GroupName,
@@ -244,7 +244,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.C
 			Namespace: cr.Namespace,
 		},
 	}
-	setRolloutsLabels(&expectedSvc.ObjectMeta)
+	setRolloutsLabelsAndAnnotations(&expectedSvc.ObjectMeta, cr)
 	// overwrite the annotations for rollouts metrics service
 	expectedSvc.ObjectMeta.Labels["app.kubernetes.io/name"] = DefaultArgoRolloutsMetricsServiceName
 	expectedSvc.ObjectMeta.Labels["app.kubernetes.io/component"] = "server"
