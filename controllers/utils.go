@@ -14,6 +14,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+type PluginItem struct {
+	Name     string `json:"name" yaml:"name"`
+	Location string `json:"location" yaml:"location"`
+	Sha256   string `json:"sha256" yaml:"sha256"`
+}
+
 func setRolloutsLabels(obj *metav1.ObjectMeta) {
 	obj.Labels = map[string]string{}
 	obj.Labels["app.kubernetes.io/name"] = DefaultArgoRolloutsResourceName

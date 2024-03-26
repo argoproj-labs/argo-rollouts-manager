@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
-	"github.com/argoproj/argo-rollouts/utils/plugin/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gopkg.in/yaml.v2"
@@ -77,7 +76,7 @@ var _ = Describe("ConfigMap Test", func() {
 		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).ToNot(ContainSubstring("test/plugin"))
 
 		By("adding a new trafficRouter plugin to test the update plugin logic")
-		trafficRouterPlugins := []types.PluginItem{
+		trafficRouterPlugins := []PluginItem{
 			{
 				Name:     "test/plugin",
 				Location: "https://test-path",
