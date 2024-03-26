@@ -57,7 +57,7 @@ func EnsureCleanSlate() error {
 		return err
 	}
 
-	// delete namespaces created during test are deleted
+	// ensure namespaces created during test are deleted
 	err = cleaner.ensureTestNamespaceDeleted()
 	if err != nil {
 		return err

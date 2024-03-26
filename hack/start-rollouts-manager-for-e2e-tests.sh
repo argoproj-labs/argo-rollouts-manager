@@ -23,4 +23,3 @@ if [ "$RUN_IN_BACKGROUND" == "true" ]; then
 else
   go run ./main.go 2>&1 | tee /tmp/e2e-operator-run.log
 fi
-

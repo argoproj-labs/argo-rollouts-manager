@@ -129,7 +129,7 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 				rm.Status.Conditions[0].Message == UnsupportedRolloutManagerNamespaceScoped &&
 				rm.Status.Conditions[0].Status == metav1.ConditionFalse).To(BeTrue())
 
-			By("2dn RM: Create cluster-scoped RolloutManager.")
+			By("2nd RM: Create cluster-scoped RolloutManager.")
 			rm2 := makeTestRolloutManager()
 
 			r2 := makeTestReconciler(rm2)
@@ -146,17 +146,17 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(res2.Requeue).Should(BeFalse(), "reconcile should not requeue request")
 
-			By("2dn RM: Check if RolloutManager's Status.Conditions are set.")
+			By("2nd RM: Check if RolloutManager's Status.Conditions are set.")
 			Expect(r2.Client.Get(ctx, types.NamespacedName{Name: rm2.Name, Namespace: rm2.Namespace}, rm2)).To(Succeed())
 			Expect(rm2.Status.Conditions[0].Type == rolloutsmanagerv1alpha1.RolloutManagerConditionType &&
 				rm2.Status.Conditions[0].Reason == rolloutsmanagerv1alpha1.RolloutManagerReasonSuccess &&
 				rm2.Status.Conditions[0].Message == "" &&
 				rm2.Status.Conditions[0].Status == metav1.ConditionTrue).To(BeTrue())
 
-			By("2dn RM: Check expected resources are created.")
+			By("2nd RM: Check expected resources are created.")
 			validateArgoRolloutManagerResources(rm2, r2.Client, false)
 
-			By("2dn RM: Check Role and RoleBinding are not created.")
+			By("2nd RM: Check Role and RoleBinding are not created.")
 			role := &rbacv1.Role{}
 			err = r2.Client.Get(ctx, types.NamespacedName{
 				Name:      DefaultArgoRolloutsResourceName,
@@ -382,6 +382,71 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 				Namespace: testNamespace,
 			}, clusterRoleBinding)
 			Expect(errors.IsNotFound(err)).To(BeTrue(), "ClusterRoleBinding should not be created")
+		})
+
+		It("Should allow multiple namespace-scoped RolloutManagers in different namespaces.", func() {
+
+			By("1st RM: Create namespace-scoped RolloutManager.")
+			rm.Spec.NamespaceScoped = true
+
+			r := makeTestReconciler(rm)
+			r.NamespaceScopedArgoRolloutsController = true
+
+			Expect(createNamespace(r, rm.Namespace)).To(Succeed())
+
+			req := reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      rm.Name,
+					Namespace: rm.Namespace,
+				},
+			}
+
+			res, err := r.Reconcile(ctx, req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(res.Requeue).Should(BeFalse(), "reconcile should not requeue request")
+
+			By("1st RM: Check if RolloutManager's Status.Conditions are set.")
+			Expect(r.Client.Get(ctx, types.NamespacedName{Name: rm.Name, Namespace: rm.Namespace}, rm)).To(Succeed())
+			Expect(rm.Status.Conditions[0].Type == rolloutsmanagerv1alpha1.RolloutManagerConditionType &&
+				rm.Status.Conditions[0].Reason == rolloutsmanagerv1alpha1.RolloutManagerReasonSuccess &&
+				rm.Status.Conditions[0].Message == "" &&
+				rm.Status.Conditions[0].Status == metav1.ConditionTrue).To(BeTrue())
+
+			By("1st RM: Check expected resources are created in 1st namespace.")
+			validateArgoRolloutManagerResources(rm, r.Client, true)
+
+			By("2nd RM: Create namespace-scoped RolloutManager.")
+			rm2 := makeTestRolloutManager()
+			rm2.Spec.NamespaceScoped = true
+			rm2.Name = "test-rm"
+			rm2.Namespace = "test-ns"
+
+			Expect(createNamespace(r, rm2.Namespace)).To(Succeed())
+
+			r2 := makeTestReconciler(rm2)
+			r2.NamespaceScopedArgoRolloutsController = true
+			Expect(createNamespace(r2, rm2.Namespace)).To(Succeed())
+
+			req2 := reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      rm2.Name,
+					Namespace: rm2.Namespace,
+				},
+			}
+
+			res2, err := r2.Reconcile(ctx, req2)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(res2.Requeue).Should(BeFalse(), "reconcile should not requeue request")
+
+			By("2nd RM: Check if RolloutManager's Status.Conditions are set.")
+			Expect(r2.Client.Get(ctx, types.NamespacedName{Name: rm2.Name, Namespace: rm2.Namespace}, rm2)).To(Succeed())
+			Expect(rm2.Status.Conditions[0].Type == rolloutsmanagerv1alpha1.RolloutManagerConditionType &&
+				rm2.Status.Conditions[0].Reason == rolloutsmanagerv1alpha1.RolloutManagerReasonSuccess &&
+				rm2.Status.Conditions[0].Message == "" &&
+				rm2.Status.Conditions[0].Status == metav1.ConditionTrue).To(BeTrue())
+
+			By("2nd RM: Check expected resources are created in 2nd namespace.")
+			validateArgoRolloutManagerResources(rm2, r2.Client, true)
 		})
 	})
 })

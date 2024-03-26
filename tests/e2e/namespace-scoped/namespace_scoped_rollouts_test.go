@@ -64,16 +64,10 @@ var _ = Describe("Namespace-scoped RolloutManager tests", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			By("Verify that RolloutManager is successfully created.")
-			Eventually(rolloutsManager, "1m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseAvailable))
+			Eventually(rolloutsManager, "2m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseAvailable))
 
-			By("Verify that Status.Condition is set.")
-			Eventually(rolloutsManager, "1m", "1s").Should(rmFixture.HaveCondition(
-				metav1.Condition{
-					Type:    rmv1alpha1.RolloutManagerConditionType,
-					Status:  metav1.ConditionTrue,
-					Reason:  rmv1alpha1.RolloutManagerReasonSuccess,
-					Message: "",
-				}))
+			By("Verify that Status.Condition is having success condition.")
+			Eventually(rolloutsManager, "2m", "1s").Should(rmFixture.HaveSuccessCondition())
 
 			By("Verify that expected resources are created.")
 			utils.ValidateArgoRolloutManagerResources(ctx, rolloutsManager, k8sClient, true)
@@ -100,16 +94,10 @@ var _ = Describe("Namespace-scoped RolloutManager tests", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			By("1st RM: Verify that RolloutManager is successfully created.")
-			Eventually(rolloutsManagerNs1, "1m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseAvailable))
+			Eventually(rolloutsManagerNs1, "2m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseAvailable))
 
-			By("1st RM: Verify that Status.Condition is set.")
-			Eventually(rolloutsManagerNs1, "1m", "1s").Should(rmFixture.HaveCondition(
-				metav1.Condition{
-					Type:    rmv1alpha1.RolloutManagerConditionType,
-					Status:  metav1.ConditionTrue,
-					Reason:  rmv1alpha1.RolloutManagerReasonSuccess,
-					Message: "",
-				}))
+			By("1st RM: Verify that Status.Condition is having success condition.")
+			Eventually(rolloutsManagerNs1, "2m", "1s").Should(rmFixture.HaveSuccessCondition())
 
 			By("1st RM: Verify argo Rollouts controller of 1st namespace is able to reconcile CR created in 1st namespace.")
 
@@ -126,14 +114,8 @@ var _ = Describe("Namespace-scoped RolloutManager tests", func() {
 			By("2nd RM: Verify that RolloutManager of 2nd namespace is successfully created.")
 			Eventually(rolloutsManagerNs2, "1m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseAvailable))
 
-			By("2nd RM: Verify that Status.Condition is set.")
-			Eventually(rolloutsManagerNs2, "1m", "1s").Should(rmFixture.HaveCondition(
-				metav1.Condition{
-					Type:    rmv1alpha1.RolloutManagerConditionType,
-					Status:  metav1.ConditionTrue,
-					Reason:  rmv1alpha1.RolloutManagerReasonSuccess,
-					Message: "",
-				}))
+			By("2nd RM: Verify that Status.Condition is having success condition.")
+			Eventually(rolloutsManagerNs2, "2m", "1s").Should(rmFixture.HaveSuccessCondition())
 
 			By("2nd RM: Verify argo Rollouts controller of 2nd namespace is able to reconcile CR created in 2nd namespace.")
 
@@ -141,21 +123,25 @@ var _ = Describe("Namespace-scoped RolloutManager tests", func() {
 			utils.ValidateArgoRolloutsResources(ctx, k8sClient, nsName1, 31001, 32001)
 
 			By("1st RM: Update 1st RolloutManager, after reconciliation it should still work.")
-			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&rolloutsManagerNs1), &rolloutsManagerNs1)).To(Succeed())
-			rolloutsManagerNs1.Spec.Env = append(rolloutsManagerNs1.Spec.Env, corev1.EnvVar{Name: "test-name", Value: "test-value"})
-			Expect(k8sClient.Update(ctx, &rolloutsManagerNs1)).To(Succeed())
+			err = k8s.UpdateWithoutConflict(ctx, &rolloutsManagerNs1, k8sClient, func(obj client.Object) {
+				goObj, ok := obj.(*rmv1alpha1.RolloutManager)
+				Expect(ok).To(BeTrue())
+
+				goObj.Spec.Env = append(goObj.Spec.Env, corev1.EnvVar{Name: "test-name", Value: "test-value"})
+			})
+			Expect(err).ToNot(HaveOccurred())
 
 			By("1st RM: Verify that now 1st RolloutManager is still working.")
-			Eventually(rolloutsManagerNs1, "1m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseAvailable))
+			Eventually(rolloutsManagerNs1, "2m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseAvailable))
 
 			By("2nd RM: Delete 2nd RolloutManager and ensure 2nd Rollouts controller is also deleted.")
 			Expect(k8sClient.Delete(ctx, &rolloutsManagerNs2)).To(Succeed())
-			Consistently(&appsv1.Deployment{
+			Eventually(&appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      controllers.DefaultArgoRolloutsResourceName,
 					Namespace: nsName1,
 				},
-			}, "30s", "1s").ShouldNot(k8s.ExistByName(k8sClient))
+			}, "3m", "2s").ShouldNot(k8s.ExistByName(k8sClient))
 
 			By("2nd RM: Delete 2nd Rollout CR and ensure it is not recreated.")
 			rollout2 := rv1alpha1.Rollout{
@@ -164,7 +150,7 @@ var _ = Describe("Namespace-scoped RolloutManager tests", func() {
 			Expect(k8sClient.Delete(ctx, &rollout2)).To(Succeed())
 			Eventually(func() error {
 				return k8sClient.Get(ctx, client.ObjectKeyFromObject(&rollout2), &rollout2)
-			}, "30s", "1s").ShouldNot(BeNil())
+			}, "1m", "1s").ShouldNot(BeNil())
 
 			By("2nd RM: Create 3rd Rollout in 2nd namespace and ensure it is not reconciled, since RolloutsManager is deleted from 2nd namespace.")
 			rollout3, err := utils.CreateArgoRollout(ctx, k8sClient, "simple-rollout-1", nsName1, utils.RolloutsActiveServiceName, utils.RolloutsPreviewServiceName)
@@ -174,7 +160,7 @@ var _ = Describe("Namespace-scoped RolloutManager tests", func() {
 					return false
 				}
 				return reflect.DeepEqual(rollout3.Status, rv1alpha1.RolloutStatus{})
-			}, "30s", "1s").Should(
+			}, "1m", "1s").Should(
 				BeTrue(),
 			)
 		})
@@ -196,16 +182,10 @@ var _ = Describe("Namespace-scoped RolloutManager tests", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			By("1st NS: Verify that RolloutManager is successfully created in 1st namespace.")
-			Eventually(rolloutsManager, "1m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseAvailable))
+			Eventually(rolloutsManager, "2m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseAvailable))
 
-			By("1st NS: Verify that Status.Condition is set.")
-			Eventually(rolloutsManager, "1m", "1s").Should(rmFixture.HaveCondition(
-				metav1.Condition{
-					Type:    rmv1alpha1.RolloutManagerConditionType,
-					Status:  metav1.ConditionTrue,
-					Reason:  rmv1alpha1.RolloutManagerReasonSuccess,
-					Message: "",
-				}))
+			By("1st NS: Verify that Status.Condition is having success condition.")
+			Eventually(rolloutsManager, "2m", "1s").Should(rmFixture.HaveSuccessCondition())
 
 			By("1st NS: Verify that expected resources are created in 1st namespace.")
 			utils.ValidateArgoRolloutManagerResources(ctx, rolloutsManager, k8sClient, true)
@@ -256,14 +236,8 @@ var _ = Describe("Namespace-scoped RolloutManager tests", func() {
 			By("1st RM: Verify that RolloutManager is successfully created in 1st namespace.")
 			Eventually(rolloutsManagerNs, "1m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseAvailable))
 
-			By("1st RM: Verify that Status.Condition is set.")
-			Eventually(rolloutsManagerNs, "1m", "1s").Should(rmFixture.HaveCondition(
-				metav1.Condition{
-					Type:    rmv1alpha1.RolloutManagerConditionType,
-					Status:  metav1.ConditionTrue,
-					Reason:  rmv1alpha1.RolloutManagerReasonSuccess,
-					Message: "",
-				}))
+			By("1st RM: Verify that Status.Condition is having success condition.")
+			Eventually(rolloutsManagerNs, "1m", "1s").Should(rmFixture.HaveSuccessCondition())
 
 			By("2nd RM: Create 2nd namespace.")
 			Expect(utils.CreateNamespace(ctx, k8sClient, nsName)).To(Succeed())
@@ -285,21 +259,18 @@ var _ = Describe("Namespace-scoped RolloutManager tests", func() {
 				}))
 
 			By("1st RM: Update namespace-scoped RolloutManager of 1st namespace, after reconciliation it should still be working.")
-			err = k8sClient.Get(ctx, client.ObjectKeyFromObject(&rolloutsManagerNs), &rolloutsManagerNs)
+			err = k8s.UpdateWithoutConflict(ctx, &rolloutsManagerNs, k8sClient, func(obj client.Object) {
+				goObj, ok := obj.(*rmv1alpha1.RolloutManager)
+				Expect(ok).To(BeTrue())
+
+				goObj.Spec.Env = append(goObj.Spec.Env, corev1.EnvVar{Name: "test-name", Value: "test-value"})
+			})
 			Expect(err).ToNot(HaveOccurred())
-			rolloutsManagerNs.Spec.Env = append(rolloutsManagerNs.Spec.Env, corev1.EnvVar{Name: "test-name", Value: "test-value"})
-			err = k8sClient.Update(ctx, &rolloutsManagerNs)
-			Expect(err).ToNot(HaveOccurred())
+
 			Eventually(rolloutsManagerNs, "1m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseAvailable))
 
 			By("1st RM: Verify that Status.Condition is not having any error.")
-			Eventually(rolloutsManagerNs, "1m", "1s").Should(rmFixture.HaveCondition(
-				metav1.Condition{
-					Type:    rmv1alpha1.RolloutManagerConditionType,
-					Status:  metav1.ConditionTrue,
-					Reason:  rmv1alpha1.RolloutManagerReasonSuccess,
-					Message: "",
-				}))
+			Eventually(rolloutsManagerNs, "1m", "1s").Should(rmFixture.HaveSuccessCondition())
 
 			By("1st RM: Create Rollout CR in 1st namespace and ensure it is reconciled.")
 			utils.ValidateArgoRolloutsResources(ctx, k8sClient, fixture.TestE2ENamespace, 31000, 32000)

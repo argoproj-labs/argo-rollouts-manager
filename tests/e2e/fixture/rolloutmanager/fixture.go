@@ -64,3 +64,31 @@ func HaveCondition(expected metav1.Condition) matcher.GomegaMatcher {
 		return false
 	})
 }
+
+func HaveSuccessCondition() matcher.GomegaMatcher {
+	return fetchRolloutManager(func(app rolloutsmanagerv1alpha1.RolloutManager) bool {
+
+		if len(app.Status.Conditions) == 0 {
+			fmt.Println("HaveSuccessCondition: Conditions is nil")
+			return false
+		}
+
+		expected := metav1.Condition{
+			Type:    rolloutsmanagerv1alpha1.RolloutManagerConditionType,
+			Status:  metav1.ConditionTrue,
+			Reason:  rolloutsmanagerv1alpha1.RolloutManagerReasonSuccess,
+			Message: "",
+		}
+
+		for _, condition := range app.Status.Conditions {
+			if condition.Type == rolloutsmanagerv1alpha1.RolloutManagerConditionType {
+				fmt.Println("HaveSuccessCondition:", "expected: ", expected, "actual: ", condition)
+				return condition.Type == expected.Type &&
+					condition.Status == expected.Status &&
+					condition.Reason == expected.Reason &&
+					condition.Message == expected.Message
+			}
+		}
+		return false
+	})
+}

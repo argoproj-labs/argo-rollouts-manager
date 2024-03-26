@@ -6,6 +6,7 @@ import (
 
 	. "github.com/onsi/gomega"
 	matcher "github.com/onsi/gomega/types"
+	"k8s.io/client-go/util/retry"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -24,4 +25,21 @@ func ExistByName(k8sClient client.Client) matcher.GomegaMatcher {
 		}
 		return err == nil
 	}, BeTrue())
+}
+
+// UpdateWithoutConflict will keep trying to update object until it succeeds, or times out.
+func UpdateWithoutConflict(ctx context.Context, obj client.Object, k8sClient client.Client, modify func(client.Object)) error {
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// Retrieve the latest version of the object
+		err := k8sClient.Get(context.Background(), client.ObjectKeyFromObject(obj), obj)
+		if err != nil {
+			return err
+		}
+		modify(obj)
+
+		// Attempt to update the object
+		return k8sClient.Update(ctx, obj)
+	})
+
+	return err
 }

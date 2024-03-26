@@ -136,7 +136,7 @@ start-e2e-namespace-scoped-bg: ## Start the operator, to run the e2e tests
 
 .PHONY: start-e2e-cluster-scoped-bg 
 start-e2e-cluster-scoped-bg: ## Start the operator, to run the e2e tests
-	RUN_IN_BACKGROUND=true NAMESPACE_SCOPED_ARGO_ROLLOUTS=false hack/start-rollouts-manager-for-e2e-tests.sh
+	RUN_IN_BACKGROUND=true hack/start-rollouts-manager-for-e2e-tests.sh
 
 
 .PHONY: test-e2e-namespace-scoped
@@ -145,7 +145,7 @@ test-e2e-namespace-scoped: ## Run operator e2e tests
 
 .PHONY: test-e2e-cluster-scoped
 test-e2e-cluster-scoped: ## Run operator e2e tests
-	NAMESPACE_SCOPED_ARGO_ROLLOUTS=false hack/run-rollouts-manager-e2e-tests.sh
+	hack/run-rollouts-manager-e2e-tests.sh
 
 .PHONY: start-test-e2e-all
 start-test-e2e-all: start-e2e-namespace-scoped-bg test-e2e-namespace-scoped start-e2e-cluster-scoped-bg test-e2e-cluster-scoped
