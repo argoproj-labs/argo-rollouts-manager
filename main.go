@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"os"
+	"strings"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -96,10 +97,19 @@ func main() {
 		openShiftRoutePluginLocation = controllers.DefaultOpenShiftRoutePluginURL
 	}
 
+	isNamespaceScoped := strings.ToLower(os.Getenv(controllers.NamespaceScopedArgoRolloutsController)) == "true"
+
+	if isNamespaceScoped {
+		setupLog.Info("Running in namespaced-scoped mode")
+	} else {
+		setupLog.Info("Running in cluster-scoped mode")
+	}
+
 	if err = (&controllers.RolloutManagerReconciler{
-		Client:                       mgr.GetClient(),
-		Scheme:                       mgr.GetScheme(),
-		OpenShiftRoutePluginLocation: openShiftRoutePluginLocation,
+		Client:                                mgr.GetClient(),
+		Scheme:                                mgr.GetScheme(),
+		OpenShiftRoutePluginLocation:          openShiftRoutePluginLocation,
+		NamespaceScopedArgoRolloutsController: isNamespaceScoped,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RolloutManager")
 		os.Exit(1)

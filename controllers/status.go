@@ -41,8 +41,9 @@ func (r *RolloutManagerReconciler) reconcileRolloutControllerStatus(ctx context.
 	}
 
 	if cr.Status.RolloutController != status {
-		cr.Status.RolloutController = status
-		if err := r.Client.Status().Update(ctx, cr); err != nil {
+		if err := UpdateDeploymentStatusWithFunction(ctx, r.Client, cr, func(cr *rolloutsmanagerv1alpha1.RolloutManager) {
+			cr.Status.RolloutController = status
+		}); err != nil {
 			log.Error(err, "error updating the Argo Rollout CR status")
 		}
 	}
@@ -58,7 +59,10 @@ func (r *RolloutManagerReconciler) reconcileStatusPhase(ctx context.Context, cr 
 	// In future this condition may change
 	if cr.Status.Phase != cr.Status.RolloutController {
 		cr.Status.Phase = cr.Status.RolloutController
-		return r.Client.Status().Update(ctx, cr)
+
+		return UpdateDeploymentStatusWithFunction(ctx, r.Client, cr, func(cr *rolloutsmanagerv1alpha1.RolloutManager) {
+			cr.Status.Phase = cr.Status.RolloutController
+		})
 	}
 	return nil
 }

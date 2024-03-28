@@ -8,9 +8,10 @@ import (
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
-	// . "github.com/onsi/gomega"
 
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -27,15 +28,19 @@ import (
 
 const (
 	TestE2ENamespace = "argo-rollouts"
+	LabelsKey        = "app"
+	LabelsValue      = "test-argo-app"
 )
+
+var NamespaceLabels = map[string]string{LabelsKey: LabelsValue}
 
 type Cleaner struct {
 	cxt       context.Context
 	k8sClient client.Client
 }
 
-func NewCleaner() (*Cleaner, error) {
-	k8sClient, err := GetE2ETestKubeClient()
+func newCleaner() (*Cleaner, error) {
+	k8sClient, _, err := GetE2ETestKubeClient()
 	if err != nil {
 		return nil, err
 	}
@@ -47,17 +52,24 @@ func NewCleaner() (*Cleaner, error) {
 }
 
 func EnsureCleanSlate() error {
-	cleaner, err := NewCleaner()
+	cleaner, err := newCleaner()
 	if err != nil {
 		return err
 	}
 
-	err = cleaner.EnsureDestinationNamespaceExists(TestE2ENamespace)
+	// delete namespaces created during test are deleted
+	err = cleaner.ensureTestNamespaceDeleted()
 	if err != nil {
 		return err
 	}
 
-	err = cleaner.DeleteRolloutsClusterRoles()
+	// create default namespace used for Rollouts controller
+	err = cleaner.ensureRlloutNamespaceExists(TestE2ENamespace)
+	if err != nil {
+		return err
+	}
+
+	err = cleaner.deleteRolloutsClusterRoles()
 	if err != nil {
 		return err
 	}
@@ -65,8 +77,8 @@ func EnsureCleanSlate() error {
 	return nil
 }
 
-func (cleaner *Cleaner) EnsureDestinationNamespaceExists(namespaceParam string) error {
-	if err := cleaner.DeleteNamespace(namespaceParam); err != nil {
+func (cleaner *Cleaner) ensureRlloutNamespaceExists(namespaceParam string) error {
+	if err := cleaner.deleteNamespace(namespaceParam); err != nil {
 		return fmt.Errorf("unable to delete namespace '%s': %w", namespaceParam, err)
 	}
 
@@ -81,7 +93,7 @@ func (cleaner *Cleaner) EnsureDestinationNamespaceExists(namespaceParam string) 
 	return nil
 }
 
-func (cleaner *Cleaner) DeleteRolloutsClusterRoles() error {
+func (cleaner *Cleaner) deleteRolloutsClusterRoles() error {
 	crList := rbacv1.ClusterRoleList{}
 	if err := cleaner.k8sClient.List(cleaner.cxt, &crList, &client.ListOptions{}); err != nil {
 		return err
@@ -100,8 +112,8 @@ func (cleaner *Cleaner) DeleteRolloutsClusterRoles() error {
 	return nil
 }
 
-// DeleteNamespace deletes a namespace, and waits for it to be reported as deleted.
-func (cleaner *Cleaner) DeleteNamespace(namespaceParam string) error {
+// deleteNamespace deletes a namespace, and waits for it to be reported as deleted.
+func (cleaner *Cleaner) deleteNamespace(namespaceParam string) error {
 
 	// Delete the namespace:
 	// - Issue a request to Delete the namespace
@@ -138,55 +150,55 @@ func (cleaner *Cleaner) DeleteNamespace(namespaceParam string) error {
 	return nil
 }
 
-func GetE2ETestKubeClient() (client.Client, error) {
-	config, err := GetSystemKubeConfig()
+func GetE2ETestKubeClient() (client.Client, *runtime.Scheme, error) {
+	config, err := getSystemKubeConfig()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	k8sClient, err := GetKubeClient(config)
+	k8sClient, scheme, err := getKubeClient(config)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return k8sClient, nil
+	return k8sClient, scheme, nil
 }
 
-// GetKubeClient returns a controller-runtime Client for accessing K8s API resources used by the controller.
-func GetKubeClient(config *rest.Config) (client.Client, error) {
+// getKubeClient returns a controller-runtime Client for accessing K8s API resources used by the controller.
+func getKubeClient(config *rest.Config) (client.Client, *runtime.Scheme, error) {
 
 	scheme := runtime.NewScheme()
 
 	if err := rolloutsmanagerv1alpha1.AddToScheme(scheme); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if err := corev1.AddToScheme(scheme); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if err := apps.AddToScheme(scheme); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if err := rbacv1.AddToScheme(scheme); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if err := admissionv1.AddToScheme(scheme); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	k8sClient, err := client.New(config, client.Options{Scheme: scheme})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return k8sClient, nil
+	return k8sClient, scheme, nil
 
 }
 
 // Retrieve the system-level Kubernetes config (e.g. ~/.kube/config or service account config from volume)
-func GetSystemKubeConfig() (*rest.Config, error) {
+func getSystemKubeConfig() (*rest.Config, error) {
 
 	overrides := clientcmd.ConfigOverrides{}
 
@@ -198,4 +210,40 @@ func GetSystemKubeConfig() (*rest.Config, error) {
 		return nil, err
 	}
 	return restConfig, nil
+}
+
+// Delete all namespaces having a specific label used to identify namespaces that are created by e2e tests.
+func (cleaner *Cleaner) ensureTestNamespaceDeleted() error {
+
+	// fetch all namespaces having given label
+	nsList, err := listE2ETestNamespaces(cleaner.cxt, cleaner.k8sClient)
+	if err != nil {
+		return fmt.Errorf("unable to delete test namespace: %w", err)
+	}
+
+	// delete selected namespaces
+	for _, namespace := range nsList.Items {
+		if err := cleaner.deleteNamespace(namespace.Name); err != nil {
+			return fmt.Errorf("unable to delete namespace '%s': %w", namespace.Name, err)
+		}
+	}
+	return nil
+}
+
+// Retrieve list of namespaces having a specific label used to identify namespaces that are created by e2e tests.
+func listE2ETestNamespaces(ctx context.Context, k8sClient client.Client) (corev1.NamespaceList, error) {
+	nsList := corev1.NamespaceList{}
+
+	// set e2e label
+	req, err := labels.NewRequirement(LabelsKey, selection.Equals, []string{LabelsValue})
+	if err != nil {
+		return nsList, fmt.Errorf("unable to set labels while fetching list of test namespace: %w", err)
+	}
+
+	// fetch all namespaces having given label
+	err = k8sClient.List(ctx, &nsList, &client.ListOptions{LabelSelector: labels.NewSelector().Add(*req)})
+	if err != nil {
+		return nsList, fmt.Errorf("unable to fetch list of test namespace: %w", err)
+	}
+	return nsList, nil
 }

@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -39,6 +40,10 @@ type RolloutManagerReconciler struct {
 	client.Client
 	Scheme                       *runtime.Scheme
 	OpenShiftRoutePluginLocation string
+
+	// NamespaceScopedArgoRolloutsController is used to configure scope of Argo Rollouts controller
+	// If value is true then deploy namespace-scoped Argo Rollouts controller else cluster-scoped
+	NamespaceScopedArgoRolloutsController bool
 }
 
 var log = logr.Log.WithName("rollouts-controller")
@@ -94,8 +99,19 @@ func (r *RolloutManagerReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return reconcile.Result{}, err
 	}
 
-	if err := r.reconcileRolloutsManager(ctx, rollouts); err != nil {
-		// Error reconciling RolloutManager sub-resources - requeue the request.
+	condition, err := r.reconcileRolloutsManager(ctx, rollouts)
+
+	if err := updateStatusConditionOfRolloutManager(ctx, condition, &rolloutsmanagerv1alpha1.RolloutManager{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      req.Name,
+			Namespace: req.Namespace,
+		},
+	}, r.Client, log); err != nil {
+		log.Error(err, "unable to update status of RolloutManager")
+		return reconcile.Result{}, err
+	}
+
+	if err != nil {
 		return reconcile.Result{}, err
 	}
 
@@ -123,8 +139,14 @@ func (r *RolloutManagerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Watch for changes to Role sub-resources owned by RolloutManager.
 	bld.Owns(&rbacv1.Role{})
 
+	// Watch for changes to ClusterRole sub-resources owned by RolloutManager.
+	bld.Owns(&rbacv1.ClusterRole{})
+
 	// Watch for changes to RoleBinding sub-resources owned by RolloutManager.
 	bld.Owns(&rbacv1.RoleBinding{})
+
+	// Watch for changes to ClusterRoleBinding sub-resources owned by RolloutManager.
+	bld.Owns(&rbacv1.ClusterRoleBinding{})
 
 	return bld.Complete(r)
 }
