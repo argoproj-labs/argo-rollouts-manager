@@ -76,6 +76,7 @@ var log = logr.Log.WithName("rollouts-controller")
 //+kubebuilder:rbac:groups="traefik.containo.us",resources=traefikservices,verbs=watch;get;update
 //+kubebuilder:rbac:groups="x.getambassador.io",resources=ambassadormappings;mappings,verbs=create;watch;get;update;list;delete
 //+kubebuilder:rbac:groups="apisix.apache.org",resources=apisixroutes,verbs=watch;get;update
+//+kubebuilder:rbac:groups="route.openshift.io",resources=routes,verbs=create;watch;get;update;patch;list
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.

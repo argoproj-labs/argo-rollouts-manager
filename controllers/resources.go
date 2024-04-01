@@ -832,6 +832,22 @@ func GetPolicyRules() []rbacv1.PolicyRule {
 				"update",
 			},
 		},
+		{
+			APIGroups: []string{
+				"route.openshift.io",
+			},
+			Resources: []string{
+				"routes",
+			},
+			Verbs: []string{
+				"create",
+				"watch",
+				"get",
+				"update",
+				"patch",
+				"list",
+			},
+		},
 	}
 }
 

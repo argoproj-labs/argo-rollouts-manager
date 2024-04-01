@@ -19,12 +19,12 @@ const (
 	DefaultRolloutsSelectorKey = "app.kubernetes.io/name"
 
 	// OpenShiftRolloutPluginName is the plugin name for Openshift Route Plugin
-	OpenShiftRolloutPluginName = "argoproj-labs/openshift-route-plugin"
+	OpenShiftRolloutPluginName = "argoproj-labs/openshift"
 
 	// DefaultRolloutsConfigMapName is the default name of the ConfigMap that contains the Rollouts controller configuration
 	DefaultRolloutsConfigMapName = "argo-rollouts-config"
 
-	DefaultOpenShiftRoutePluginURL = "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-openshift/releases/download/commit-2749e0ac96ba00ce6f4af19dc6d5358048227d77/rollouts-plugin-trafficrouter-openshift-linux-amd64"
+	DefaultOpenShiftRoutePluginURL = "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-openshift/releases/download/commit-8d0b3c6c5c18341f9f019cf1015b56b0d0c6085b/rollouts-plugin-trafficrouter-openshift-linux-amd64"
 
 	// NamespaceScopedArgoRolloutsController is an environment variable that can be used to configure scope of Argo Rollouts controller
 	// Set true to allow only namespace-scoped Argo Rollouts controller deployment and false for cluster-scoped
