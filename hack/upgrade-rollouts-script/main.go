@@ -137,7 +137,7 @@ func createNewCommitAndBranch(latestReleaseVersionTag string, latestReleaseVersi
 		{"git", "stash"},
 		{"git", "fetch", "parent"},
 		{"git", "checkout", "main"},
-		{"git", "rebase", "parent/main"},
+		{"git", "reset", "--hard", "parent/main"},
 		{"git", "checkout", "-b", newBranchName},
 	}
 
