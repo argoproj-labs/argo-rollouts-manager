@@ -9,7 +9,7 @@ cd "$SCRIPTPATH/.."
 
 killall main
 
-sleep 3s
+sleep 5s
 
 rm -f /tmp/e2e-operator-run.log || true
 

@@ -16,7 +16,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsManager(ctx context.Context,
 			return createCondition(err.Error(), rolloutsmanagerv1alpha1.RolloutManagerReasonInvalidScoped), nil
 		}
 		log.Error(err, "failed to validate RolloutManager's scope.")
-		return createCondition(err.Error()), nil
+		return createCondition(err.Error()), err
 	}
 
 	log.Info("searching for existing RolloutManagers")
@@ -25,7 +25,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsManager(ctx context.Context,
 			return createCondition(err.Error(), rolloutsmanagerv1alpha1.RolloutManagerReasonMultipleClusterScopedRolloutManager), nil
 		}
 		log.Error(err, "failed to validate multiple RolloutManagers.")
-		return createCondition(err.Error()), nil
+		return createCondition(err.Error()), err
 	}
 
 	log.Info("reconciling Rollouts ServiceAccount")

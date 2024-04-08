@@ -18,9 +18,9 @@ import (
 )
 
 const (
-	UnsupportedRolloutManagerConfiguration   = "when there exists a cluster-scoped RolloutManager on the cluster, there may not exist another: only a single cluster-scoped RolloutManager is supported."
-	UnsupportedRolloutManagerClusterScoped   = "when Subscription has environment variable NAMESPACE_SCOPED_ARGO_ROLLOUTS set to True, there may not exist any cluster-scoped RolloutManager: only a single namespace-scoped RolloutManager is supported in a namespace."
-	UnsupportedRolloutManagerNamespaceScoped = "when Subscription has environment variable NAMESPACE_SCOPED_ARGO_ROLLOUTS set to False, there may not exist any namespace-scoped RolloutManager: only cluster-scoped RolloutManager is supported."
+	UnsupportedRolloutManagerConfiguration   = "when there exists a cluster-scoped RolloutManager on the cluster, there may not exist another: only a single cluster-scoped RolloutManager is supported"
+	UnsupportedRolloutManagerClusterScoped   = "when Subscription has environment variable NAMESPACE_SCOPED_ARGO_ROLLOUTS set to True, there may not exist any cluster-scoped RolloutManagers: in this case, only namespace-scoped RolloutManager resources are supported"
+	UnsupportedRolloutManagerNamespaceScoped = "when Subscription has environment variable NAMESPACE_SCOPED_ARGO_ROLLOUTS set to False, there may not exist any namespace-scoped RolloutManagers: only a single cluster-scoped RolloutManager is supported"
 )
 
 func setRolloutsLabels(obj *metav1.ObjectMeta) {
