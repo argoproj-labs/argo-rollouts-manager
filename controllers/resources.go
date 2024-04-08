@@ -28,7 +28,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsServiceAccount(ctx context.C
 
 	if err := fetchObject(ctx, r.Client, cr.Namespace, sa.Name, sa); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("failed to get the ServiceAccount associated with %s: %s", sa.Name, err)
+			return nil, fmt.Errorf("failed to get the ServiceAccount associated with %s: %w", sa.Name, err)
 		}
 
 		if err := controllerutil.SetControllerReference(cr, sa, r.Scheme); err != nil {
@@ -60,7 +60,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRole(ctx context.Context, cr
 
 	if err := fetchObject(ctx, r.Client, cr.Namespace, role.Name, role); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("failed to reconcile the Role for the ServiceAccount associated with %s: %s", role.Name, err)
+			return nil, fmt.Errorf("failed to reconcile the Role for the ServiceAccount associated with %s: %w", role.Name, err)
 		}
 
 		if err = controllerutil.SetControllerReference(cr, role, r.Scheme); err != nil {
@@ -152,7 +152,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRoleBinding(ctx context.Cont
 	// Fetch the RoleBinding if exists and store that in actualRoleBinding.
 	if err := fetchObject(ctx, r.Client, cr.Namespace, expectedRoleBinding.Name, actualRoleBinding); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to get the RoleBinding associated with %s: %s", expectedRoleBinding.Name, err)
+			return fmt.Errorf("failed to get the RoleBinding associated with %s: %w", expectedRoleBinding.Name, err)
 		}
 
 		if err := controllerutil.SetControllerReference(cr, expectedRoleBinding, r.Scheme); err != nil {
@@ -212,7 +212,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsClusterRoleBinding(ctx conte
 	// Fetch the ClusterRoleBinding if exists and store that in actualClusterRoleBinding.
 	if err := fetchObject(ctx, r.Client, "", expectedClusterRoleBinding.Name, actualClusterRoleBinding); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to get the ClusterRoleBinding associated with %s: %s", expectedClusterRoleBinding.Name, err)
+			return fmt.Errorf("failed to get the ClusterRoleBinding associated with %s: %w", expectedClusterRoleBinding.Name, err)
 		}
 
 		log.Info(fmt.Sprintf("Creating ClusterRoleBinding %s", expectedClusterRoleBinding.Name))
@@ -248,7 +248,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToAdminClusterRole(
 
 	if err := fetchObject(ctx, r.Client, "", clusterRole.Name, clusterRole); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to reconcile the aggregated ClusterRole %s: %s", clusterRole.Name, err)
+			return fmt.Errorf("failed to reconcile the aggregated ClusterRole %s: %w", clusterRole.Name, err)
 		}
 
 		log.Info(fmt.Sprintf("Creating aggregated ClusterRole %s", clusterRole.Name))
@@ -283,7 +283,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToEditClusterRole(c
 
 	if err := fetchObject(ctx, r.Client, "", clusterRole.Name, clusterRole); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to reconcile the aggregated ClusterRole %s: %s", clusterRole.Name, err)
+			return fmt.Errorf("failed to reconcile the aggregated ClusterRole %s: %w", clusterRole.Name, err)
 		}
 
 		log.Info(fmt.Sprintf("Creating aggregated ClusterRole %s", clusterRole.Name))
@@ -318,7 +318,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToViewClusterRole(c
 
 	if err := fetchObject(ctx, r.Client, "", clusterRole.Name, clusterRole); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to reconcile the aggregated ClusterRole %s: %s", clusterRole.Name, err)
+			return fmt.Errorf("failed to reconcile the aggregated ClusterRole %s: %w", clusterRole.Name, err)
 		}
 
 		log.Info(fmt.Sprintf("Creating aggregated ClusterRole %s", clusterRole.Name))
@@ -368,7 +368,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.C
 	// Fetch the Service if exists and store that in actualSvc.
 	if err := fetchObject(ctx, r.Client, cr.Namespace, expectedSvc.Name, actualSvc); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to get the Service %s: %s", expectedSvc.Name, err)
+			return fmt.Errorf("failed to get the Service %s: %w", expectedSvc.Name, err)
 		}
 
 		if err := controllerutil.SetControllerReference(cr, expectedSvc, r.Scheme); err != nil {
@@ -400,7 +400,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsSecrets(ctx context.Context,
 
 	if err := fetchObject(ctx, r.Client, cr.Namespace, secret.Name, secret); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to get the Secret %s: %s", secret.Name, err)
+			return fmt.Errorf("failed to get the Secret %s: %w", secret.Name, err)
 		}
 
 		if err := controllerutil.SetControllerReference(cr, secret, r.Scheme); err != nil {

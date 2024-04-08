@@ -101,7 +101,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(ctx context.Conte
 
 	if err := fetchObject(ctx, r.Client, cr.Namespace, DefaultArgoRolloutsResourceName, actualDeployment); err != nil {
 		if !errors.IsNotFound(err) {
-			return fmt.Errorf("failed to get the Deployment %s: %s", DefaultArgoRolloutsResourceName, err)
+			return fmt.Errorf("failed to get the Deployment %s: %w", DefaultArgoRolloutsResourceName, err)
 		}
 
 		if err := controllerutil.SetControllerReference(cr, &desiredDeployment, r.Scheme); err != nil {

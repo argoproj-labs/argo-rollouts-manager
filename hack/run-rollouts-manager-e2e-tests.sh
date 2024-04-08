@@ -27,9 +27,9 @@ set +e
 if [ -f "/tmp/e2e-operator-run.log" ]; then
 
   # Wait for the controller to flush to the file, before killing the controller
-  sleep 8
+  sleep 10
   killall main
-  sleep 3
+  sleep 5
 
   # Grep the log for unexpected errors
   # - Ignore errors that are expected to occur

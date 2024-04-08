@@ -53,7 +53,7 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr *r
 			log.Info("configMap not found, creating default configmap with openshift route plugin information")
 			return r.Client.Create(ctx, desiredConfigMap)
 		}
-		return fmt.Errorf("failed to get the serviceAccount associated with %s: %s", desiredConfigMap.Name, err)
+		return fmt.Errorf("failed to get the serviceAccount associated with %s: %w", desiredConfigMap.Name, err)
 	}
 
 	var actualTrafficRouterPlugins []types.PluginItem
@@ -72,7 +72,7 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr *r
 
 	pluginString, err = yaml.Marshal(updatedTrafficRouterPlugins)
 	if err != nil {
-		return fmt.Errorf("error marshalling trafficRouterPlugin to string %s", err)
+		return fmt.Errorf("error marshalling trafficRouterPlugin to string %w", err)
 	}
 
 	actualConfigMap.Data[TrafficRouterPluginConfigMapKey] = string(pluginString)
