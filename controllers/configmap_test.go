@@ -13,14 +13,14 @@ import (
 
 var _ = Describe("ConfigMap Test", func() {
 	var ctx context.Context
-	var a *v1alpha1.RolloutManager
+	var a v1alpha1.RolloutManager
 	var r *RolloutManagerReconciler
 
 	BeforeEach(func() {
 		ctx = context.Background()
-		a = makeTestRolloutManager()
+		a = *makeTestRolloutManager()
 
-		r = makeTestReconciler(a)
+		r = makeTestReconciler(&a)
 		Expect(createNamespace(r, a.Namespace)).To(Succeed())
 	})
 

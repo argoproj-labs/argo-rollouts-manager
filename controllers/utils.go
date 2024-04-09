@@ -11,7 +11,6 @@ import (
 	rolloutsmanagerv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -154,59 +153,58 @@ func isMergable(extraArgs []string, cmd []string) error {
 }
 
 // validateRolloutsScope will check scope of Rollouts controller configured in RolloutManager and scope allowed by Admin (Configured in Subscription.Spec.Config.Env)
-func validateRolloutsScope(ctx context.Context, k8sClient client.Client, cr *rolloutsmanagerv1alpha1.RolloutManager, namespaceScopedArgoRolloutsController bool) error {
+func validateRolloutsScope(cr rolloutsmanagerv1alpha1.RolloutManager, namespaceScopedArgoRolloutsController bool) (*reconcileStatusResult, error) {
 
 	// If namespace-scoped Rollouts controller is allowed according to Subscription.Spec.Config.Env value
 	if namespaceScopedArgoRolloutsController {
 
 		// if RolloutManager being reconciled will create cluster-scoped Rollouts controller, then don't allow it.
 		if !cr.Spec.NamespaceScoped {
-			cr.Status.Phase = rolloutsmanagerv1alpha1.PhaseFailure
-			cr.Status.RolloutController = rolloutsmanagerv1alpha1.PhaseFailure
 
-			if err := k8sClient.Status().Update(ctx, cr); err != nil {
-				return fmt.Errorf("error updating the RolloutManager CR status: %w", err)
-			}
+			phaseFailure := rolloutsmanagerv1alpha1.PhaseFailure
 
-			return fmt.Errorf(UnsupportedRolloutManagerClusterScoped)
+			return &reconcileStatusResult{
+				rolloutController: &phaseFailure,
+				phase:             &phaseFailure,
+			}, fmt.Errorf(UnsupportedRolloutManagerClusterScoped)
+
 		}
 
 		// allow only namespace-scoped Rollouts controller
-		return nil
+		return nil, nil
 
 	} else { // If cluster-scoped Rollout controller is allowed according to Subscription.Spec.Config.Env value
 
 		// if RolloutManager being reconciled will create namespace-scoped Rollouts controller, then don't allow it.
 		if cr.Spec.NamespaceScoped {
-			cr.Status.Phase = rolloutsmanagerv1alpha1.PhaseFailure
-			cr.Status.RolloutController = rolloutsmanagerv1alpha1.PhaseFailure
 
-			if err := k8sClient.Status().Update(ctx, cr); err != nil {
-				return fmt.Errorf("error updating the RolloutManager CR status: %w", err)
-			}
+			phaseFailure := rolloutsmanagerv1alpha1.PhaseFailure
 
-			return fmt.Errorf(UnsupportedRolloutManagerNamespaceScoped)
+			return &reconcileStatusResult{
+				rolloutController: &phaseFailure,
+				phase:             &phaseFailure,
+			}, fmt.Errorf(UnsupportedRolloutManagerNamespaceScoped)
 		}
 
 		// allow only cluster-scoped RolloutManager
-		return nil
+		return nil, nil
 	}
 }
 
 // checkForExistingRolloutManager will return error if more than one cluster-scoped RolloutManagers are created.
 // because only one cluster-scoped or all namespace-scoped RolloutManagers are supported.
-func checkForExistingRolloutManager(ctx context.Context, k8sClient client.Client, cr *rolloutsmanagerv1alpha1.RolloutManager) error {
+func checkForExistingRolloutManager(ctx context.Context, k8sClient client.Client, cr rolloutsmanagerv1alpha1.RolloutManager) (*reconcileStatusResult, error) {
 
 	// if it is namespace-scoped then return no error
 	// because multiple namespace-scoped RolloutManagers are allowed if validateRolloutsScope check is passed earlier.
 	if cr.Spec.NamespaceScoped {
-		return nil
+		return nil, nil
 	}
 
 	// get the list of all RolloutManagers available across all namespaces
 	rolloutManagerList := rolloutsmanagerv1alpha1.RolloutManagerList{}
 	if err := k8sClient.List(ctx, &rolloutManagerList); err != nil {
-		return fmt.Errorf("failed to get the list of RolloutManager CRs from cluster: %w", err)
+		return nil, fmt.Errorf("failed to get the list of RolloutManager CRs from cluster: %w", err)
 	}
 
 	// if there are more than one RolloutManagers available, then check if any cluster-scoped RolloutManager exists,
@@ -220,19 +218,18 @@ func checkForExistingRolloutManager(ctx context.Context, k8sClient client.Client
 
 		// if there is a another cluster-scoped RolloutManager available in cluster then skip reconciliation of this one and set status to failure.
 		if !rolloutManager.Spec.NamespaceScoped {
-			cr.Status.Phase = rolloutsmanagerv1alpha1.PhaseFailure
-			cr.Status.RolloutController = rolloutsmanagerv1alpha1.PhaseFailure
 
-			if err := k8sClient.Status().Update(ctx, cr); err != nil {
-				return fmt.Errorf("error updating the RolloutManager CR status: %w", err)
-			}
+			phaseFailure := rolloutsmanagerv1alpha1.PhaseFailure
 
-			return fmt.Errorf(UnsupportedRolloutManagerConfiguration)
+			return &reconcileStatusResult{
+				rolloutController: &phaseFailure,
+				phase:             &phaseFailure,
+			}, fmt.Errorf(UnsupportedRolloutManagerConfiguration)
+
 		}
 	}
-	// either there are no existing RolloutManagers or all are namespace-scoped or only one cluster-scoped RolloutManagers exists,
-	// so continue reconciliation of this CR
-	return nil
+
+	return nil, nil
 }
 
 func multipleRolloutManagersExist(err error) bool {
@@ -245,18 +242,19 @@ func invalidRolloutScope(err error) bool {
 }
 
 // updateStatusConditionOfRolloutManager calls Set Condition of RolloutManager status
-func updateStatusConditionOfRolloutManager(ctx context.Context, newCondition metav1.Condition, rm *rolloutsmanagerv1alpha1.RolloutManager, k8sClient client.Client, log logr.Logger) error {
+func updateStatusConditionOfRolloutManager(ctx context.Context, rr reconcileStatusResult, rm *rolloutsmanagerv1alpha1.RolloutManager, k8sClient client.Client, log logr.Logger) error {
 
-	if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(rm), rm); err != nil {
-		if apierrors.IsNotFound(err) {
-			log.Error(err, "unable to fetch RolloutManager")
-			return nil
-		} else {
-			return err
-		}
+	changed, newConditions := insertOrUpdateConditionsInSlice(rr.condition, rm.Status.Conditions)
+
+	if rr.phase != nil && *rr.phase != rm.Status.Phase {
+		rm.Status.Phase = *rr.phase
+		changed = true
 	}
 
-	changed, newConditions := insertOrUpdateConditionsInSlice(newCondition, rm.Status.Conditions)
+	if rr.rolloutController != nil && *rr.rolloutController != rm.Status.RolloutController {
+		rm.Status.RolloutController = *rr.rolloutController
+		changed = true
+	}
 
 	if changed {
 		rm.Status.Conditions = newConditions
@@ -303,6 +301,13 @@ func insertOrUpdateConditionsInSlice(newCondition metav1.Condition, existingCond
 
 	return changed, existingConditions
 
+}
+
+// wrapCondition is a utility function which returns an empty reconcileStatusResult containing only the condition
+func wrapCondition(cond metav1.Condition) reconcileStatusResult {
+	return reconcileStatusResult{
+		condition: cond,
+	}
 }
 
 // createCondition returns Condition based on input provided.

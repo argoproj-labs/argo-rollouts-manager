@@ -16,7 +16,7 @@ import (
 )
 
 // Reconciles Rollouts ServiceAccount.
-func (r *RolloutManagerReconciler) reconcileRolloutsServiceAccount(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager) (*corev1.ServiceAccount, error) {
+func (r *RolloutManagerReconciler) reconcileRolloutsServiceAccount(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager) (*corev1.ServiceAccount, error) {
 
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
@@ -31,7 +31,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsServiceAccount(ctx context.C
 			return nil, fmt.Errorf("failed to get the ServiceAccount associated with %s: %w", sa.Name, err)
 		}
 
-		if err := controllerutil.SetControllerReference(cr, sa, r.Scheme); err != nil {
+		if err := controllerutil.SetControllerReference(&cr, sa, r.Scheme); err != nil {
 			return nil, err
 		}
 
@@ -46,7 +46,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsServiceAccount(ctx context.C
 }
 
 // Reconciles Rollouts Role.
-func (r *RolloutManagerReconciler) reconcileRolloutsRole(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager) (*rbacv1.Role, error) {
+func (r *RolloutManagerReconciler) reconcileRolloutsRole(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager) (*rbacv1.Role, error) {
 
 	expectedPolicyRules := GetPolicyRules()
 
@@ -63,7 +63,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRole(ctx context.Context, cr
 			return nil, fmt.Errorf("failed to reconcile the Role for the ServiceAccount associated with %s: %w", role.Name, err)
 		}
 
-		if err = controllerutil.SetControllerReference(cr, role, r.Scheme); err != nil {
+		if err = controllerutil.SetControllerReference(&cr, role, r.Scheme); err != nil {
 			return nil, err
 		}
 
@@ -115,7 +115,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsClusterRole(ctx context.Cont
 }
 
 // Reconcile Rollouts RoleBinding.
-func (r *RolloutManagerReconciler) reconcileRolloutsRoleBinding(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager, role *rbacv1.Role, sa *corev1.ServiceAccount) error {
+func (r *RolloutManagerReconciler) reconcileRolloutsRoleBinding(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager, role *rbacv1.Role, sa *corev1.ServiceAccount) error {
 
 	if role == nil {
 		return fmt.Errorf("received Role is nil while reconciling RoleBinding")
@@ -155,7 +155,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRoleBinding(ctx context.Cont
 			return fmt.Errorf("failed to get the RoleBinding associated with %s: %w", expectedRoleBinding.Name, err)
 		}
 
-		if err := controllerutil.SetControllerReference(cr, expectedRoleBinding, r.Scheme); err != nil {
+		if err := controllerutil.SetControllerReference(&cr, expectedRoleBinding, r.Scheme); err != nil {
 			return err
 		}
 
@@ -337,7 +337,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToViewClusterRole(c
 }
 
 // Reconcile Rollouts Metrics Service.
-func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager) error {
+func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager) error {
 
 	expectedSvc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -371,7 +371,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.C
 			return fmt.Errorf("failed to get the Service %s: %w", expectedSvc.Name, err)
 		}
 
-		if err := controllerutil.SetControllerReference(cr, expectedSvc, r.Scheme); err != nil {
+		if err := controllerutil.SetControllerReference(&cr, expectedSvc, r.Scheme); err != nil {
 			return err
 		}
 
@@ -389,7 +389,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.C
 }
 
 // Reconciles Secrets for Rollouts controller
-func (r *RolloutManagerReconciler) reconcileRolloutsSecrets(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager) error {
+func (r *RolloutManagerReconciler) reconcileRolloutsSecrets(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager) error {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultRolloutsNotificationSecretName,
@@ -403,7 +403,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsSecrets(ctx context.Context,
 			return fmt.Errorf("failed to get the Secret %s: %w", secret.Name, err)
 		}
 
-		if err := controllerutil.SetControllerReference(cr, secret, r.Scheme); err != nil {
+		if err := controllerutil.SetControllerReference(&cr, secret, r.Scheme); err != nil {
 			return err
 		}
 

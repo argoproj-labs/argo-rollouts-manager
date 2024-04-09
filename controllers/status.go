@@ -8,57 +8,40 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
-// reconcileStatus will ensure that all of the Status properties are updated for the given RolloutManager.
-func (r *RolloutManagerReconciler) reconcileStatus(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager) error {
+// determineStatusPhase calculates and returns RolloutManager's current .status.phase and .status.rolloutcontroller, both based on Deployment status.
+func (r *RolloutManagerReconciler) determineStatusPhase(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager) (reconcileStatusResult, error) {
 
-	if err := r.reconcileRolloutControllerStatus(ctx, cr); err != nil {
-		return err
-	}
-
-	if err := r.reconcileStatusPhase(ctx, cr); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (r *RolloutManagerReconciler) reconcileRolloutControllerStatus(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager) error {
 	status := rolloutsmanagerv1alpha1.PhaseUnknown
 
 	deploy := &appsv1.Deployment{}
 	if err := fetchObject(ctx, r.Client, cr.Namespace, DefaultArgoRolloutsResourceName, deploy); err != nil {
 		if apierrors.IsNotFound(err) {
 			status = rolloutsmanagerv1alpha1.PhaseFailure
+		} else {
+			log.Error(err, "error retrieving Deployment")
+			return reconcileStatusResult{}, err
 		}
-		log.Error(err, "error getting deployment")
+	} else {
+
+		// Deployment exists
+
+		if deploy.Spec.Replicas != nil {
+			status = rolloutsmanagerv1alpha1.PhasePending
+			if deploy.Status.ReadyReplicas == *deploy.Spec.Replicas {
+				status = rolloutsmanagerv1alpha1.PhaseAvailable
+			}
+		}
 	}
 
-	if deploy.Spec.Replicas != nil {
-		status = rolloutsmanagerv1alpha1.PhasePending
-		if deploy.Status.ReadyReplicas == *deploy.Spec.Replicas {
-			status = rolloutsmanagerv1alpha1.PhaseAvailable
-		}
-	}
+	var res reconcileStatusResult
 
 	if cr.Status.RolloutController != status {
-		cr.Status.RolloutController = status
-		if err := r.Client.Status().Update(ctx, cr); err != nil {
-			log.Error(err, "error updating the Argo Rollout CR status")
-		}
+		res.rolloutController = &status
 	}
 
-	return nil
-}
-
-// Reconciles the status phase of the RolloutManager
-func (r *RolloutManagerReconciler) reconcileStatusPhase(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager) error {
-
-	// For now, there is only one controller that is created by RolloutManager CR
-	// So the status of Argo Rollout will be same as the status of the Rollout Controller
-	// In future this condition may change
-	if cr.Status.Phase != cr.Status.RolloutController {
-		cr.Status.Phase = cr.Status.RolloutController
-		return r.Client.Status().Update(ctx, cr)
+	if cr.Status.Phase != status {
+		res.phase = &status
 	}
-	return nil
+
+	return res, nil
 }

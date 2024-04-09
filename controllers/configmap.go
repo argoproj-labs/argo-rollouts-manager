@@ -15,7 +15,7 @@ import (
 const TrafficRouterPluginConfigMapKey = "trafficRouterPlugins"
 
 // Reconcile the Rollouts Default Config Map.
-func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager) error {
+func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager) error {
 
 	if r.OpenShiftRoutePluginLocation == "" { // sanity test the plugin value
 		return fmt.Errorf("OpenShift Route Plugin location is not set")
