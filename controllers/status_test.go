@@ -17,11 +17,13 @@ var _ = Describe("RolloutManager Test", func() {
 
 		r := makeTestReconciler(a)
 		Expect(createNamespace(r, a.Namespace)).To(Succeed())
-		Expect(r.reconcileStatus(ctx, a)).To(Succeed())
+
+		rr, err := r.determineStatusPhase(ctx, *a)
+		Expect(err).ToNot(HaveOccurred())
 
 		By("When deployment for rollout controller does not exist")
-		Expect(a.Status.RolloutController).To(Equal(rolloutsmanagerv1alpha1.PhaseFailure))
-		Expect(a.Status.Phase).To(Equal(rolloutsmanagerv1alpha1.PhaseFailure))
+		Expect(*rr.rolloutController).To(Equal(rolloutsmanagerv1alpha1.PhaseFailure))
+		Expect(*rr.phase).To(Equal(rolloutsmanagerv1alpha1.PhaseFailure))
 
 		By("When deployment exists but with an unknown status")
 		deploy := &appsv1.Deployment{
@@ -32,10 +34,12 @@ var _ = Describe("RolloutManager Test", func() {
 		}
 
 		Expect(r.Client.Create(ctx, deploy)).To(Succeed())
-		Expect(r.reconcileStatus(ctx, a)).To(Succeed())
 
-		Expect(a.Status.RolloutController).To(Equal(rolloutsmanagerv1alpha1.PhaseUnknown))
-		Expect(a.Status.Phase).To(Equal(rolloutsmanagerv1alpha1.PhaseUnknown))
+		rr, err = r.determineStatusPhase(ctx, *a)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(*rr.rolloutController).To(Equal(rolloutsmanagerv1alpha1.PhaseUnknown))
+		Expect(*rr.phase).To(Equal(rolloutsmanagerv1alpha1.PhaseUnknown))
 
 		By("When deployment exists and replicas are in pending state.")
 		var requiredReplicas int32 = 1
@@ -44,20 +48,23 @@ var _ = Describe("RolloutManager Test", func() {
 
 		Expect(r.Client.Update(ctx, deploy)).To(Succeed())
 
-		Expect(r.reconcileStatus(ctx, a)).To(Succeed())
+		rr, err = r.determineStatusPhase(ctx, *a)
+		Expect(err).ToNot(HaveOccurred())
 
-		Expect(a.Status.RolloutController).To(Equal(rolloutsmanagerv1alpha1.PhasePending))
-		Expect(a.Status.Phase).To(Equal(rolloutsmanagerv1alpha1.PhasePending))
+		Expect(*rr.rolloutController).To(Equal(rolloutsmanagerv1alpha1.PhasePending))
+		Expect(*rr.phase).To(Equal(rolloutsmanagerv1alpha1.PhasePending))
 
 		By("When deployment exists and required number of replicas are up and running.")
 		deploy.Status.ReadyReplicas = 1
 		deploy.Spec.Replicas = &requiredReplicas
 
 		Expect(r.Client.Status().Update(ctx, deploy)).To(Succeed())
-		Expect(r.reconcileStatus(ctx, a)).To(Succeed())
 
-		Expect(a.Status.RolloutController).To(Equal(rolloutsmanagerv1alpha1.PhaseAvailable))
-		Expect(a.Status.Phase).To(Equal(rolloutsmanagerv1alpha1.PhaseAvailable))
+		rr, err = r.determineStatusPhase(ctx, *a)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(*rr.rolloutController).To(Equal(rolloutsmanagerv1alpha1.PhaseAvailable))
+		Expect(*rr.phase).To(Equal(rolloutsmanagerv1alpha1.PhaseAvailable))
 
 	})
 })

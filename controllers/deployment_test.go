@@ -16,15 +16,15 @@ import (
 
 var _ = Describe("Deployment Test", func() {
 	var ctx context.Context
-	var a *v1alpha1.RolloutManager
+	var a v1alpha1.RolloutManager
 	var r *RolloutManagerReconciler
 	var sa *corev1.ServiceAccount
 
 	BeforeEach(func() {
 		ctx = context.Background()
-		a = makeTestRolloutManager()
+		a = *makeTestRolloutManager()
 
-		r = makeTestReconciler(a)
+		r = makeTestReconciler(&a)
 		Expect(createNamespace(r, a.Namespace)).To(Succeed())
 
 		sa = &corev1.ServiceAccount{
@@ -215,7 +215,7 @@ var _ = Describe("Deployment Test", func() {
 
 })
 
-func deploymentCR(name string, namespace string, label string, volumeName string, nodeSelector string, serviceAccount string, rolloutManager *v1alpha1.RolloutManager) *appsv1.Deployment {
+func deploymentCR(name string, namespace string, label string, volumeName string, nodeSelector string, serviceAccount string, rolloutManager v1alpha1.RolloutManager) *appsv1.Deployment {
 	runAsNonRoot := true
 	deploymentCR := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -246,7 +246,7 @@ func deploymentCR(name string, namespace string, label string, volumeName string
 					"kubernetes.io/os": nodeSelector,
 				},
 				Containers: []corev1.Container{
-					rolloutsContainer(*rolloutManager),
+					rolloutsContainer(rolloutManager),
 				},
 				ServiceAccountName: serviceAccount,
 				SecurityContext: &corev1.PodSecurityContext{

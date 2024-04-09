@@ -23,7 +23,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -87,10 +87,25 @@ func (r *RolloutManagerReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	reqLogger := logr.FromContext(ctx, "Request.Namespace", req.Namespace, "Request.Name", req.Name)
 	reqLogger.Info("Reconciling RolloutManager")
 
-	// Fetch the RolloutManager instance
-	rollouts := &rolloutsmanagerv1alpha1.RolloutManager{}
-	if err := r.Client.Get(ctx, req.NamespacedName, rollouts); err != nil {
-		if errors.IsNotFound(err) {
+	// First retrieve the Namespace of the request: if it's being deleted, no more work for us.
+	rolloutManagerNamespace := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: req.Namespace}}
+	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(&rolloutManagerNamespace), &rolloutManagerNamespace); err != nil {
+		if apierrors.IsNotFound(err) { // If Namespace doesn't exist, our work is done
+			reqLogger.Info("Skipping reconciliation of RolloutManager as request Namespace no longer exists")
+			return ctrl.Result{}, nil
+		}
+		return ctrl.Result{}, err // Any other error, return it
+	} else {
+		// If the Namespace is in the process of being deleted, no more work required for us.
+		if rolloutManagerNamespace.DeletionTimestamp != nil {
+			return ctrl.Result{}, nil
+		}
+	}
+
+	// Next, fetch and reconcile the RolloutManager instance
+	rolloutManager := &rolloutsmanagerv1alpha1.RolloutManager{}
+	if err := r.Client.Get(ctx, req.NamespacedName, rolloutManager); err != nil {
+		if apierrors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
@@ -100,20 +115,17 @@ func (r *RolloutManagerReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return reconcile.Result{}, err
 	}
 
-	condition, err := r.reconcileRolloutsManager(ctx, rollouts)
+	res, reconcileErr := r.reconcileRolloutsManager(ctx, *rolloutManager)
 
-	if err := updateStatusConditionOfRolloutManager(ctx, condition, &rolloutsmanagerv1alpha1.RolloutManager{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      req.Name,
-			Namespace: req.Namespace,
-		},
-	}, r.Client, log); err != nil {
+	// Set the condition/phase on the RolloutManager status  (before we check the error from reconcileRolloutManager, below)
+	if err := updateStatusConditionOfRolloutManager(ctx, res, rolloutManager, r.Client, log); err != nil {
 		log.Error(err, "unable to update status of RolloutManager")
 		return reconcile.Result{}, err
 	}
 
-	if err != nil {
-		return reconcile.Result{}, err
+	// Next return the reconcileErr if applicable
+	if reconcileErr != nil {
+		return reconcile.Result{}, reconcileErr
 	}
 
 	return reconcile.Result{}, nil

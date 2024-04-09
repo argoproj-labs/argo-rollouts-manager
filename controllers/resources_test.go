@@ -20,14 +20,14 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 	Context("Resource creation test", func() {
 		var (
 			ctx context.Context
-			a   *v1alpha1.RolloutManager
+			a   v1alpha1.RolloutManager
 			r   *RolloutManagerReconciler
 		)
 
 		BeforeEach(func() {
 			ctx = context.Background()
-			a = makeTestRolloutManager()
-			r = makeTestReconciler(a)
+			a = *makeTestRolloutManager()
+			r = makeTestReconciler(&a)
 			err := createNamespace(r, a.Namespace)
 			Expect(err).ToNot(HaveOccurred())
 		})

@@ -78,9 +78,9 @@ func generateDesiredRolloutsDeployment(cr rolloutsmanagerv1alpha1.RolloutManager
 }
 
 // Reconcile the Rollouts controller deployment.
-func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager, sa corev1.ServiceAccount) error {
+func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager, sa corev1.ServiceAccount) error {
 
-	desiredDeployment := generateDesiredRolloutsDeployment(*cr, sa)
+	desiredDeployment := generateDesiredRolloutsDeployment(cr, sa)
 
 	normalizedDesiredDeployment, err := normalizeDeployment(desiredDeployment)
 	if err != nil {
@@ -104,7 +104,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(ctx context.Conte
 			return fmt.Errorf("failed to get the Deployment %s: %w", DefaultArgoRolloutsResourceName, err)
 		}
 
-		if err := controllerutil.SetControllerReference(cr, &desiredDeployment, r.Scheme); err != nil {
+		if err := controllerutil.SetControllerReference(&cr, &desiredDeployment, r.Scheme); err != nil {
 			return err
 		}
 		log.Info(fmt.Sprintf("Creating Deployment %s", DefaultArgoRolloutsResourceName))

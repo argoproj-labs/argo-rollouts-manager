@@ -17,6 +17,90 @@ import (
 	logger "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+var _ = Describe("updateStatusConditionOfRolloutManager tests", func() {
+
+	var (
+		ctx             context.Context
+		k8sClient       client.WithWatch
+		rolloutsManager rolloutsmanagerv1alpha1.RolloutManager
+	)
+
+	BeforeEach(func() {
+		s := scheme.Scheme
+		Expect(rolloutsmanagerv1alpha1.AddToScheme(s)).To(Succeed())
+
+		ctx = context.Background()
+		log = logger.FromContext(ctx)
+		k8sClient = fake.NewClientBuilder().WithScheme(s).Build()
+
+		rolloutsManager = rolloutsmanagerv1alpha1.RolloutManager{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-rm-1",
+				Namespace: "test-ns-1",
+			},
+			Spec: rolloutsmanagerv1alpha1.RolloutManagerSpec{
+				NamespaceScoped: false,
+			},
+		}
+	})
+
+	When("reconcileStatusResult has a non-nil phase", func() {
+		It("should set the phase on the on the RolloutManager status", func() {
+
+			Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
+
+			failed := rolloutsmanagerv1alpha1.PhaseFailure
+			rsr := reconcileStatusResult{
+				phase: &failed,
+			}
+			Expect(updateStatusConditionOfRolloutManager(ctx, rsr, &rolloutsManager, k8sClient, logger.FromContext(ctx))).To(Succeed())
+
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&rolloutsManager), &rolloutsManager)).To(Succeed())
+
+			Expect(rolloutsManager.Status.Phase).To(Equal(failed))
+
+		})
+	})
+
+	When("reconcileStatusResult has a non-nil rolloutController", func() {
+		It("should set the phase on the on the RolloutManager status", func() {
+
+			Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
+
+			failed := rolloutsmanagerv1alpha1.PhaseFailure
+			rsr := reconcileStatusResult{
+				rolloutController: &failed,
+			}
+			Expect(updateStatusConditionOfRolloutManager(ctx, rsr, &rolloutsManager, k8sClient, logger.FromContext(ctx))).To(Succeed())
+
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&rolloutsManager), &rolloutsManager)).To(Succeed())
+
+			Expect(rolloutsManager.Status.RolloutController).To(Equal(failed))
+
+		})
+	})
+
+	When("reconcileStatusResult contains a new condition to set on RolloutManger Status", func() {
+		It("should set condition on status", func() {
+			Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
+
+			newCondition := createCondition("my condition")
+
+			rsr := reconcileStatusResult{
+				condition: newCondition,
+			}
+			Expect(updateStatusConditionOfRolloutManager(ctx, rsr, &rolloutsManager, k8sClient, logger.FromContext(ctx))).To(Succeed())
+
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&rolloutsManager), &rolloutsManager)).To(Succeed())
+
+			Expect(rolloutsManager.Status.Conditions).To(HaveLen(1))
+			Expect(rolloutsManager.Status.Conditions[0].Message).To(Equal(newCondition.Message))
+
+		})
+	})
+
+})
+
 var _ = Describe("checkForExistingRolloutManager tests", func() {
 
 	var (
@@ -52,7 +136,9 @@ var _ = Describe("checkForExistingRolloutManager tests", func() {
 			Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
 
 			By("Verify there is no error returned.")
-			Expect(checkForExistingRolloutManager(ctx, k8sClient, &rolloutsManager)).To(Succeed())
+			rr, err := checkForExistingRolloutManager(ctx, k8sClient, rolloutsManager)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(rr).To(BeNil())
 		})
 	})
 
@@ -65,7 +151,9 @@ var _ = Describe("checkForExistingRolloutManager tests", func() {
 			Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
 
 			By("1st RM: Verify there is no error returned, as only one RolloutsManager is created yet.")
-			Expect(checkForExistingRolloutManager(ctx, k8sClient, &rolloutsManager)).To(Succeed())
+			rr, err := checkForExistingRolloutManager(ctx, k8sClient, rolloutsManager)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(rr).To(BeNil())
 
 			By("2nd RM: Create namespace-scoped RolloutsManager.")
 			rolloutsManager2 := rolloutsmanagerv1alpha1.RolloutManager{
@@ -80,11 +168,15 @@ var _ = Describe("checkForExistingRolloutManager tests", func() {
 			Expect(k8sClient.Create(ctx, &rolloutsManager2)).To(Succeed())
 
 			By("2nd RM: Verify there is no error returned, as all namespace-scoped RolloutsManagers are created.")
-			Expect(checkForExistingRolloutManager(ctx, k8sClient, &rolloutsManager2)).To(Succeed())
+			rr, err = checkForExistingRolloutManager(ctx, k8sClient, rolloutsManager2)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(rr).To(BeNil())
 
 			By("1st RM: Recheck and it should still work, as all namespace-scoped RolloutsManagers are created.")
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: rolloutsManager.Name, Namespace: rolloutsManager.Namespace}, &rolloutsManager)).To(Succeed())
-			Expect(checkForExistingRolloutManager(ctx, k8sClient, &rolloutsManager)).To(Succeed())
+			rr, err = checkForExistingRolloutManager(ctx, k8sClient, rolloutsManager)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(rr).To(BeNil())
 		})
 	})
 
@@ -96,7 +188,9 @@ var _ = Describe("checkForExistingRolloutManager tests", func() {
 			Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
 
 			By("1st RM: Verify there is no error returned, as only one RolloutsManager is created yet.")
-			Expect(checkForExistingRolloutManager(ctx, k8sClient, &rolloutsManager)).To(Succeed())
+			rr, err := checkForExistingRolloutManager(ctx, k8sClient, rolloutsManager)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(rr).To(BeNil())
 
 			By("2nd RM: Create another cluster-scoped RolloutsManager.")
 			rolloutsManager2 := rolloutsmanagerv1alpha1.RolloutManager{
@@ -111,18 +205,18 @@ var _ = Describe("checkForExistingRolloutManager tests", func() {
 			Expect(k8sClient.Create(ctx, &rolloutsManager2)).To(Succeed())
 
 			By("2nd RM: It should return error.")
-			err := checkForExistingRolloutManager(ctx, k8sClient, &rolloutsManager2)
+			rr, err = checkForExistingRolloutManager(ctx, k8sClient, rolloutsManager2)
 			Expect(err).To(HaveOccurred())
 			Expect(multipleRolloutManagersExist(err)).To(BeTrue())
-			Expect(rolloutsManager2.Status.Phase).To(Equal(rolloutsmanagerv1alpha1.PhaseFailure))
-			Expect(rolloutsManager2.Status.RolloutController).To(Equal(rolloutsmanagerv1alpha1.PhaseFailure))
+			Expect(*rr.phase).To(Equal(rolloutsmanagerv1alpha1.PhaseFailure))
+			Expect(*rr.rolloutController).To(Equal(rolloutsmanagerv1alpha1.PhaseFailure))
 
 			By("1st RM: Recheck 1st RolloutsManager and it should also have error now. since multiple RolloutsManagers are created.")
-			err = checkForExistingRolloutManager(ctx, k8sClient, &rolloutsManager)
+			rr, err = checkForExistingRolloutManager(ctx, k8sClient, rolloutsManager)
 			Expect(err).To(HaveOccurred())
 			Expect(multipleRolloutManagersExist(err)).To(BeTrue())
-			Expect(rolloutsManager.Status.Phase).To(Equal(rolloutsmanagerv1alpha1.PhaseFailure))
-			Expect(rolloutsManager.Status.RolloutController).To(Equal(rolloutsmanagerv1alpha1.PhaseFailure))
+			Expect(*rr.phase).To(Equal(rolloutsmanagerv1alpha1.PhaseFailure))
+			Expect(*rr.rolloutController).To(Equal(rolloutsmanagerv1alpha1.PhaseFailure))
 		})
 
 		It("should return error when multiple cluster-scoped RolloutsManagers are created, and when one of them is deleted other one should start working.", func() {
@@ -131,7 +225,9 @@ var _ = Describe("checkForExistingRolloutManager tests", func() {
 			Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
 
 			By("1st RM: Verify there is no error returned, as only one RolloutsManager is created yet.")
-			Expect(checkForExistingRolloutManager(ctx, k8sClient, &rolloutsManager)).To(Succeed())
+			rr, err := checkForExistingRolloutManager(ctx, k8sClient, rolloutsManager)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(rr).To(BeNil())
 
 			By("2nd RM: Create another cluster-scoped RolloutsManager.")
 			rolloutsManager2 := rolloutsmanagerv1alpha1.RolloutManager{
@@ -146,26 +242,28 @@ var _ = Describe("checkForExistingRolloutManager tests", func() {
 			Expect(k8sClient.Create(ctx, &rolloutsManager2)).To(Succeed())
 
 			By("2nd RM: It should return error.")
-			err := checkForExistingRolloutManager(ctx, k8sClient, &rolloutsManager2)
+			rr, err = checkForExistingRolloutManager(ctx, k8sClient, rolloutsManager2)
 			Expect(err).To(HaveOccurred())
 			Expect(multipleRolloutManagersExist(err)).To(BeTrue())
-			Expect(rolloutsManager2.Status.Phase).To(Equal(rolloutsmanagerv1alpha1.PhaseFailure))
-			Expect(rolloutsManager2.Status.RolloutController).To(Equal(rolloutsmanagerv1alpha1.PhaseFailure))
+			Expect(*rr.phase).To(Equal(rolloutsmanagerv1alpha1.PhaseFailure))
+			Expect(*rr.rolloutController).To(Equal(rolloutsmanagerv1alpha1.PhaseFailure))
 
 			By("1st RM: Recheck 1st RolloutsManager and it should also have error now. since multiple RolloutsManagers are created.")
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: rolloutsManager2.Name, Namespace: rolloutsManager2.Namespace}, &rolloutsManager2)).To(Succeed())
 
-			err = checkForExistingRolloutManager(ctx, k8sClient, &rolloutsManager)
+			rr, err = checkForExistingRolloutManager(ctx, k8sClient, rolloutsManager)
 			Expect(err).To(HaveOccurred())
 			Expect(multipleRolloutManagersExist(err)).To(BeTrue())
-			Expect(rolloutsManager.Status.Phase).To(Equal(rolloutsmanagerv1alpha1.PhaseFailure))
-			Expect(rolloutsManager.Status.RolloutController).To(Equal(rolloutsmanagerv1alpha1.PhaseFailure))
+			Expect(*rr.phase).To(Equal(rolloutsmanagerv1alpha1.PhaseFailure))
+			Expect(*rr.rolloutController).To(Equal(rolloutsmanagerv1alpha1.PhaseFailure))
 
 			By("2nd RM: Delete one RolloutsManager.")
 			Expect(k8sClient.Delete(ctx, &rolloutsManager2)).To(Succeed())
 
 			By("1st RM: Verify it works now, as only one RolloutsManager is available.")
-			Expect(checkForExistingRolloutManager(ctx, k8sClient, &rolloutsManager)).To(Succeed())
+			rr, err = checkForExistingRolloutManager(ctx, k8sClient, rolloutsManager)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(rr).To(BeNil())
 		})
 	})
 })
@@ -207,10 +305,12 @@ var _ = Describe("validateRolloutsScope tests", func() {
 			Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
 
 			By("Verify an error is returned.")
-			err := validateRolloutsScope(ctx, k8sClient, &rolloutsManager, namespaceScopedArgoRolloutsController)
+			rr, err := validateRolloutsScope(rolloutsManager, namespaceScopedArgoRolloutsController)
 
 			Expect(err).To(HaveOccurred())
 			Expect(invalidRolloutScope(err)).To(BeTrue())
+			Expect(*rr.phase).To(Equal(rolloutsmanagerv1alpha1.PhaseFailure))
+			Expect(*rr.rolloutController).To(Equal(rolloutsmanagerv1alpha1.PhaseFailure))
 		})
 
 		It("should not return any error, if namespace-scoped RolloutManager is created.", func() {
@@ -220,7 +320,9 @@ var _ = Describe("validateRolloutsScope tests", func() {
 			Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
 
 			By("Verify there is no error returned.")
-			Expect(validateRolloutsScope(ctx, k8sClient, &rolloutsManager, namespaceScopedArgoRolloutsController)).To(Succeed())
+			rr, err := validateRolloutsScope(rolloutsManager, namespaceScopedArgoRolloutsController)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(rr).To(BeNil())
 		})
 	})
 
@@ -234,7 +336,9 @@ var _ = Describe("validateRolloutsScope tests", func() {
 			Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
 
 			By("Verify there is no error returned.")
-			Expect(validateRolloutsScope(ctx, k8sClient, &rolloutsManager, namespaceScopedArgoRolloutsController)).To(Succeed())
+			rr, err := validateRolloutsScope(rolloutsManager, namespaceScopedArgoRolloutsController)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(rr).To(BeNil())
 		})
 
 		It("should return error, if namespace-scoped RolloutManager is created.", func() {
@@ -244,10 +348,12 @@ var _ = Describe("validateRolloutsScope tests", func() {
 			Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
 
 			By("Verify an error is returned.")
-			err := validateRolloutsScope(ctx, k8sClient, &rolloutsManager, namespaceScopedArgoRolloutsController)
+			rr, err := validateRolloutsScope(rolloutsManager, namespaceScopedArgoRolloutsController)
 
 			Expect(err).To(HaveOccurred())
 			Expect(invalidRolloutScope(err)).To(BeTrue())
+			Expect(*rr.phase).To(Equal(rolloutsmanagerv1alpha1.PhaseFailure))
+			Expect(*rr.rolloutController).To(Equal(rolloutsmanagerv1alpha1.PhaseFailure))
 		})
 	})
 })
