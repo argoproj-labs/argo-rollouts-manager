@@ -20,6 +20,7 @@ import (
 	"context"
 
 	rolloutsmanagerv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -161,6 +162,8 @@ func (r *RolloutManagerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	// Watch for changes to ClusterRoleBinding sub-resources owned by RolloutManager.
 	bld.Owns(&rbacv1.ClusterRoleBinding{})
+	// Watch for changes to ServiceMonitor sub-resources owned by RolloutManager.
+	bld.Owns(&monitoringv1.ServiceMonitor{})
 
 	return bld.Complete(r)
 }
