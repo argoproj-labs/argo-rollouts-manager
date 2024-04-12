@@ -46,14 +46,6 @@ if [ -z "$SKIP_RUN_STEP" ]; then
 
   set +e
 
-  # Check if the ServiceMonitor CRD exists
-  kubectl get crd/servicemonitors.monitoring.coreos.com &> /dev/null
-  retVal=$?
-  if [ $retVal -ne 0 ]; then
-      # If the CRD is not found, apply the CRD YAML
-      kubectl apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/release-0.52/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml
-  fi 
-
   rm -f /tmp/e2e-operator-run.log || true
   go run ./main.go 2>&1 | tee /tmp/e2e-operator-run.log &
 

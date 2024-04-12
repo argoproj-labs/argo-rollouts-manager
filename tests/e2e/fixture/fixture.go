@@ -200,11 +200,11 @@ func getKubeClient(config *rest.Config) (client.Client, *runtime.Scheme, error) 
 	}
 
 	if err := monitoringv1.AddToScheme(scheme); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if err := crdv1.AddToScheme(scheme); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	k8sClient, err := client.New(config, client.Options{Scheme: scheme})
