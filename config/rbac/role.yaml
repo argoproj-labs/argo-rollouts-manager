@@ -230,11 +230,14 @@ rules:
 - apiGroups:
   - monitoring.coreos.com
   resources:
-  - prometheuses
-  - prometheusrules
   - servicemonitors
   verbs:
-  - '*'
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - networking.istio.io
   resources:
