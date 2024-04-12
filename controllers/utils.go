@@ -23,6 +23,12 @@ const (
 	UnsupportedRolloutManagerNamespaceScoped = "when Subscription has environment variable NAMESPACE_SCOPED_ARGO_ROLLOUTS set to False, there may not exist any namespace-scoped RolloutManagers: only a single cluster-scoped RolloutManager is supported"
 )
 
+type PluginItem struct {
+	Name     string `json:"name" yaml:"name"`
+	Location string `json:"location" yaml:"location"`
+	Sha256   string `json:"sha256" yaml:"sha256"`
+}
+
 func setRolloutsLabels(obj *metav1.ObjectMeta) {
 	obj.Labels = map[string]string{}
 	obj.Labels["app.kubernetes.io/name"] = DefaultArgoRolloutsResourceName

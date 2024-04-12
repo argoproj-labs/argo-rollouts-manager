@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	rolloutsmanagerv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
-	"github.com/argoproj/argo-rollouts/utils/plugin/types"
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -31,7 +30,7 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr *r
 			},
 		},
 	}
-	trafficRouterPlugins := []types.PluginItem{
+	trafficRouterPlugins := []PluginItem{
 		{
 			Name:     OpenShiftRolloutPluginName,
 			Location: r.OpenShiftRoutePluginLocation,
@@ -56,7 +55,7 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr *r
 		return fmt.Errorf("failed to get the serviceAccount associated with %s: %w", desiredConfigMap.Name, err)
 	}
 
-	var actualTrafficRouterPlugins []types.PluginItem
+	var actualTrafficRouterPlugins []PluginItem
 	if err = yaml.Unmarshal([]byte(actualConfigMap.Data[TrafficRouterPluginConfigMapKey]), &actualTrafficRouterPlugins); err != nil {
 		return fmt.Errorf("failed to unmarshal traffic router plugins from ConfigMap: %s", err)
 	}

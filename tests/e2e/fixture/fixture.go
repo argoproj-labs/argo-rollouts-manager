@@ -118,8 +118,7 @@ func (cleaner *Cleaner) deleteNamespace(namespaceParam string) error {
 	// Delete the namespace:
 	// - Issue a request to Delete the namespace
 	// - Finally, we check if it has been deleted.
-	if err := wait.PollImmediate(time.Second*5, time.Minute*6, func() (done bool, err error) {
-
+	if err := wait.PollUntilContextTimeout(cleaner.cxt, time.Second*5, time.Minute*6, true, func(ctx context.Context) (done bool, err error) {
 		// Delete the namespace, if it exists
 		namespace := corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
