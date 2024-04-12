@@ -9,7 +9,6 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -273,13 +272,14 @@ func makeTestRolloutManager(opts ...rolloutManagerOpt) *rolloutsmanagerv1alpha1.
 	return a
 }
 
-func makeTestReconciler(objs ...runtime.Object) *RolloutManagerReconciler {
+func makeTestReconciler(obj ...client.Object) *RolloutManagerReconciler {
 	s := scheme.Scheme
 
 	err := rolloutsmanagerv1alpha1.AddToScheme(s)
 	Expect(err).ToNot(HaveOccurred())
 
-	cl := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(objs...).Build()
+	cl := fake.NewClientBuilder().WithScheme(s).WithStatusSubresource(obj...).WithObjects(obj...).Build()
+
 	return &RolloutManagerReconciler{
 		Client:                       cl,
 		Scheme:                       s,

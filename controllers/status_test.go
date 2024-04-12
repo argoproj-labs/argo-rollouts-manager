@@ -53,7 +53,7 @@ var _ = Describe("RolloutManager Test", func() {
 		deploy.Status.ReadyReplicas = 1
 		deploy.Spec.Replicas = &requiredReplicas
 
-		Expect(r.Client.Update(ctx, deploy)).To(Succeed())
+		Expect(r.Client.Status().Update(ctx, deploy)).To(Succeed())
 		Expect(r.reconcileStatus(ctx, a)).To(Succeed())
 
 		Expect(a.Status.RolloutController).To(Equal(rolloutsmanagerv1alpha1.PhaseAvailable))
