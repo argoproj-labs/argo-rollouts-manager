@@ -239,6 +239,15 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 					},
 				},
 			},
+			{
+				fmt.Sprintf("ServiceMonitor %s", DefaultArgoRolloutsResourceName),
+				&monitoringv1.ServiceMonitor{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      DefaultArgoRolloutsResourceName,
+						Namespace: a.Namespace,
+					},
+				},
+			},
 		}
 
 		for _, test := range tt {
@@ -270,50 +279,140 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 	})
 
 	It("Verify whether RolloutManager creating ServiceMonitor", func() {
-		smCRD := &crdv1.CustomResourceDefinition{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "servicemonitors.monitoring.coreos.com",
-				Namespace: req.Namespace,
-			},
-		}
-
+		smCRD, existingSvc := serviceAndServiceMonitorCRD(req.Namespace)
 		Expect(r.Client.Create(ctx, smCRD)).To(Succeed())
-
-		existingSvc := &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      DefaultArgoRolloutsMetricsServiceName,
-				Namespace: req.Namespace,
-				Labels: map[string]string{
-					"app.kubernetes.io/name":      DefaultArgoRolloutsMetricsServiceName,
-					"app.kubernetes.io/component": "server",
-				},
-			},
-			Spec: corev1.ServiceSpec{
-				Ports: []corev1.ServicePort{
-					{
-						Name:       "metrics",
-						Port:       8090,
-						Protocol:   corev1.ProtocolTCP,
-						TargetPort: intstr.FromInt(8090),
-					},
-				},
-				Selector: map[string]string{
-					DefaultRolloutsSelectorKey: DefaultArgoRolloutsResourceName,
-				},
-			},
-		}
-
 		Expect(r.Client.Create(ctx, existingSvc)).To(Succeed())
 
 		res, err := r.Reconcile(ctx, req)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(res.Requeue).Should(BeFalse(), "reconcile should not requeue request")
 
+		expectedServiceMonitor := serviceMonitor()
+
 		sm := &monitoringv1.ServiceMonitor{}
 		Expect(r.Client.Get(ctx, types.NamespacedName{
 			Name:      DefaultArgoRolloutsMetricsServiceName,
 			Namespace: testNamespace,
 		}, sm)).To(Succeed())
+
+		Expect(sm.Name).To(Equal(expectedServiceMonitor.Name))
+		Expect(sm.Namespace).To(Equal(expectedServiceMonitor.Namespace))
+		Expect(sm.Spec).To(Equal(expectedServiceMonitor.Spec))
 	})
 
+	It("Verify if ServiceMonitor exists, but has different content than we expect then it should update ServiceMonitor", func() {
+		smCRD, existingSvc := serviceAndServiceMonitorCRD(req.Namespace)
+		Expect(r.Client.Create(ctx, smCRD)).To(Succeed())
+		Expect(r.Client.Create(ctx, existingSvc)).To(Succeed())
+
+		existingServiceMonitor := &monitoringv1.ServiceMonitor{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      DefaultArgoRolloutsMetricsServiceName,
+				Namespace: testNamespace,
+			},
+			Spec: monitoringv1.ServiceMonitorSpec{
+				Selector: metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app.kubernetes.io/name": "test-label",
+					},
+				},
+				Endpoints: []monitoringv1.Endpoint{
+					{
+						Port: "metrics-test",
+					},
+				},
+			},
+		}
+
+		Expect(r.Client.Create(ctx, existingServiceMonitor)).To(Succeed())
+
+		res, err := r.Reconcile(ctx, req)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.Requeue).Should(BeFalse(), "reconcile should not requeue request")
+
+		expectedSM := serviceMonitor()
+
+		Expect(r.Client.Get(ctx, types.NamespacedName{
+			Name:      DefaultArgoRolloutsMetricsServiceName,
+			Namespace: testNamespace,
+		}, existingServiceMonitor)).To(Succeed())
+
+		Expect(existingServiceMonitor.Name).To(Equal(expectedSM.Name))
+		Expect(existingServiceMonitor.Namespace).To(Equal(expectedSM.Namespace))
+		Expect(existingServiceMonitor.Spec).To(Equal(expectedSM.Spec))
+
+	})
+
+	It("Verify ServiceMonitor is not created if the CRD does not exist.", func() {
+		_, existingSvc := serviceAndServiceMonitorCRD(req.Namespace)
+		Expect(r.Client.Create(ctx, existingSvc)).To(Succeed())
+
+		res, err := r.Reconcile(ctx, req)
+		Expect(err).To(HaveOccurred())
+		Expect(res.Requeue).Should(BeFalse(), "reconcile should not requeue request")
+
+		sm := &monitoringv1.ServiceMonitor{}
+		Expect(r.Client.Get(ctx, types.NamespacedName{
+			Name:      DefaultArgoRolloutsMetricsServiceName,
+			Namespace: testNamespace,
+		}, sm)).ToNot(Succeed())
+	})
 })
+
+func serviceMonitor() *monitoringv1.ServiceMonitor {
+	sm := &monitoringv1.ServiceMonitor{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      DefaultArgoRolloutsMetricsServiceName,
+			Namespace: testNamespace,
+		},
+		Spec: monitoringv1.ServiceMonitorSpec{
+			Selector: metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app.kubernetes.io/name": DefaultArgoRolloutsMetricsServiceName,
+				},
+			},
+			Endpoints: []monitoringv1.Endpoint{
+				{
+					Port: "metrics",
+				},
+			},
+		},
+	}
+	return sm
+}
+
+func serviceAndServiceMonitorCRD(namespace string) (*crdv1.CustomResourceDefinition, *corev1.Service) {
+	smCRD := &crdv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "servicemonitors.monitoring.coreos.com",
+			Namespace: namespace,
+		},
+	}
+
+	existingSvc := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      DefaultArgoRolloutsMetricsServiceName,
+			Namespace: namespace,
+			Labels: map[string]string{
+				"app.kubernetes.io/name":      DefaultArgoRolloutsResourceName,
+				"app.kubernetes.io/component": "server",
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Name:       "metrics",
+					Port:       8090,
+					Protocol:   corev1.ProtocolTCP,
+					TargetPort: intstr.FromInt(8090),
+				},
+			},
+			Selector: map[string]string{
+				DefaultRolloutsSelectorKey: DefaultArgoRolloutsResourceName,
+			},
+		},
+	}
+
+	return smCRD, existingSvc
+
+}

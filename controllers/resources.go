@@ -395,12 +395,18 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.C
 		},
 	}
 
-	if err := fetchObject(ctx, r.Client, smCRD.Namespace, smCRD.Name, smCRD); err == nil {
-		// Create ServiceMonitor for Rollouts metrics
-		err := r.createServiceMonitorIfAbsent(cr.Namespace, cr, actualSvc.Name, actualSvc.Name)
-		if err != nil {
-			return err
+	if err := fetchObject(ctx, r.Client, smCRD.Namespace, smCRD.Name, smCRD); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return fmt.Errorf("failed to get the ServiceMonitor %s : %s", smCRD.Name, err)
 		}
+
+		return fmt.Errorf("failed to get ServiceMonitor for Rollouts metrics associated with %s : %s", smCRD.Name, err)
+	}
+
+	// Create ServiceMonitor for Rollouts metrics
+	err := r.createServiceMonitorIfAbsent(cr.Namespace, cr, actualSvc.Name, actualSvc.Name)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -959,6 +965,20 @@ func (r *RolloutManagerReconciler) createServiceMonitorIfAbsent(namespace string
 	if err == nil {
 		log.Info("A ServiceMonitor instance already exists",
 			"Namespace", existingServiceMonitor.Namespace, "Name", existingServiceMonitor.Name)
+
+		// Check if existing ServiceMonitor matches expected content
+		if !serviceMonitorMatches(existingServiceMonitor, serviceMonitorLabel) {
+			log.Info("Updating existing ServiceMonitor instance",
+				"Namespace", existingServiceMonitor.Namespace, "Name", existingServiceMonitor.Name)
+
+			// Update ServiceMonitor with expected content
+			updateServiceMonitor(existingServiceMonitor, serviceMonitorLabel)
+			if err := r.Client.Update(context.TODO(), existingServiceMonitor); err != nil {
+				log.Error(err, "Error updating existing ServiceMonitor instance",
+					"Namespace", existingServiceMonitor.Namespace, "Name", existingServiceMonitor.Name)
+				return err
+			}
+		}
 		return nil
 	}
 	if apierrors.IsNotFound(err) {
@@ -1006,5 +1026,38 @@ func newServiceMonitor(namespace, name, matchLabel string) *monitoringv1.Service
 	return &monitoringv1.ServiceMonitor{
 		ObjectMeta: objectMeta,
 		Spec:       spec,
+	}
+}
+
+func serviceMonitorMatches(sm *monitoringv1.ServiceMonitor, matchLabel string) bool {
+	// Check if labels match
+	labels := sm.Spec.Selector.MatchLabels
+	if val, ok := labels["app.kubernetes.io/name"]; ok {
+		if val != matchLabel {
+			return false
+		}
+	} else {
+		return false
+	}
+
+	// Check if endpoints match
+	if sm.Spec.Endpoints[0].Port != "metrics" {
+		return false
+	}
+
+	return true
+}
+
+func updateServiceMonitor(sm *monitoringv1.ServiceMonitor, matchLabel string) {
+	// Update labels
+	sm.Spec.Selector.MatchLabels = map[string]string{
+		"app.kubernetes.io/name": matchLabel,
+	}
+
+	// Update endpoints
+	sm.Spec.Endpoints = []monitoringv1.Endpoint{
+		{
+			Port: "metrics",
+		},
 	}
 }

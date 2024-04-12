@@ -10,13 +10,14 @@ import (
 
 	"github.com/argoproj-labs/argo-rollouts-manager/tests/e2e/fixture/k8s"
 	rolloutManagerFixture "github.com/argoproj-labs/argo-rollouts-manager/tests/e2e/fixture/rolloutmanager"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	rolloutsmanagerv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 
 	controllers "github.com/argoproj-labs/argo-rollouts-manager/controllers"
-	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -99,6 +100,11 @@ var _ = Describe("RolloutManager tests", func() {
 				By("deleting the secret")
 				Eventually(&corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultRolloutsNotificationSecretName, Namespace: rolloutManager.Namespace},
+				}, "30s", "1s").ShouldNot(k8s.ExistByName(k8sClient))
+
+				By("deleting the serviceMonitor")
+				Eventually(&monitoringv1.ServiceMonitor{
+					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsMetricsServiceName, Namespace: rolloutManager.Namespace},
 				}, "30s", "1s").ShouldNot(k8s.ExistByName(k8sClient))
 
 				// Make sure the cluster roles have not been deleted
@@ -240,7 +246,26 @@ var _ = Describe("RolloutManager tests", func() {
 					return deployment.Spec.Template.Spec.Containers[0].Image
 				}, "10s", "1s").Should(Equal(expectedVersion))
 
-				By("verify whether ServiceMonitor is created or not for Rolloutsmanager")
+				expectedServiceMonitor := &monitoringv1.ServiceMonitor{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "argo-rollouts-metrics",
+						Namespace: fixture.TestE2ENamespace,
+					},
+					Spec: monitoringv1.ServiceMonitorSpec{
+						Selector: metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"app.kubernetes.io/name": "argo-rollouts-metrics",
+							},
+						},
+						Endpoints: []monitoringv1.Endpoint{
+							{
+								Port: "metrics",
+							},
+						},
+					},
+				}
+
+				By("verify whether ServiceMonitor is created or not for RolloutManager")
 				sm := &monitoringv1.ServiceMonitor{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "argo-rollouts-metrics",
@@ -249,6 +274,10 @@ var _ = Describe("RolloutManager tests", func() {
 				}
 
 				Eventually(sm, "10s", "1s").Should(k8s.ExistByName(k8sClient))
+				Expect(sm.Name).To(Equal(expectedServiceMonitor.Name))
+				Expect(sm.Namespace).To(Equal(expectedServiceMonitor.Namespace))
+				Expect(sm.Spec).To(Equal(expectedServiceMonitor.Spec))
+
 			})
 		})
 	})

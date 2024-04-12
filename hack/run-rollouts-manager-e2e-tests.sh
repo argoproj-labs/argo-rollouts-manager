@@ -8,6 +8,15 @@ SCRIPTPATH="$(
 cd "$SCRIPTPATH/.."
 
 set -o pipefail
+
+# Check if the CRD exists
+kubectl get crd/servicemonitors.monitoring.coreos.com &> /dev/null
+retVal=$?
+if [ $retVal -ne 0 ]; then
+    # If the CRD is not found, apply the CRD YAML
+    kubectl apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/release-0.52/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml
+fi
+
 set -ex
 
 if [ "$NAMESPACE_SCOPED_ARGO_ROLLOUTS" == "true" ]; then
