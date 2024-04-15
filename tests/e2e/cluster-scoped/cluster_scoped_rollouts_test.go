@@ -16,10 +16,9 @@ import (
 	rmv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 
 	controllers "github.com/argoproj-labs/argo-rollouts-manager/controllers"
-	rv1alpha1 "github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var _ = Describe("Cluster-scoped RolloutManager tests", func() {
@@ -30,16 +29,12 @@ var _ = Describe("Cluster-scoped RolloutManager tests", func() {
 			err       error
 			ctx       context.Context
 			k8sClient client.Client
-			scheme    *runtime.Scheme
 		)
 
 		BeforeEach(func() {
 			Expect(fixture.EnsureCleanSlate()).To(Succeed())
 
-			k8sClient, scheme, err = fixture.GetE2ETestKubeClient()
-			Expect(err).ToNot(HaveOccurred())
-
-			err = rv1alpha1.AddToScheme(scheme)
+			k8sClient, _, err = fixture.GetE2ETestKubeClient()
 			Expect(err).ToNot(HaveOccurred())
 
 			ctx = context.Background()
