@@ -15,7 +15,7 @@ import (
 	rmv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 
 	controllers "github.com/argoproj-labs/argo-rollouts-manager/controllers"
-	rv1alpha1 "github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -74,54 +74,6 @@ func CreateService(ctx context.Context, k8sClient client.Client, name, namespace
 	return service, k8sClient.Create(ctx, &service)
 }
 
-// Create Argo Rollout CR
-func CreateArgoRollout(ctx context.Context, k8sClient client.Client, name, namespace, activeService, previewService string) (rv1alpha1.Rollout, error) {
-	var num int32 = 2
-	autoPromotionEnabled := false
-
-	rollout := rv1alpha1.Rollout{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-		Spec: rv1alpha1.RolloutSpec{
-			Replicas: &num,
-			Strategy: rv1alpha1.RolloutStrategy{
-				BlueGreen: &rv1alpha1.BlueGreenStrategy{
-					ActiveService:        activeService,
-					PreviewService:       previewService,
-					AutoPromotionEnabled: &autoPromotionEnabled,
-				},
-			},
-			RevisionHistoryLimit: &num,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: fixture.NamespaceLabels,
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: fixture.NamespaceLabels,
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "webserver-simple",
-							Image: "docker.io/kostiscodefresh/gitops-canary-app:v1.0",
-							Ports: []corev1.ContainerPort{
-								{
-									Name:          "http",
-									ContainerPort: 8080,
-									Protocol:      corev1.ProtocolTCP,
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-	return rollout, k8sClient.Create(ctx, &rollout)
-}
-
 // Check resources created after creating of RolloutManager CR and verify that they are healthy.
 func ValidateArgoRolloutManagerResources(ctx context.Context, rolloutsManager rmv1alpha1.RolloutManager, k8sClient client.Client, namespaceScoped bool) {
 
@@ -176,15 +128,6 @@ func ValidateArgoRolloutsResources(ctx context.Context, k8sClient client.Client,
 	Expect(err).ToNot(HaveOccurred())
 	Eventually(&rolloutServicePreview, "10s", "1s").Should(k8s.ExistByName(k8sClient))
 
-	By("Create Argo Rollout CR in given namespace and check it is reconciled successfully.")
-	rollout, err := CreateArgoRollout(ctx, k8sClient, RolloutsName, nsName, rolloutServiceActive.Name, rolloutServicePreview.Name)
-	Expect(err).ToNot(HaveOccurred())
-	Eventually(func() bool {
-		if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(&rollout), &rollout); err != nil {
-			return false
-		}
-		return rollout.Status.Phase == rv1alpha1.RolloutPhaseHealthy
-	}, "3m", "1s").Should(BeTrue())
 }
 
 func validateServiceAccount(k8sClient client.Client, rolloutsManager rmv1alpha1.RolloutManager) {

@@ -31,7 +31,6 @@ var _ = Describe("checkForExistingRolloutManager tests", func() {
 
 		ctx = context.Background()
 		log = logger.FromContext(ctx)
-		k8sClient = fake.NewClientBuilder().WithScheme(s).Build()
 
 		rolloutsManager = rolloutsmanagerv1alpha1.RolloutManager{
 			ObjectMeta: metav1.ObjectMeta{
@@ -42,6 +41,7 @@ var _ = Describe("checkForExistingRolloutManager tests", func() {
 				NamespaceScoped: false,
 			},
 		}
+		k8sClient = fake.NewClientBuilder().WithScheme(s).WithStatusSubresource(&rolloutsManager).Build()
 	})
 
 	When("A single cluster-scoped RolloutsManager is created.", func() {
@@ -184,7 +184,6 @@ var _ = Describe("validateRolloutsScope tests", func() {
 
 		ctx = context.Background()
 		log = logger.FromContext(ctx)
-		k8sClient = fake.NewClientBuilder().WithScheme(s).Build()
 
 		rolloutsManager = rolloutsmanagerv1alpha1.RolloutManager{
 			ObjectMeta: metav1.ObjectMeta{
@@ -195,6 +194,7 @@ var _ = Describe("validateRolloutsScope tests", func() {
 				NamespaceScoped: false,
 			},
 		}
+		k8sClient = fake.NewClientBuilder().WithScheme(s).WithStatusSubresource(&rolloutsManager).Build()
 	})
 
 	When("NAMESPACE_SCOPED_ARGO_ROLLOUTS environment variable is set to True.", func() {

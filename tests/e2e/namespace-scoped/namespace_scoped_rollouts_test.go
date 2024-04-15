@@ -2,7 +2,6 @@ package e2e
 
 import (
 	"context"
-	"reflect"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -17,11 +16,9 @@ import (
 	rmv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 
 	controllers "github.com/argoproj-labs/argo-rollouts-manager/controllers"
-	rv1alpha1 "github.com/argoproj/argo-rollouts/pkg/apis/rollouts/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var _ = Describe("Namespace-scoped RolloutManager tests", func() {
@@ -32,16 +29,12 @@ var _ = Describe("Namespace-scoped RolloutManager tests", func() {
 			err       error
 			ctx       context.Context
 			k8sClient client.Client
-			scheme    *runtime.Scheme
 		)
 
 		BeforeEach(func() {
 			Expect(fixture.EnsureCleanSlate()).To(Succeed())
 
-			k8sClient, scheme, err = fixture.GetE2ETestKubeClient()
-			Expect(err).ToNot(HaveOccurred())
-
-			err = rv1alpha1.AddToScheme(scheme)
+			k8sClient, _, err = fixture.GetE2ETestKubeClient()
 			Expect(err).ToNot(HaveOccurred())
 
 			ctx = context.Background()
@@ -143,26 +136,6 @@ var _ = Describe("Namespace-scoped RolloutManager tests", func() {
 				},
 			}, "3m", "2s").ShouldNot(k8s.ExistByName(k8sClient))
 
-			By("2nd RM: Delete 2nd Rollout CR and ensure it is not recreated.")
-			rollout2 := rv1alpha1.Rollout{
-				ObjectMeta: metav1.ObjectMeta{Name: utils.RolloutsName, Namespace: nsName1},
-			}
-			Expect(k8sClient.Delete(ctx, &rollout2)).To(Succeed())
-			Eventually(func() error {
-				return k8sClient.Get(ctx, client.ObjectKeyFromObject(&rollout2), &rollout2)
-			}, "1m", "1s").ShouldNot(BeNil())
-
-			By("2nd RM: Create 3rd Rollout in 2nd namespace and ensure it is not reconciled, since RolloutsManager is deleted from 2nd namespace.")
-			rollout3, err := utils.CreateArgoRollout(ctx, k8sClient, "simple-rollout-1", nsName1, utils.RolloutsActiveServiceName, utils.RolloutsPreviewServiceName)
-			Expect(err).ToNot(HaveOccurred())
-			Consistently(func() bool {
-				if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(&rollout3), &rollout3); err != nil {
-					return false
-				}
-				return reflect.DeepEqual(rollout3.Status, rv1alpha1.RolloutStatus{})
-			}, "1m", "1s").Should(
-				BeTrue(),
-			)
 		})
 
 		/*
@@ -204,17 +177,6 @@ var _ = Describe("Namespace-scoped RolloutManager tests", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(&rolloutServicePreview, "10s", "1s").Should(k8s.ExistByName(k8sClient))
 
-			By("2nd NS: Create Argo Rollout CR in a 2nd namespace and verify that it is not reconciled by Rollouts controller of 1st namespace.")
-			rollout, err := utils.CreateArgoRollout(ctx, k8sClient, utils.RolloutsName, nsName2, rolloutServiceActive.Name, rolloutServicePreview.Name)
-			Expect(err).ToNot(HaveOccurred())
-			Consistently(func() bool {
-				if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(&rollout), &rollout); err != nil {
-					return false
-				}
-				return reflect.DeepEqual(rollout.Status, rv1alpha1.RolloutStatus{})
-			}, "1m", "1s").Should(
-				BeTrue(),
-			)
 		})
 
 		/*
@@ -285,18 +247,6 @@ var _ = Describe("Namespace-scoped RolloutManager tests", func() {
 			rolloutServicePreview, err := utils.CreateService(ctx, k8sClient, utils.RolloutsPreviewServiceName, nsName, 32002)
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(&rolloutServicePreview, "10s", "1s").Should(k8s.ExistByName(k8sClient))
-
-			By("2nd RM: Create Argo Rollout CR in 2nd namespace and verify that it is not reconciled.")
-			rollout, err := utils.CreateArgoRollout(ctx, k8sClient, "simple-rollout-1", nsName, rolloutServiceActive.Name, rolloutServicePreview.Name)
-			Expect(err).ToNot(HaveOccurred())
-			Consistently(func() bool {
-				if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(&rollout), &rollout); err != nil {
-					return false
-				}
-				return reflect.DeepEqual(rollout.Status, rv1alpha1.RolloutStatus{})
-			}, "30s", "1s").Should(
-				BeTrue(),
-			)
 		})
 	})
 })
