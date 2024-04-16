@@ -45,7 +45,7 @@ var _ = Describe("updateStatusConditionOfRolloutManager tests", func() {
 	})
 
 	When("reconcileStatusResult has a non-nil phase", func() {
-		It("should set the phase on the on the RolloutManager status", func() {
+		It("should set the phase on the RolloutManager status", func() {
 
 			Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
 
@@ -63,7 +63,7 @@ var _ = Describe("updateStatusConditionOfRolloutManager tests", func() {
 	})
 
 	When("reconcileStatusResult has a non-nil rolloutController", func() {
-		It("should set the phase on the on the RolloutManager status", func() {
+		It("should set the phase on the RolloutManager status", func() {
 
 			Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
 
