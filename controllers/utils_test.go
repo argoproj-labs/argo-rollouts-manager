@@ -31,7 +31,7 @@ var _ = Describe("updateStatusConditionOfRolloutManager tests", func() {
 
 		ctx = context.Background()
 		log = logger.FromContext(ctx)
-		k8sClient = fake.NewClientBuilder().WithScheme(s).Build()
+		k8sClient = fake.NewClientBuilder().WithStatusSubresource(&rolloutsmanagerv1alpha1.RolloutManager{}).WithScheme(s).Build()
 
 		rolloutsManager = rolloutsmanagerv1alpha1.RolloutManager{
 			ObjectMeta: metav1.ObjectMeta{
