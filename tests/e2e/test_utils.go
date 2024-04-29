@@ -10,6 +10,8 @@ import (
 	"github.com/argoproj-labs/argo-rollouts-manager/tests/e2e/fixture"
 	"github.com/argoproj-labs/argo-rollouts-manager/tests/e2e/fixture/k8s"
 
+	rolloutFixture "github.com/argoproj-labs/argo-rollouts-manager/tests/e2e/fixture/rollouts"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	rmv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
@@ -127,6 +129,22 @@ func ValidateArgoRolloutsResources(ctx context.Context, k8sClient client.Client,
 	rolloutServicePreview, err := CreateService(ctx, k8sClient, RolloutsPreviewServiceName, nsName, port2)
 	Expect(err).ToNot(HaveOccurred())
 	Eventually(&rolloutServicePreview, "10s", "1s").Should(k8s.ExistByName(k8sClient))
+
+	By("Create Argo Rollout CR in given namespace and check it is reconciled successfully.")
+
+	_, err = rolloutFixture.CreateArgoRollout(ctx, RolloutsName, nsName, rolloutServiceActive.Name, rolloutServicePreview.Name)
+	Expect(err).ToNot(HaveOccurred())
+
+	Eventually(func() bool {
+
+		hasPhase, err := rolloutFixture.HasStatusPhase(ctx, RolloutsName, nsName, "Healthy")
+		if err != nil {
+			fmt.Println(err)
+			return false
+		}
+		return hasPhase
+
+	}, "3m", "1s").Should(BeTrue())
 
 }
 

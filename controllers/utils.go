@@ -23,7 +23,9 @@ const (
 	UnsupportedRolloutManagerNamespaceScoped = "when Subscription has environment variable NAMESPACE_SCOPED_ARGO_ROLLOUTS set to False, there may not exist any namespace-scoped RolloutManagers: only a single cluster-scoped RolloutManager is supported"
 )
 
-type PluginItem struct {
+// pluginItem is a clone of PluginItem from "github.com/argoproj/argo-rollouts/utils/plugin/types"
+// We clone it here, to avoid a dependency on argo-rollouts.
+type pluginItem struct {
 	Name     string `json:"name" yaml:"name"`
 	Location string `json:"location" yaml:"location"`
 	Sha256   string `json:"sha256" yaml:"sha256"`

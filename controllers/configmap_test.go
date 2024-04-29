@@ -76,7 +76,7 @@ var _ = Describe("ConfigMap Test", func() {
 		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).ToNot(ContainSubstring("test/plugin"))
 
 		By("adding a new trafficRouter plugin to test the update plugin logic")
-		trafficRouterPlugins := []PluginItem{
+		trafficRouterPlugins := []pluginItem{
 			{
 				Name:     "test/plugin",
 				Location: "https://test-path",

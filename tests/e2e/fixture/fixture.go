@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -147,6 +148,15 @@ func (cleaner *Cleaner) deleteNamespace(namespaceParam string) error {
 	}
 
 	return nil
+}
+
+func GetDynamicClient() (*dynamic.DynamicClient, error) {
+	config, err := getSystemKubeConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	return dynamic.NewForConfig(config)
 }
 
 func GetE2ETestKubeClient() (client.Client, *runtime.Scheme, error) {
