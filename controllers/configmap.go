@@ -30,7 +30,7 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr *r
 			},
 		},
 	}
-	trafficRouterPlugins := []PluginItem{
+	trafficRouterPlugins := []pluginItem{
 		{
 			Name:     OpenShiftRolloutPluginName,
 			Location: r.OpenShiftRoutePluginLocation,
@@ -55,7 +55,7 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr *r
 		return fmt.Errorf("failed to get the serviceAccount associated with %s: %w", desiredConfigMap.Name, err)
 	}
 
-	var actualTrafficRouterPlugins []PluginItem
+	var actualTrafficRouterPlugins []pluginItem
 	if err = yaml.Unmarshal([]byte(actualConfigMap.Data[TrafficRouterPluginConfigMapKey]), &actualTrafficRouterPlugins); err != nil {
 		return fmt.Errorf("failed to unmarshal traffic router plugins from ConfigMap: %s", err)
 	}

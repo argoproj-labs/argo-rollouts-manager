@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -10,6 +11,7 @@ import (
 	"github.com/argoproj-labs/argo-rollouts-manager/tests/e2e/fixture"
 	"github.com/argoproj-labs/argo-rollouts-manager/tests/e2e/fixture/k8s"
 	rmFixture "github.com/argoproj-labs/argo-rollouts-manager/tests/e2e/fixture/rolloutmanager"
+	rolloutFixture "github.com/argoproj-labs/argo-rollouts-manager/tests/e2e/fixture/rollouts"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -136,6 +138,29 @@ var _ = Describe("Namespace-scoped RolloutManager tests", func() {
 				},
 			}, "3m", "2s").ShouldNot(k8s.ExistByName(k8sClient))
 
+			By("2nd RM: Delete 2nd Rollout CR and ensure it is not recreated.")
+			Expect(rolloutFixture.DeleteArgoRollout(ctx, utils.RolloutsName, nsName1)).To(Succeed())
+			Eventually(func() error {
+				_, err := rolloutFixture.GetArgoRollout(ctx, utils.RolloutsName, nsName1)
+				return err
+			}, "1m", "1s").ShouldNot(BeNil())
+
+			By("2nd RM: Create 3rd Rollout in 2nd namespace and ensure it is not reconciled, since RolloutsManager is deleted from 2nd namespace.")
+
+			_, err = rolloutFixture.CreateArgoRollout(ctx, "simple-rollout-1", nsName1, utils.RolloutsActiveServiceName, utils.RolloutsPreviewServiceName)
+			Expect(err).ToNot(HaveOccurred())
+			Consistently(func() bool {
+
+				res, err := rolloutFixture.HasEmptyStatus(ctx, "simple-rollout-1", nsName1)
+				if err != nil {
+					fmt.Println(err)
+					return false
+				}
+				return res
+
+			}, "1m", "1s").Should(
+				BeTrue(),
+			)
 		})
 
 		/*
@@ -177,6 +202,22 @@ var _ = Describe("Namespace-scoped RolloutManager tests", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(&rolloutServicePreview, "10s", "1s").Should(k8s.ExistByName(k8sClient))
 
+			By("2nd NS: Create Argo Rollout CR in a 2nd namespace and verify that it is not reconciled by Rollouts controller of 1st namespace.")
+
+			_, err = rolloutFixture.CreateArgoRollout(ctx, utils.RolloutsName, nsName2, rolloutServiceActive.Name, rolloutServicePreview.Name)
+			Expect(err).ToNot(HaveOccurred())
+
+			Consistently(func() bool {
+
+				res, err := rolloutFixture.HasEmptyStatus(ctx, utils.RolloutsName, nsName1)
+				if err != nil {
+					return false
+				}
+				return res
+
+			}, "1m", "1s").Should(
+				BeTrue(),
+			)
 		})
 
 		/*
@@ -247,6 +288,21 @@ var _ = Describe("Namespace-scoped RolloutManager tests", func() {
 			rolloutServicePreview, err := utils.CreateService(ctx, k8sClient, utils.RolloutsPreviewServiceName, nsName, 32002)
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(&rolloutServicePreview, "10s", "1s").Should(k8s.ExistByName(k8sClient))
+
+			By("2nd RM: Create Argo Rollout CR in 2nd namespace and verify that it is not reconciled.")
+
+			_, err = rolloutFixture.CreateArgoRollout(ctx, "simple-rollout-1", nsName, rolloutServiceActive.Name, rolloutServicePreview.Name)
+			Expect(err).ToNot(HaveOccurred())
+			Consistently(func() bool {
+				res, err := rolloutFixture.HasEmptyStatus(ctx, "simple-rollout-1", nsName)
+				if err != nil {
+					return false
+				}
+				return res
+
+			}, "30s", "1s").Should(
+				BeTrue(),
+			)
 		})
 	})
 })
