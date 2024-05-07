@@ -209,8 +209,9 @@ var _ = Describe("Namespace-scoped RolloutManager tests", func() {
 
 			Consistently(func() bool {
 
-				res, err := rolloutFixture.HasEmptyStatus(ctx, utils.RolloutsName, nsName1)
+				res, err := rolloutFixture.HasEmptyStatus(ctx, utils.RolloutsName, nsName2)
 				if err != nil {
+					fmt.Println(err)
 					return false
 				}
 				return res
