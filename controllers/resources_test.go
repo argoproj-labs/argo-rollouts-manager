@@ -7,10 +7,13 @@ import (
 	"github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	crdv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -264,6 +267,53 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 				})
 			})
 		}
+	})
+
+	It("Verify whether RolloutManager creating ServiceMonitor", func() {
+		smCRD := &crdv1.CustomResourceDefinition{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "servicemonitors.monitoring.coreos.com",
+				Namespace: req.Namespace,
+			},
+		}
+
+		Expect(r.Client.Create(ctx, smCRD)).To(Succeed())
+
+		existingSvc := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      DefaultArgoRolloutsMetricsServiceName,
+				Namespace: req.Namespace,
+				Labels: map[string]string{
+					"app.kubernetes.io/name":      DefaultArgoRolloutsMetricsServiceName,
+					"app.kubernetes.io/component": "server",
+				},
+			},
+			Spec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{
+					{
+						Name:       "metrics",
+						Port:       8090,
+						Protocol:   corev1.ProtocolTCP,
+						TargetPort: intstr.FromInt(8090),
+					},
+				},
+				Selector: map[string]string{
+					DefaultRolloutsSelectorKey: DefaultArgoRolloutsResourceName,
+				},
+			},
+		}
+
+		Expect(r.Client.Create(ctx, existingSvc)).To(Succeed())
+
+		res, err := r.Reconcile(ctx, req)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.Requeue).Should(BeFalse(), "reconcile should not requeue request")
+
+		sm := &monitoringv1.ServiceMonitor{}
+		Expect(r.Client.Get(ctx, types.NamespacedName{
+			Name:      DefaultArgoRolloutsMetricsServiceName,
+			Namespace: testNamespace,
+		}, sm)).To(Succeed())
 	})
 
 })

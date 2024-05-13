@@ -7,6 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/argoproj-labs/argo-rollouts-manager/tests/e2e/fixture"
+
 	"github.com/argoproj-labs/argo-rollouts-manager/tests/e2e/fixture/k8s"
 	rolloutManagerFixture "github.com/argoproj-labs/argo-rollouts-manager/tests/e2e/fixture/rolloutmanager"
 
@@ -15,6 +16,7 @@ import (
 	rolloutsmanagerv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 
 	controllers "github.com/argoproj-labs/argo-rollouts-manager/controllers"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -237,6 +239,16 @@ var _ = Describe("RolloutManager tests", func() {
 					Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&deployment), &deployment)).To(Succeed())
 					return deployment.Spec.Template.Spec.Containers[0].Image
 				}, "10s", "1s").Should(Equal(expectedVersion))
+
+				By("verify whether ServiceMonitor is created or not for Rolloutsmanager")
+				sm := &monitoringv1.ServiceMonitor{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "argo-rollouts-metrics",
+						Namespace: fixture.TestE2ENamespace,
+					},
+				}
+
+				Eventually(sm, "10s", "1s").Should(k8s.ExistByName(k8sClient))
 			})
 		})
 	})
