@@ -410,12 +410,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.C
 	}
 
 	// Create ServiceMonitor for Rollouts metrics
-	existingServiceMonitor := &monitoringv1.ServiceMonitor{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      actualSvc.Name,
-			Namespace: actualSvc.Namespace,
-		},
-	}
+	existingServiceMonitor := &monitoringv1.ServiceMonitor{}
 	if err := fetchObject(ctx, r.Client, cr.Namespace, actualSvc.Name, existingServiceMonitor); err != nil {
 		if apierrors.IsNotFound(err) {
 			err = r.createServiceMonitorIfAbsent(ctx, cr.Namespace, cr, actualSvc.Name, actualSvc.Name)
@@ -1003,7 +998,7 @@ func GetAggregateToViewPolicyRules() []rbacv1.PolicyRule {
 	}
 }
 
-func (r *RolloutManagerReconciler) createServiceMonitorIfAbsent(ctx context.Context, namespace string, rolloutManager *rolloutsmanagerv1alpha1.RolloutManager, name, serviceMonitorLabel string) error {
+func (r *RolloutManagerReconciler) createServiceMonitorIfAbsent(ctx context.Context, namespace string, rolloutManager rolloutsmanagerv1alpha1.RolloutManager, name, serviceMonitorLabel string) error {
 	serviceMonitor := &monitoringv1.ServiceMonitor{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -1026,7 +1021,7 @@ func (r *RolloutManagerReconciler) createServiceMonitorIfAbsent(ctx context.Cont
 		"Namespace", serviceMonitor.Namespace, "Name", serviceMonitor.Name)
 
 	// Set the RolloutManager instance as the owner and controller
-	if err := controllerutil.SetControllerReference(rolloutManager, serviceMonitor, r.Scheme); err != nil {
+	if err := controllerutil.SetControllerReference(&rolloutManager, serviceMonitor, r.Scheme); err != nil {
 		log.Error(err, "Error setting read role owner ref",
 			"Namespace", serviceMonitor.Namespace, "Name", serviceMonitor.Name, "RolloutManager Name", rolloutManager.Name)
 		return err
