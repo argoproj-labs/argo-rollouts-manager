@@ -19,10 +19,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	rolloutsmanagerv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	crdv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -195,6 +197,14 @@ func getKubeClient(config *rest.Config) (client.Client, *runtime.Scheme, error) 
 
 	if err := admissionv1.AddToScheme(scheme); err != nil {
 		return nil, nil, err
+	}
+
+	if err := monitoringv1.AddToScheme(scheme); err != nil {
+		return nil, err
+	}
+
+	if err := crdv1.AddToScheme(scheme); err != nil {
+		return nil, err
 	}
 
 	k8sClient, err := client.New(config, client.Options{Scheme: scheme})

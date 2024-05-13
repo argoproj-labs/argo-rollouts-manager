@@ -37,6 +37,8 @@ import (
 	rolloutsmanagerv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 
 	controllers "github.com/argoproj-labs/argo-rollouts-manager/controllers"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	crdv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -109,6 +111,16 @@ func main() {
 		setupLog.Info("Running in namespaced-scoped mode")
 	} else {
 		setupLog.Info("Running in cluster-scoped mode")
+	}
+
+	if err := monitoringv1.AddToScheme(mgr.GetScheme()); err != nil {
+		setupLog.Error(err, "")
+		os.Exit(1)
+	}
+
+	if err := crdv1.AddToScheme(mgr.GetScheme()); err != nil {
+		setupLog.Error(err, "")
+		os.Exit(1)
 	}
 
 	if err = (&controllers.RolloutManagerReconciler{
