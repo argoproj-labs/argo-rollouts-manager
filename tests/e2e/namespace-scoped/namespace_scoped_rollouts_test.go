@@ -25,6 +25,9 @@ import (
 
 var _ = Describe("Namespace-scoped RolloutManager tests", func() {
 
+	// Add the tests which are designed to run in both cluster-scoped and namespace-scoped modes.
+	utils.RunRolloutsTests(true)
+
 	Context("Testing namespace-scoped RolloutManager behaviour", func() {
 
 		var (

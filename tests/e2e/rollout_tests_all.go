@@ -24,9 +24,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var _ = Describe("RolloutManager tests", func() {
+// This file contains tests that should run in both namespace-scoped and cluster-scoped scenarios.
+// As of this writing, these function is called from the 'tests/e2e/(cluster-scoped/namespace-scoped)' packages.
+func RunRolloutsTests(namespaceScopedParam bool) {
 
-	Context("RolloutManager tests", func() {
+	testType := "cluster-scoped"
+	if namespaceScopedParam {
+		testType = "namespace-scoped"
+	}
+
+	Context("RolloutManager tests - "+testType, func() {
 
 		var (
 			k8sClient      client.Client
@@ -48,7 +55,7 @@ var _ = Describe("RolloutManager tests", func() {
 					Namespace: fixture.TestE2ENamespace,
 				},
 				Spec: rolloutsmanagerv1alpha1.RolloutManagerSpec{
-					NamespaceScoped: true,
+					NamespaceScoped: namespaceScopedParam,
 				},
 			}
 		})
@@ -57,11 +64,11 @@ var _ = Describe("RolloutManager tests", func() {
 			It("should create the appropriate K8s resources", func() {
 				Expect(k8sClient.Create(ctx, &rolloutManager)).To(Succeed())
 
-				By("setting the phase to \"Available\"")
+				By("waiting for phase to be \"Available\"")
 				Eventually(rolloutManager, "60s", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
 
 				By("Verify that expected resources are created.")
-				ValidateArgoRolloutManagerResources(ctx, rolloutManager, k8sClient, true)
+				ValidateArgoRolloutManagerResources(ctx, rolloutManager, k8sClient, namespaceScopedParam)
 			})
 		})
 
@@ -127,7 +134,7 @@ var _ = Describe("RolloutManager tests", func() {
 						"--loglevel",
 						"error",
 					},
-					NamespaceScoped: true,
+					NamespaceScoped: namespaceScopedParam,
 				}
 				Expect(k8sClient.Create(ctx, &rolloutManager)).To(Succeed())
 				Eventually(rolloutManager, "1m", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
@@ -136,7 +143,15 @@ var _ = Describe("RolloutManager tests", func() {
 					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rolloutManager.Namespace},
 				}
 				Eventually(&deployment, "10s", "1s").Should(k8s.ExistByName(k8sClient))
-				Expect(deployment.Spec.Template.Spec.Containers[0].Args).To(Equal([]string{"--namespaced", "--loglevel", "error"}))
+
+				var expectedContainerArgs []string
+				if namespaceScopedParam {
+					expectedContainerArgs = []string{"--namespaced", "--loglevel", "error"}
+				} else {
+					expectedContainerArgs = []string{"--loglevel", "error"}
+				}
+
+				Expect(deployment.Spec.Template.Spec.Containers[0].Args).To(Equal(expectedContainerArgs))
 
 				By("updating the deployment when the argument in the RolloutManager is updated")
 
@@ -149,15 +164,21 @@ var _ = Describe("RolloutManager tests", func() {
 							"--logformat",
 							"text",
 						},
-						NamespaceScoped: true,
+						NamespaceScoped: namespaceScopedParam,
 					}
 				})
 				Expect(err).ToNot(HaveOccurred())
 
+				if namespaceScopedParam {
+					expectedContainerArgs = []string{"--namespaced", "--logformat", "text"}
+				} else {
+					expectedContainerArgs = []string{"--logformat", "text"}
+				}
+
 				Eventually(func() []string {
 					Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&deployment), &deployment)).To(Succeed())
 					return deployment.Spec.Template.Spec.Containers[0].Args
-				}, "10s", "1s").Should(Equal([]string{"--namespaced", "--logformat", "text"}))
+				}, "10s", "1s").Should(Equal(expectedContainerArgs))
 			})
 		})
 
@@ -301,7 +322,7 @@ var _ = Describe("RolloutManager tests", func() {
 								"foo-label2": "bar-label2",
 							},
 						},
-						NamespaceScoped: true,
+						NamespaceScoped: namespaceScopedParam,
 					},
 				}
 
@@ -343,4 +364,4 @@ var _ = Describe("RolloutManager tests", func() {
 			})
 		})
 	})
-})
+}

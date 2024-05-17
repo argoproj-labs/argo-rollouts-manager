@@ -23,6 +23,9 @@ import (
 
 var _ = Describe("Cluster-scoped RolloutManager tests", func() {
 
+	// Add the tests which are designed to run in both cluster-scoped and namespace-scoped modes.
+	utils.RunRolloutsTests(false)
+
 	Context("Testing cluster-scoped RolloutManager behaviour", func() {
 
 		var (
