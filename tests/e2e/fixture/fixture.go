@@ -67,7 +67,7 @@ func EnsureCleanSlate() error {
 	}
 
 	// create default namespace used for Rollouts controller
-	err = cleaner.ensureRlloutNamespaceExists(TestE2ENamespace)
+	err = cleaner.ensureRolloutNamespaceExists(TestE2ENamespace)
 	if err != nil {
 		return err
 	}
@@ -80,7 +80,7 @@ func EnsureCleanSlate() error {
 	return nil
 }
 
-func (cleaner *Cleaner) ensureRlloutNamespaceExists(namespaceParam string) error {
+func (cleaner *Cleaner) ensureRolloutNamespaceExists(namespaceParam string) error {
 	if err := cleaner.deleteNamespace(namespaceParam); err != nil {
 		return fmt.Errorf("unable to delete namespace '%s': %w", namespaceParam, err)
 	}

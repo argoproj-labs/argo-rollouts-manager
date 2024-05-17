@@ -21,7 +21,7 @@ set -ex
 
 if [ "$NAMESPACE_SCOPED_ARGO_ROLLOUTS" == "true" ]; then
 
-  go test -v -p=1 -timeout=30m -race -count=1 -coverprofile=coverage.out ./tests/e2e/.  ./tests/e2e/namespace-scoped
+  go test -v -p=1 -timeout=30m -race -count=1 -coverprofile=coverage.out ./tests/e2e/namespace-scoped
 
 else
 
