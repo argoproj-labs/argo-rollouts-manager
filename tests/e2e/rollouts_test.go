@@ -104,7 +104,7 @@ var _ = Describe("RolloutManager tests", func() {
 
 				By("deleting the serviceMonitor")
 				Eventually(&monitoringv1.ServiceMonitor{
-					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsMetricsServiceName, Namespace: rolloutManager.Namespace},
+					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rolloutManager.Namespace},
 				}, "30s", "1s").ShouldNot(k8s.ExistByName(k8sClient))
 
 				// Make sure the cluster roles have not been deleted
@@ -248,13 +248,13 @@ var _ = Describe("RolloutManager tests", func() {
 
 				expectedServiceMonitor := &monitoringv1.ServiceMonitor{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "argo-rollouts-metrics",
+						Name:      controllers.DefaultArgoRolloutsResourceName,
 						Namespace: fixture.TestE2ENamespace,
 					},
 					Spec: monitoringv1.ServiceMonitorSpec{
 						Selector: metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								"app.kubernetes.io/name": "argo-rollouts-metrics",
+								"app.kubernetes.io/name": controllers.DefaultArgoRolloutsMetricsServiceName,
 							},
 						},
 						Endpoints: []monitoringv1.Endpoint{
@@ -268,7 +268,7 @@ var _ = Describe("RolloutManager tests", func() {
 				By("verify whether ServiceMonitor is created or not for RolloutManager")
 				sm := &monitoringv1.ServiceMonitor{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "argo-rollouts-metrics",
+						Name:      controllers.DefaultArgoRolloutsResourceName,
 						Namespace: fixture.TestE2ENamespace,
 					},
 				}
