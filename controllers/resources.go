@@ -379,12 +379,14 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.C
 		if err := controllerutil.SetControllerReference(&cr, expectedSvc, r.Scheme); err != nil {
 			return err
 		}
-		fmt.Println("kuuu")
+
 		log.Info(fmt.Sprintf("Creating Service %s", expectedSvc.Name))
 		if err := r.Client.Create(ctx, expectedSvc); err != nil {
 			log.Error(err, "Error creating Service", "Name", expectedSvc.Name)
 			return err
 		}
+		actualSvc = expectedSvc
+
 	} else if !reflect.DeepEqual(actualSvc.Spec.Ports, expectedSvc.Spec.Ports) {
 		log.Info(fmt.Sprintf("Ports of Service %s do not match the expected state, hence updating it", actualSvc.Name))
 		actualSvc.Spec.Ports = expectedSvc.Spec.Ports
@@ -397,7 +399,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.C
 	// Checks if user is using the Prometheus operator by checking CustomResourceDefinition for ServiceMonitor
 	smCRD := &crdv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "servicemonitors.monitoring.coreos.com",
+			Name: serviceMonitorsCRDName,
 		},
 	}
 
@@ -410,16 +412,18 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.C
 
 	// Create ServiceMonitor for Rollouts metrics
 	existingServiceMonitor := &monitoringv1.ServiceMonitor{}
-	if err := fetchObject(ctx, r.Client, cr.Namespace, actualSvc.Name, existingServiceMonitor); err != nil {
+	if err := fetchObject(ctx, r.Client, cr.Namespace, DefaultArgoRolloutsResourceName, existingServiceMonitor); err != nil {
 		if apierrors.IsNotFound(err) {
-			err = r.createServiceMonitorIfAbsent(ctx, cr.Namespace, cr, expectedSvc.Name, expectedSvc.Name)
-			if err != nil {
+			if err := r.createServiceMonitorIfAbsent(ctx, cr.Namespace, cr, DefaultArgoRolloutsResourceName, expectedSvc.Name); err != nil {
 				return err
 			}
+			return nil
+
 		} else {
 			log.Error(err, "Error querying for ServiceMonitor", "Namespace", cr.Namespace, "Name", actualSvc.Name)
 			return err
 		}
+
 	} else {
 		log.Info("A ServiceMonitor instance already exists",
 			"Namespace", existingServiceMonitor.Namespace, "Name", existingServiceMonitor.Name)
@@ -447,7 +451,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.C
 		}
 		return nil
 	}
-	return nil
+
 }
 
 // Reconciles Secrets for Rollouts controller

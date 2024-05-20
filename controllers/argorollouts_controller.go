@@ -24,11 +24,10 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	crdv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logr "sigs.k8s.io/controller-runtime/pkg/log"
@@ -50,6 +49,10 @@ type RolloutManagerReconciler struct {
 }
 
 var log = logr.Log.WithName("rollouts-controller")
+
+const (
+	serviceMonitorsCRDName = "servicemonitors.monitoring.coreos.com"
+)
 
 //+kubebuilder:rbac:groups=argoproj.io,resources=rolloutmanagers,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=argoproj.io,resources=rolloutmanagers/status,verbs=get;update;patch
@@ -165,27 +168,39 @@ func (r *RolloutManagerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Watch for changes to ClusterRoleBinding sub-resources owned by RolloutManager.
 	bld.Owns(&rbacv1.ClusterRoleBinding{})
 
-	if r.isCRDExist(mgr.GetConfig(), "servicemonitors.monitoring.coreos.com") {
+	if crdExists, err := r.doesCRDExist(mgr.GetClient(), serviceMonitorsCRDName); err != nil {
+		return err
+	} else if crdExists {
+		// We only attempt to own ServiceMonitor if it exists on the cluster on startup
 		bld.Owns(&monitoringv1.ServiceMonitor{})
 	}
 
 	return bld.Complete(r)
 }
 
-// isCRDExist checks if a CRD is present in the cluster.
-func (r *RolloutManagerReconciler) isCRDExist(cfg *rest.Config, crdName string) bool {
-	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
-	if err != nil {
-		return false
+// doesCRDExist checks if a CRD with the given name is present on the cluster.
+func (r *RolloutManagerReconciler) doesCRDExist(k8sClient client.Client, crdName string) (bool, error) {
+
+	// As per the docs, the name of a CRD MUST always be in the format <.spec.name>.<.spec.group>
+	crd := crdv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: crdName,
+		},
 	}
-	apiResources, err := discoveryClient.ServerResourcesForGroupVersion("monitoring.coreos.com/v1")
-	if err != nil {
-		return false
-	}
-	for _, resource := range apiResources.APIResources {
-		if resource.Name == crdName {
-			return true
+
+	if err := k8sClient.Get(context.Background(), client.ObjectKeyFromObject(&crd), &crd); err != nil {
+
+		if apierrors.IsNotFound(err) {
+			// Not found, so CRD doesn't exist; return
+			return false, nil
 		}
+
+		// Some other error occurred: log it, and return it
+		log.Error(err, "an unexpected error occurred when retrieving CRD", "crdName", crdName)
+		return false, err
 	}
-	return false
+
+	// CRD exists
+	return true, nil
+
 }
