@@ -376,23 +376,19 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.C
 		if err := controllerutil.SetControllerReference(&cr, expectedSvc, r.Scheme); err != nil {
 			return err
 		}
-
+		fmt.Println("kuuu")
 		log.Info(fmt.Sprintf("Creating Service %s", expectedSvc.Name))
 		if err := r.Client.Create(ctx, expectedSvc); err != nil {
 			log.Error(err, "Error creating Service", "Name", expectedSvc.Name)
 			return err
 		}
-		return nil
-	}
-
-	if !reflect.DeepEqual(actualSvc.Spec.Ports, expectedSvc.Spec.Ports) {
+	} else if !reflect.DeepEqual(actualSvc.Spec.Ports, expectedSvc.Spec.Ports) {
 		log.Info(fmt.Sprintf("Ports of Service %s do not match the expected state, hence updating it", actualSvc.Name))
 		actualSvc.Spec.Ports = expectedSvc.Spec.Ports
 		if err := r.Client.Update(ctx, actualSvc); err != nil {
 			log.Error(err, "Error updating Ports of Service", "Name", actualSvc.Name)
 			return err
 		}
-		return nil
 	}
 
 	// Checks if user is using the Prometheus operator by checking CustomResourceDefinition for ServiceMonitor
@@ -413,7 +409,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.C
 	existingServiceMonitor := &monitoringv1.ServiceMonitor{}
 	if err := fetchObject(ctx, r.Client, cr.Namespace, actualSvc.Name, existingServiceMonitor); err != nil {
 		if apierrors.IsNotFound(err) {
-			err = r.createServiceMonitorIfAbsent(ctx, cr.Namespace, cr, actualSvc.Name, actualSvc.Name)
+			err = r.createServiceMonitorIfAbsent(ctx, cr.Namespace, cr, expectedSvc.Name, expectedSvc.Name)
 			if err != nil {
 				return err
 			}
@@ -1050,7 +1046,7 @@ func serviceMonitorMatches(sm *monitoringv1.ServiceMonitor, matchLabel string) b
 	}
 
 	// Check if endpoints match
-	if sm.Spec.Endpoints[0].Port != "metrics" {
+	if len(sm.Spec.Endpoints) == 0 || sm.Spec.Endpoints[0].Port != "metrics" {
 		return false
 	}
 

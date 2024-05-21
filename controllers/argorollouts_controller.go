@@ -27,6 +27,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logr "sigs.k8s.io/controller-runtime/pkg/log"
@@ -162,8 +164,28 @@ func (r *RolloutManagerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	// Watch for changes to ClusterRoleBinding sub-resources owned by RolloutManager.
 	bld.Owns(&rbacv1.ClusterRoleBinding{})
-	// Watch for changes to ServiceMonitor sub-resources owned by RolloutManager.
-	bld.Owns(&monitoringv1.ServiceMonitor{})
+
+	if r.isCRDExist(mgr.GetConfig(), "servicemonitors.monitoring.coreos.com") {
+		bld.Owns(&monitoringv1.ServiceMonitor{})
+	}
 
 	return bld.Complete(r)
+}
+
+// isCRDExist checks if a CRD is present in the cluster.
+func (r *RolloutManagerReconciler) isCRDExist(cfg *rest.Config, crdName string) bool {
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
+	if err != nil {
+		return false
+	}
+	apiResources, err := discoveryClient.ServerResourcesForGroupVersion("monitoring.coreos.com/v1")
+	if err != nil {
+		return false
+	}
+	for _, resource := range apiResources.APIResources {
+		if resource.Name == crdName {
+			return true
+		}
+	}
+	return false
 }

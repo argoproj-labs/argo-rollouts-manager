@@ -13,7 +13,6 @@ import (
 	crdv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -278,7 +277,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 		}
 	})
 
-	Context("Rollouts Metics ServiceMonitor test", func() {
+	Context("Rollouts Metrics ServiceMonitor test", func() {
 		var (
 			ctx context.Context
 			a   *v1alpha1.RolloutManager
@@ -301,9 +300,8 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 		})
 
 		It("Verify whether RolloutManager creating ServiceMonitor", func() {
-			smCRD, existingSvc := serviceAndServiceMonitorCRD(req.Namespace)
+			smCRD := serviceAndServiceMonitorCRD(req.Namespace)
 			Expect(r.Client.Create(ctx, smCRD)).To(Succeed())
-			Expect(r.Client.Create(ctx, existingSvc)).To(Succeed())
 
 			res, err := r.Reconcile(ctx, req)
 			Expect(err).ToNot(HaveOccurred())
@@ -323,10 +321,6 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 		})
 
 		It("Verify if ServiceMonitor exists, but has different content than we expect then it should update ServiceMonitor", func() {
-			smCRD, existingSvc := serviceAndServiceMonitorCRD(req.Namespace)
-			Expect(r.Client.Create(ctx, smCRD)).To(Succeed())
-			Expect(r.Client.Create(ctx, existingSvc)).To(Succeed())
-
 			existingServiceMonitor := &monitoringv1.ServiceMonitor{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      DefaultArgoRolloutsMetricsServiceName,
@@ -335,12 +329,12 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 				Spec: monitoringv1.ServiceMonitorSpec{
 					Selector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"app.kubernetes.io/name": "test-label",
+							"app.kubernetes.io/name": "argo-rollouts-metrics",
 						},
 					},
 					Endpoints: []monitoringv1.Endpoint{
 						{
-							Port: "metrics-test",
+							Port: "metrics",
 						},
 					},
 				},
@@ -366,9 +360,6 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 		})
 
 		It("Verify ServiceMonitor is not created if the CRD does not exist.", func() {
-			_, existingSvc := serviceAndServiceMonitorCRD(req.Namespace)
-			Expect(r.Client.Create(ctx, existingSvc)).To(Succeed())
-
 			res, err := r.Reconcile(ctx, req)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(res.Requeue).Should(BeFalse(), "reconcile should not requeue request")
@@ -405,37 +396,11 @@ func serviceMonitor() *monitoringv1.ServiceMonitor {
 	return sm
 }
 
-func serviceAndServiceMonitorCRD(namespace string) (*crdv1.CustomResourceDefinition, *corev1.Service) {
+func serviceAndServiceMonitorCRD(namespace string) *crdv1.CustomResourceDefinition {
 	smCRD := &crdv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "servicemonitors.monitoring.coreos.com",
 		},
 	}
-
-	existingSvc := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      DefaultArgoRolloutsMetricsServiceName,
-			Namespace: namespace,
-			Labels: map[string]string{
-				"app.kubernetes.io/name":      DefaultArgoRolloutsResourceName,
-				"app.kubernetes.io/component": "server",
-			},
-		},
-		Spec: corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{
-				{
-					Name:       "metrics",
-					Port:       8090,
-					Protocol:   corev1.ProtocolTCP,
-					TargetPort: intstr.FromInt(8090),
-				},
-			},
-			Selector: map[string]string{
-				DefaultRolloutsSelectorKey: DefaultArgoRolloutsResourceName,
-			},
-		},
-	}
-
-	return smCRD, existingSvc
-
+	return smCRD
 }
