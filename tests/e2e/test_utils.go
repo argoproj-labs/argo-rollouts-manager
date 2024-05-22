@@ -157,7 +157,7 @@ func ValidateArgoRolloutsResources(ctx context.Context, k8sClient client.Client,
 }
 
 // Checks that the labels and annotations provided are present in the ObjectMeta
-func ExpectMetadataOnObjectMeta(ObjectMeta *metav1.ObjectMeta, expectedMetadata *rmv1alpha1.ResourceMetadata) {
+func expectMetadataOnObjectMeta(ObjectMeta *metav1.ObjectMeta, expectedMetadata *rmv1alpha1.ResourceMetadata) {
 	if expectedMetadata != nil {
 		for k, v := range expectedMetadata.Labels {
 			Expect(ObjectMeta.Labels).To(HaveKeyWithValue(k, v))
@@ -179,7 +179,7 @@ func validateServiceAccount(k8sClient client.Client, rolloutsManager rmv1alpha1.
 
 	By("Verify that ServiceAccount has correct labels and annotations.")
 	validateLabels(&sa.ObjectMeta)
-	ExpectMetadataOnObjectMeta(&sa.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
+	expectMetadataOnObjectMeta(&sa.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
 }
 
 func validateArgoRolloutsRole(k8sClient client.Client, rolloutsManager rmv1alpha1.RolloutManager) {
@@ -193,7 +193,7 @@ func validateArgoRolloutsRole(k8sClient client.Client, rolloutsManager rmv1alpha
 
 	By("Verify that Role has correct labels and annotations.")
 	validateLabels(&role.ObjectMeta)
-	ExpectMetadataOnObjectMeta(&role.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
+	expectMetadataOnObjectMeta(&role.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
 
 	By("Verify that Role has correct policy rules.")
 	Expect(role.Rules).To(ConsistOf(controllers.GetPolicyRules()))
@@ -209,7 +209,7 @@ func validateArgoRolloutsClusterRole(k8sClient client.Client, rolloutsManager rm
 
 	By("Verify that ClusterRole has correct labels and annotations.")
 	validateLabels(&clusterRole.ObjectMeta)
-	ExpectMetadataOnObjectMeta(&clusterRole.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
+	expectMetadataOnObjectMeta(&clusterRole.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
 
 	By("Verify that ClusterRole has correct policy rules.")
 	Expect(clusterRole.Rules).To(ConsistOf(controllers.GetPolicyRules()))
@@ -228,7 +228,7 @@ func validateAggregateToAdminClusterRole(k8sClient client.Client, rolloutsManage
 
 	By("Verify that ClusterRole has correct labels and annotations.")
 	validateAggregateLabels(&clusterRole.ObjectMeta, aggregationType)
-	ExpectMetadataOnObjectMeta(&clusterRole.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
+	expectMetadataOnObjectMeta(&clusterRole.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
 
 	By("Verify that ClusterRole has correct policy rules.")
 	Expect(clusterRole.Rules).To(ConsistOf(controllers.GetAggregateToAdminPolicyRules()))
@@ -247,7 +247,7 @@ func validateAggregateToEditClusterRole(k8sClient client.Client, rolloutsManager
 
 	By("Verify that ClusterRole has correct labels and annotations.")
 	validateAggregateLabels(&clusterRole.ObjectMeta, aggregationType)
-	ExpectMetadataOnObjectMeta(&clusterRole.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
+	expectMetadataOnObjectMeta(&clusterRole.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
 
 	By("Verify that ClusterRole has correct policy rules.")
 	Expect(clusterRole.Rules).To(ConsistOf(controllers.GetAggregateToEditPolicyRules()))
@@ -266,7 +266,7 @@ func validateAggregateToViewClusterRole(k8sClient client.Client, rolloutsManager
 
 	By("Verify that ClusterRole has correct labels and annotations.")
 	validateAggregateLabels(&clusterRole.ObjectMeta, aggregationType)
-	ExpectMetadataOnObjectMeta(&clusterRole.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
+	expectMetadataOnObjectMeta(&clusterRole.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
 
 	By("Verify that ClusterRole has correct policy rules.")
 	Expect(clusterRole.Rules).To(ConsistOf(controllers.GetAggregateToViewPolicyRules()))
@@ -283,7 +283,7 @@ func validateRoleBinding(k8sClient client.Client, rolloutsManager rmv1alpha1.Rol
 
 	By("Verify that RoleBinding has correct labels and annotations.")
 	validateLabels(&binding.ObjectMeta)
-	ExpectMetadataOnObjectMeta(&binding.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
+	expectMetadataOnObjectMeta(&binding.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
 
 	By("Verify that RoleBinding has correct RoleRef.")
 	Expect(binding.RoleRef).To(Equal(rbacv1.RoleRef{
@@ -314,7 +314,7 @@ func validateClusterRoleBinding(k8sClient client.Client, rolloutsManager rmv1alp
 
 	By("Verify that ClusterRoleBinding has correct labels and annotations.")
 	validateLabels(&clusterRoleBinding.ObjectMeta)
-	ExpectMetadataOnObjectMeta(&clusterRoleBinding.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
+	expectMetadataOnObjectMeta(&clusterRoleBinding.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
 
 	By("Verify that ClusterRoleBinding has correct RoleRef.")
 	Expect(clusterRoleBinding.RoleRef).To(Equal(rbacv1.RoleRef{
@@ -348,7 +348,7 @@ func validateService(k8sClient client.Client, rolloutsManager rmv1alpha1.Rollout
 	Expect(service.Labels["app.kubernetes.io/name"]).To(Equal(controllers.DefaultArgoRolloutsMetricsServiceName))
 	Expect(service.Labels["app.kubernetes.io/part-of"]).To(Equal(controllers.DefaultArgoRolloutsResourceName))
 	Expect(service.Labels["app.kubernetes.io/component"]).To(Equal("server"))
-	ExpectMetadataOnObjectMeta(&service.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
+	expectMetadataOnObjectMeta(&service.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
 
 	By("Verify that ClusterRoleBinding has correct Ports.")
 	Expect(service.Spec.Ports).To(Equal([]corev1.ServicePort{
@@ -379,7 +379,7 @@ func validateSecret(k8sClient client.Client, rolloutsManager rmv1alpha1.RolloutM
 	Expect(secret.Type).To(Equal(corev1.SecretTypeOpaque))
 
 	By("Verify that Secret has correct labels and annotations.")
-	ExpectMetadataOnObjectMeta(&secret.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
+	expectMetadataOnObjectMeta(&secret.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
 }
 
 func validateDeployment(ctx context.Context, k8sClient client.Client, rolloutsManager rmv1alpha1.RolloutManager) {
@@ -401,14 +401,14 @@ func validateDeployment(ctx context.Context, k8sClient client.Client, rolloutsMa
 
 	By("Verify that Deployment has correct labels and annotations.")
 	validateLabels(&depl.ObjectMeta)
-	ExpectMetadataOnObjectMeta(&depl.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
+	expectMetadataOnObjectMeta(&depl.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
 
 	By("Verify that Deployment has correct Selector.")
 	Expect(depl.Spec.Selector.MatchLabels).To(HaveKeyWithValue(controllers.DefaultRolloutsSelectorKey, controllers.DefaultArgoRolloutsResourceName))
 
 	By("Verify that Deployment Template has correct Template.")
 	Expect(depl.Spec.Template.Labels).To(HaveKeyWithValue(controllers.DefaultRolloutsSelectorKey, controllers.DefaultArgoRolloutsResourceName))
-	ExpectMetadataOnObjectMeta(&depl.Spec.Template.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
+	expectMetadataOnObjectMeta(&depl.Spec.Template.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
 
 	By("Verify that Deployment Template has correct NodeSelector.")
 	Expect(depl.Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"kubernetes.io/os": "linux"}))
