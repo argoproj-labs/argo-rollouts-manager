@@ -24,10 +24,11 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	crdv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logr "sigs.k8s.io/controller-runtime/pkg/log"
@@ -168,7 +169,7 @@ func (r *RolloutManagerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Watch for changes to ClusterRoleBinding sub-resources owned by RolloutManager.
 	bld.Owns(&rbacv1.ClusterRoleBinding{})
 
-	if crdExists, err := r.doesCRDExist(mgr.GetClient(), serviceMonitorsCRDName); err != nil {
+	if crdExists, err := r.doesCRDExist(mgr.GetConfig(), serviceMonitorsCRDName); err != nil {
 		return err
 	} else if crdExists {
 		// We only attempt to own ServiceMonitor if it exists on the cluster on startup
@@ -178,29 +179,25 @@ func (r *RolloutManagerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return bld.Complete(r)
 }
 
-// doesCRDExist checks if a CRD with the given name is present on the cluster.
-func (r *RolloutManagerReconciler) doesCRDExist(k8sClient client.Client, crdName string) (bool, error) {
+// doesCRDExist checks if a CRD is present in the cluster, by using the discovery client.
+//
+// NOTE: this function should only be called from SetupWithManager. There are more efficient methods to determine this, elsewhere.
+func (r *RolloutManagerReconciler) doesCRDExist(cfg *rest.Config, crdName string) (bool, error) {
 
-	// As per the docs, the name of a CRD MUST always be in the format <.spec.name>.<.spec.group>
-	crd := crdv1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: crdName,
-		},
-	}
+	// Idealy we would use client.Client to retrieve the CRD, here, but since the manager has not yet started, we don't have access to the client from the manager. We would need to convert the rest.Config into a client.Client, and it's easier to use
 
-	if err := k8sClient.Get(context.Background(), client.ObjectKeyFromObject(&crd), &crd); err != nil {
-
-		if apierrors.IsNotFound(err) {
-			// Not found, so CRD doesn't exist; return
-			return false, nil
-		}
-
-		// Some other error occurred: log it, and return it
-		log.Error(err, "an unexpected error occurred when retrieving CRD", "crdName", crdName)
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
+	if err != nil {
 		return false, err
 	}
-
-	// CRD exists
-	return true, nil
-
+	apiResources, err := discoveryClient.ServerResourcesForGroupVersion("monitoring.coreos.com/v1")
+	if err != nil {
+		return false, err
+	}
+	for _, resource := range apiResources.APIResources {
+		if resource.Name == crdName {
+			return true, nil
+		}
+	}
+	return false, nil
 }
