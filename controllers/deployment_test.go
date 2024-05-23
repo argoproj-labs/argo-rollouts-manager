@@ -10,6 +10,7 @@ import (
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -45,6 +46,16 @@ var _ = Describe("Deployment Test", func() {
 		fetchedDeployment := &appsv1.Deployment{}
 		Expect(fetchObject(ctx, r.Client, a.Namespace, DefaultArgoRolloutsResourceName, fetchedDeployment)).To(Succeed())
 
+		a.Spec.ControllerResources = corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("100m"),
+				corev1.ResourceMemory: resource.MustParse("100Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("500m"),
+				corev1.ResourceMemory: resource.MustParse("500Mi"),
+			},
+		}
 		expectedDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, "tmp", "linux", DefaultArgoRolloutsResourceName, a)
 
 		By("verify that the fetched Deployment matches the desired one")
@@ -85,6 +96,7 @@ var _ = Describe("Deployment Test", func() {
 		Expect(fetchedDeployment.Spec.Template.Spec.Tolerations).To(Equal(expectedDeployment.Spec.Template.Spec.Tolerations))
 		Expect(fetchedDeployment.Spec.Template.Spec.SecurityContext).To(Equal(expectedDeployment.Spec.Template.Spec.SecurityContext))
 		Expect(fetchedDeployment.Spec.Template.Spec.Volumes).To(Equal(expectedDeployment.Spec.Template.Spec.Volumes))
+		Expect(fetchedDeployment.Spec.Template.Spec.Containers[0].Resources).To(Equal(expectedDeployment.Spec.Template.Spec.Containers[0].Resources))
 
 	})
 
@@ -208,6 +220,18 @@ var _ = Describe("Deployment Test", func() {
 			}),
 			Entry(".spec.template.spec.volumes", func(deployment *appsv1.Deployment) {
 				deployment.Spec.Template.Spec.Volumes = []corev1.Volume{{Name: "my-volume"}}
+			}),
+			Entry(".spec.template.spec.containes.resources", func(deployment *appsv1.Deployment) {
+				deployment.Spec.Template.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("100m"),
+						corev1.ResourceMemory: resource.MustParse("100Mi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("500m"),
+						corev1.ResourceMemory: resource.MustParse("500Mi"),
+					},
+				}
 			}),
 		)
 

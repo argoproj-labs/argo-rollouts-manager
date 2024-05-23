@@ -261,6 +261,7 @@ func rolloutsContainer(cr rolloutsmanagerv1alpha1.RolloutManager) corev1.Contain
 				Name:      "tmp",
 			},
 		},
+		Resources: cr.Spec.ControllerResources,
 	}
 
 }
@@ -430,7 +431,9 @@ func normalizeDeployment(inputParam appsv1.Deployment) (appsv1.Deployment, error
 			{
 				Name:      inputVolumeMounts[0].Name,
 				MountPath: inputVolumeMounts[0].MountPath,
-			}},
+			},
+		},
+		Resources: inputContainer.Resources,
 	}}
 
 	return res, nil

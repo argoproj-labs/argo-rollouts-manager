@@ -97,3 +97,24 @@ spec:
       myannotation: "myvalue"
 ```
 
+
+### RolloutManager example with resources requests/limits for the Argo Rollouts controller
+
+You can provide resources requests and limits for the Argo Rollouts controller.
+
+``` yaml
+apiVersion: argoproj.io/v1alpha1
+kind: RolloutManager
+metadata:
+  name: argo-rollout
+  labels:
+    example: with-resources-example
+spec:
+  controllerResources:
+    requests:
+      memory: "64Mi"
+      cpu: "250m"
+    limits:
+      memory: "128Mi"
+      cpu: "500m"
+```
