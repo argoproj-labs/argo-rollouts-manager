@@ -192,6 +192,9 @@ func (r *RolloutManagerReconciler) doesCRDExist(cfg *rest.Config, crdName string
 	}
 	apiResources, err := discoveryClient.ServerResourcesForGroupVersion("monitoring.coreos.com/v1")
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		}
 		return false, err
 	}
 	for _, resource := range apiResources.APIResources {
