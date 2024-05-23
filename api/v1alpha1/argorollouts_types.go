@@ -46,6 +46,9 @@ type RolloutManagerSpec struct {
 
 	// Metadata to apply to the generated resources
 	AdditionalMetadata *ResourceMetadata `json:"additionalMetadata,omitempty"`
+
+	// Resources requests/limits for Argo Rollout controller
+	ControllerResources *corev1.ResourceRequirements `json:"controllerResources,omitempty"`
 }
 
 // ArgoRolloutsNodePlacementSpec is used to specify NodeSelector and Tolerations for Rollouts workloads
