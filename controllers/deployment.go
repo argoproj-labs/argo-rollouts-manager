@@ -249,6 +249,15 @@ func rolloutsContainer(cr rolloutsmanagerv1alpha1.RolloutManager) corev1.Contain
 	// Environment specified in the CR take precedence over everything else
 	rolloutsEnv = envMerge(rolloutsEnv, proxyEnvVars(), false)
 
+	containerResources := cr.Spec.ControllerResources
+	if containerResources == nil {
+		containerResources = &corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{
+				corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+			},
+		}
+	}
+
 	return corev1.Container{
 		Args:            getRolloutsCommandArgs(cr),
 		Env:             rolloutsEnv,
@@ -291,11 +300,6 @@ func rolloutsContainer(cr rolloutsmanagerv1alpha1.RolloutManager) corev1.Contain
 			SuccessThreshold:    int32(1),
 			TimeoutSeconds:      int32(4),
 		},
-		Resources: corev1.ResourceRequirements{
-			Limits: corev1.ResourceList{
-				corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
-			},
-		},
 		SecurityContext: &corev1.SecurityContext{
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{
@@ -319,6 +323,7 @@ func rolloutsContainer(cr rolloutsmanagerv1alpha1.RolloutManager) corev1.Contain
 				Name:      "tmp",
 			},
 		},
+		Resources: *containerResources,
 	}
 
 }

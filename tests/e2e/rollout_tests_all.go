@@ -21,6 +21,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -441,6 +442,43 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 				}
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&service), &service)).To(Succeed())
 				expectMetadataOnObjectMeta(&service.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
+			})
+		})
+
+		When("A RolloutManager specifies controller resources", func() {
+
+			It("should create the controller with the correct resources requests/limits", func() {
+
+				rolloutsManager := rolloutsmanagerv1alpha1.RolloutManager{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "basic-rollouts-manager-with-resources",
+						Namespace: fixture.TestE2ENamespace,
+					},
+					Spec: rolloutsmanagerv1alpha1.RolloutManagerSpec{
+						ControllerResources: &corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("100m"),
+								corev1.ResourceMemory: resource.MustParse("100Mi"),
+							},
+							Limits: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("500m"),
+								corev1.ResourceMemory: resource.MustParse("500Mi"),
+							},
+						},
+						NamespaceScoped: namespaceScopedParam,
+					},
+				}
+
+				Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
+
+				Eventually(rolloutsManager, "1m", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
+
+				deployment := appsv1.Deployment{
+					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rolloutManager.Namespace},
+				}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&deployment), &deployment)).To(Succeed())
+
+				Expect(deployment.Spec.Template.Spec.Containers[0].Resources).To(Equal(*rolloutsManager.Spec.ControllerResources))
 			})
 		})
 	})
