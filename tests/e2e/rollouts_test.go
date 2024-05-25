@@ -10,7 +10,7 @@ import (
 
 	"github.com/argoproj-labs/argo-rollouts-manager/tests/e2e/fixture/k8s"
 	rolloutManagerFixture "github.com/argoproj-labs/argo-rollouts-manager/tests/e2e/fixture/rolloutmanager"
-	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	monitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
