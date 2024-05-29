@@ -105,6 +105,13 @@ func (r *RolloutManagerReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(&rolloutManagerNamespace), &rolloutManagerNamespace); err != nil {
 		if apierrors.IsNotFound(err) { // If Namespace doesn't exist, our work is done
 			reqLogger.Info("Skipping reconciliation of RolloutManager as request Namespace no longer exists")
+
+			// Ensure that any cluster-scoped resources are removed, since the RolloutManager was deleted.
+			if err := r.removeClusterScopedResourcesIfApplicable(ctx); err != nil {
+				reqLogger.Error(err, "unable to remove cluster scoped resources for non-existing Namespace")
+				return ctrl.Result{}, err
+			}
+
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, err // Any other error, return it
@@ -119,8 +126,14 @@ func (r *RolloutManagerReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	rolloutManager := &rolloutsmanagerv1alpha1.RolloutManager{}
 	if err := r.Client.Get(ctx, req.NamespacedName, rolloutManager); err != nil {
 		if apierrors.IsNotFound(err) {
-			// Request object not found, could have been deleted after reconcile request.
-			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
+
+			// The RolloutManager CR has likely been deleted: owned objects are automatically garbage collected.
+			// However, cluster-scoped resources cannot be owned by a namespace-scoped RolloutManager CR, so we must delete them manually.
+			if err := r.removeClusterScopedResourcesIfApplicable(ctx); err != nil {
+				reqLogger.Error(err, "unable to remove cluster scoped resources for non-existing RolloutManager")
+				return ctrl.Result{}, err
+			}
+
 			// Return and don't requeue
 			return reconcile.Result{}, nil
 		}
@@ -171,14 +184,18 @@ func (r *RolloutManagerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Watch for changes to Role sub-resources owned by RolloutManager.
 	bld.Owns(&rbacv1.Role{})
 
-	// Watch for changes to ClusterRole sub-resources owned by RolloutManager.
-	bld.Owns(&rbacv1.ClusterRole{})
-
 	// Watch for changes to RoleBinding sub-resources owned by RolloutManager.
 	bld.Owns(&rbacv1.RoleBinding{})
 
-	// Watch for changes to ClusterRoleBinding sub-resources owned by RolloutManager.
-	bld.Owns(&rbacv1.ClusterRoleBinding{})
+	// We can't use Owns for ClusterRole/ClusterRoleBinding, because namespace-scoped resources like RolloutManager cannot own cluster-scoped resources like ClusterRole/ClusterRoleBinding.
+	// Instead, we watch all ClusterRoles/ClusterRoleBindings with the name DefaultArgoRolloutsResourceName, and when they change, we inform all RolloutManagers
+	bld.Watches(&rbacv1.ClusterRole{}, handler.EnqueueRequestsFromMapFunc(r.enqueueAllRolloutManagers), builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
+		return object.GetName() == DefaultArgoRolloutsResourceName
+	})))
+
+	bld.Watches(&rbacv1.ClusterRoleBinding{}, handler.EnqueueRequestsFromMapFunc(r.enqueueAllRolloutManagers), builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
+		return object.GetName() == DefaultArgoRolloutsResourceName
+	})))
 
 	if crdExists, err := r.doesCRDExist(mgr.GetConfig(), serviceMonitorsCRDName); err != nil {
 		return err
@@ -233,6 +250,27 @@ func (r *RolloutManagerReconciler) queueOtherRolloutManagers(context context.Con
 	}
 
 	return requests
+}
+
+// enqueueAllRolloutManagers lists all RolloutManagers on the cluster, and adds them to the list of resources to be reconciled. This function can be called when it is necessary to inform all RolloutManagers on a cluster of a specific event (for example, the creation/deletion of a cluster-scoped resource)
+func (r *RolloutManagerReconciler) enqueueAllRolloutManagers(ctx context.Context, _ client.Object) []reconcile.Request {
+
+	var rolloutManagerList rolloutsmanagerv1alpha1.RolloutManagerList
+
+	if err := r.Client.List(ctx, &rolloutManagerList); err != nil {
+		log.Error(err, "Unable to list all RolloutManagers in enqueueAllRolloutManagers")
+		return []reconcile.Request{}
+	}
+
+	var res []reconcile.Request
+
+	for idx := range rolloutManagerList.Items {
+		rm := rolloutManagerList.Items[idx]
+		res = append(res, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&rm)})
+	}
+
+	return res
+
 }
 
 // doesCRDExist checks if a CRD is present in the cluster, by using the discovery client.

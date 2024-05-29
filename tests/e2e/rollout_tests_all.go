@@ -84,15 +84,28 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rolloutManager.Namespace},
 				}, "10s", "1s").ShouldNot(k8s.ExistByName(k8sClient))
 
-				By("deleting the role")
-				Eventually(&rbacv1.Role{
-					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rolloutManager.Namespace},
-				}, "10s", "1s").ShouldNot(k8s.ExistByName(k8sClient))
+				if namespaceScopedParam {
+					By("deleting the role")
+					Eventually(&rbacv1.Role{
+						ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rolloutManager.Namespace},
+					}, "10s", "1s").ShouldNot(k8s.ExistByName(k8sClient))
 
-				By("deleting the role binding")
-				Eventually(&rbacv1.RoleBinding{
-					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rolloutManager.Namespace},
-				}, "10s", "1s").ShouldNot(k8s.ExistByName(k8sClient))
+					By("deleting the role binding")
+					Eventually(&rbacv1.RoleBinding{
+						ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rolloutManager.Namespace},
+					}, "10s", "1s").ShouldNot(k8s.ExistByName(k8sClient))
+
+				} else {
+					By("deleting the cluster role")
+					Eventually(&rbacv1.ClusterRole{
+						ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsResourceName},
+					}, "10s", "1s").ShouldNot(k8s.ExistByName(k8sClient))
+
+					By("deleting the cluster role binding")
+					Eventually(&rbacv1.ClusterRoleBinding{
+						ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsResourceName},
+					}, "10s", "1s").ShouldNot(k8s.ExistByName(k8sClient))
+				}
 
 				By("deleting the deployment")
 				Eventually(&appsv1.Deployment{
