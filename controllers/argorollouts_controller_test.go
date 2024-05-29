@@ -465,6 +465,77 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 			validateArgoRolloutManagerResources(rm2, r2.Client, true)
 		})
 	})
+
+	When("a RolloutManager is deleted in a namespace", func() {
+
+		DescribeTable("we should delete the ClusterRoles/ClusterRoleBindings that exist, both when the rolloutmanager no longer exists and when the namespace of the rolloutmanager no longer exists", func(namespaceofRolloutManagerStillExists bool) {
+
+			By("creating default cluster-scoped ClusterRole/ClusterRoleBinding. These should be deleted by the call to removeClusterScopedResourcesIfApplicable")
+			clusterRole := &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: DefaultArgoRolloutsResourceName,
+				},
+			}
+			clusterRoleBinding := &rbacv1.ClusterRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: DefaultArgoRolloutsResourceName,
+				},
+			}
+			r := makeTestReconciler(clusterRole, clusterRoleBinding)
+
+			nsName := "namespace"
+
+			if namespaceofRolloutManagerStillExists {
+				createNamespace(r, nsName)
+			}
+
+			req := reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      "rm-that-no-longer-exists",
+					Namespace: nsName,
+				},
+			}
+
+			res, err := r.Reconcile(ctx, req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(res.Requeue).Should(BeFalse(), "reconcile should not requeue request")
+
+			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(clusterRoleBinding), clusterRoleBinding)).ToNot(Succeed(), "should have been deleted by Reconcile call")
+			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(clusterRole), clusterRole)).ToNot(Succeed(), "should have been deleted by Reconcile call")
+		},
+			Entry("namespace containing RolloutManager still exists", true),
+			Entry("namespace doesn't exist", false))
+	})
+
+	When("enqueueAllRolloutManagers is called", func() {
+		It("should locate all other RolloutManagers on the cluster and return them", func() {
+
+			r := makeTestReconciler()
+
+			Expect(r.enqueueAllRolloutManagers(ctx, nil)).To(HaveLen(0), "when no rollouts exist, the slice should be empty")
+
+			ns1 := "namespace1"
+			ns2 := "namespace2"
+			Expect(createNamespace(r, ns1)).To(Succeed())
+			Expect(createNamespace(r, ns2)).To(Succeed())
+
+			rm1 := makeTestRolloutManager(func(rm *rolloutsmanagerv1alpha1.RolloutManager) {
+				rm.Namespace = ns1
+				rm.Name = "rm-in-" + ns1
+				rm.Spec.NamespaceScoped = true
+			})
+			Expect(r.Client.Create(context.Background(), rm1)).To(Succeed())
+			rm2 := makeTestRolloutManager(func(rm *rolloutsmanagerv1alpha1.RolloutManager) {
+				rm.Namespace = ns2
+				rm.Name = "rm-in-" + ns2
+				rm.Spec.NamespaceScoped = false
+			})
+			Expect(r.Client.Create(context.Background(), rm2)).To(Succeed())
+
+			Expect(r.enqueueAllRolloutManagers(ctx, nil)).To(
+				Equal([]reconcile.Request{{NamespacedName: types.NamespacedName{Namespace: rm1.Namespace, Name: rm1.Name}}, {NamespacedName: types.NamespacedName{Namespace: rm2.Namespace, Name: rm2.Name}}}), "slice should contain both rollout managers we created")
+		})
+	})
 })
 
 func validateArgoRolloutManagerResources(rolloutsManager *rolloutsmanagerv1alpha1.RolloutManager, k8sClient client.Client, namespaceScoped bool) {
