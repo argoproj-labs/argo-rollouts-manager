@@ -38,7 +38,7 @@ var _ = Describe("Deployment Test", func() {
 
 	It("should create a new deployment if it does not exist", func() {
 
-		By("calling reconcileRolloutsDeployment")
+		By("calling reconcileRolloutsDeployment to create the initial set of rollout resources")
 		Expect(r.reconcileRolloutsDeployment(ctx, a, *sa)).To(Succeed())
 
 		By("fetch the Deployment")
@@ -64,6 +64,9 @@ var _ = Describe("Deployment Test", func() {
 		By("create a new Deployment with custom values")
 		existingDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, "test-resource-name", "tmp-test", "linux-test", sa.Name, a)
 
+		existingDeployment.Labels["new-label"] = "new-label-value"
+		existingDeployment.Annotations["new-annotation"] = "new-annotation-value"
+
 		Expect(r.Client.Create(ctx, existingDeployment)).To(Succeed())
 
 		By("calling reconcileRolloutsDeployment")
@@ -77,7 +80,13 @@ var _ = Describe("Deployment Test", func() {
 
 		By("verify that the Deployment has been reconciled back to default values")
 		Expect(fetchedDeployment.Name).To(Equal(expectedDeployment.Name))
-		Expect(fetchedDeployment.Labels).To(Equal(expectedDeployment.Labels))
+		for k, v := range expectedDeployment.Labels {
+			Expect(fetchedDeployment.Labels).To(HaveKeyWithValue(k, v), "operator-added labels should still be present")
+		}
+
+		Expect(fetchedDeployment.Labels).To(HaveKeyWithValue("new-label", "new-label-value"), "user label should still be present")
+		Expect(fetchedDeployment.Annotations).To(HaveKeyWithValue("new-annotation", "new-annotation-value"), "user annotation should still be present")
+
 		Expect(fetchedDeployment.Spec.Template.Spec.ServiceAccountName).To(Equal(expectedDeployment.Spec.Template.Spec.ServiceAccountName))
 		Expect(fetchedDeployment.Spec.Template.Labels).To(Equal(expectedDeployment.Spec.Template.Labels))
 		Expect(fetchedDeployment.Spec.Selector).To(Equal(expectedDeployment.Spec.Selector))
@@ -95,7 +104,7 @@ var _ = Describe("Deployment Test", func() {
 			Expect(identifyDeploymentDifference(*expectedDeployment, *expectedDeployment)).To(Equal(""))
 
 			expectedDeployment = deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, "tmp", "linux", DefaultArgoRolloutsResourceName, a)
-			expectedDeploymentNormalized, err := normalizeDeployment(*expectedDeployment)
+			expectedDeploymentNormalized, err := normalizeDeployment(*expectedDeployment, a)
 			Expect(err).To(Succeed())
 
 			Expect(identifyDeploymentDifference(expectedDeploymentNormalized, *expectedDeployment)).To(Equal(""))
@@ -105,11 +114,43 @@ var _ = Describe("Deployment Test", func() {
 		})
 	})
 
+	When("normalizeDeployment is called with a Deployment containing additional, user-defined labels/annotations", func() {
+
+		It("should ensure the user-defiend labels/annotations are be removed by called to normalizeDeployment, while preserving the values contributed by the operation", func() {
+
+			originalDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, "tmp", "linux", DefaultArgoRolloutsResourceName, a)
+
+			By("creating a new object with user added labels/annotations")
+			new := originalDeployment.DeepCopy()
+
+			new.Annotations["newAnnotation"] = "newAnnotationValue"
+			Expect(identifyDeploymentDifference(*originalDeployment, *new)).To(Equal("Annotations"), "identifyDeploymentDifference should correctly identify that the annotations value has changed")
+
+			new.Labels["newLabel"] = "newLabelValue"
+			Expect(identifyDeploymentDifference(*originalDeployment, *new)).To(Equal("Labels"), "identifyDeploymentDifference should correctly identify that the labels value has changed")
+
+			By("calling normalizeDeployment on the object with user defined values")
+			res, err := normalizeDeployment(*new, a)
+			Expect(err).To(BeNil())
+
+			Expect(res.Labels).ToNot(HaveKey("newLabel"), "user label should not be present")
+			Expect(res.Annotations).ToNot(HaveKey("newAnnotation"), "user annotation should not be present")
+			for k := range originalDeployment.Annotations {
+				Expect(res.Annotations).To(HaveKey(k), "default operator annotations should still be present")
+			}
+			for k := range originalDeployment.Labels {
+				Expect(res.Labels).To(HaveKey(k), "default operator labels should still be present")
+			}
+
+		})
+	})
+
 	When("the Rollouts Deployment resource is changed by the user, outside of the operator", func() {
 
-		areEqual := func(x appsv1.Deployment, y appsv1.Deployment) bool {
-			xRes, xErr := normalizeDeployment(x)
-			yRes, yErr := normalizeDeployment(y)
+		areEqual := func(x appsv1.Deployment, y appsv1.Deployment, rm v1alpha1.RolloutManager) bool {
+
+			xRes, xErr := normalizeDeployment(x, rm)
+			yRes, yErr := normalizeDeployment(y, rm)
 
 			if fmt.Sprintf("%v", xErr) != fmt.Sprintf("%v", yErr) {
 				return false
@@ -119,7 +160,7 @@ var _ = Describe("Deployment Test", func() {
 
 			// Sanity test that identifyDeploymentDifference gives the same result as reflect.DeepEqual
 			deploymentDiff := identifyDeploymentDifference(x, y)
-			Expect(res == (deploymentDiff == "")).To(BeTrue())
+			ExpectWithOffset(0, res == (deploymentDiff == "")).To(BeTrue())
 
 			return res
 		}
@@ -145,7 +186,7 @@ var _ = Describe("Deployment Test", func() {
 				Expect(r.reconcileRolloutsDeployment(context.Background(), a, *sa)).To(Succeed())
 				Expect(r.Client.Get(context.Background(), client.ObjectKeyFromObject(&expectedDepl), &expectedDepl)).To(Succeed())
 				updatedDepl := expectedDepl.DeepCopy()
-				Expect(areEqual(*updatedDepl, expectedDepl)).To(BeTrue(), "copy should be same as original")
+				Expect(areEqual(*updatedDepl, expectedDepl, a)).To(BeTrue(), "copy should be same as original")
 
 				By("updating the Deployment using the function, and then updating the cluster resource")
 				fxn(updatedDepl)
@@ -156,9 +197,9 @@ var _ = Describe("Deployment Test", func() {
 					ObjectMeta: metav1.ObjectMeta{Name: DefaultArgoRolloutsResourceName, Namespace: a.Namespace},
 				}
 				Expect(r.Client.Get(context.Background(), client.ObjectKeyFromObject(&updatedDeplFromClient), &updatedDeplFromClient)).To(Succeed())
-				Expect(areEqual(*updatedDepl, updatedDeplFromClient)).To(BeTrue(), "resource on cluster should match the resource we called Update with")
+				Expect(areEqual(*updatedDepl, updatedDeplFromClient, a)).To(BeTrue(), "resource on cluster should match the resource we called Update with")
 
-				Expect(areEqual(updatedDeplFromClient, expectedDepl)).ToNot(BeTrue(), "resource on cluster should NOT match the original Deployment that was created by the call to reconcileRolloutsDeployment")
+				Expect(areEqual(updatedDeplFromClient, expectedDepl, a)).ToNot(BeTrue(), "resource on cluster should NOT match the original Deployment that was created by the call to reconcileRolloutsDeployment")
 
 				By("calling reconcileRolloutsDeployment again, it should revert the change back to default")
 				Expect(r.reconcileRolloutsDeployment(context.Background(), a, *sa)).To(Succeed())
@@ -169,14 +210,11 @@ var _ = Describe("Deployment Test", func() {
 
 				By("retrieving the Deployment version from the cluster")
 				Expect(r.Client.Get(context.Background(), client.ObjectKeyFromObject(&finalDeplFromClient), &finalDeplFromClient)).To(Succeed())
-				Expect(areEqual(finalDeplFromClient, expectedDepl)).To(BeTrue(), "version from cluster should have been reconciled back to the default")
+				Expect(areEqual(finalDeplFromClient, expectedDepl, a)).To(BeTrue(), "version from cluster should have been reconciled back to the default")
 
 			}
 
 		},
-			Entry("label", func(deployment *appsv1.Deployment) {
-				deployment.ObjectMeta.Labels = map[string]string{"my": "label"}
-			}),
 			Entry("spec.selector", func(deployment *appsv1.Deployment) {
 				deployment.Spec.Selector = &metav1.LabelSelector{
 					MatchLabels: map[string]string{"my": "label"},
@@ -223,7 +261,7 @@ func deploymentCR(name string, namespace string, label string, volumeName string
 			Namespace: namespace,
 		},
 	}
-	setRolloutsLabelsAndAnnotationsToObject(&deploymentCR.ObjectMeta, &rolloutManager)
+	setRolloutsLabelsAndAnnotationsToObject(&deploymentCR.ObjectMeta, rolloutManager)
 	deploymentCR.Spec = appsv1.DeploymentSpec{
 		Selector: &metav1.LabelSelector{
 			MatchLabels: map[string]string{

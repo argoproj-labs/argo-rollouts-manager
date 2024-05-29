@@ -302,6 +302,73 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 			})
 		})
 
+		When("a label or annotation is added to Rollout's Deployment after the Deployment has been created", func() {
+
+			It("should not ovewrite the label/annotation with operator labels/annotations, and should instead merge them", func() {
+
+				By("creating default RolloutManager")
+				Expect(k8sClient.Create(ctx, &rolloutManager)).To(Succeed())
+				Eventually(rolloutManager, "1m", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
+
+				deployment := appsv1.Deployment{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      controllers.DefaultArgoRolloutsResourceName,
+						Namespace: rolloutManager.Namespace,
+					},
+				}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&deployment), &deployment)).To(Succeed())
+
+				deploymentExistingLabels := deployment.DeepCopy().GetLabels()
+				deploymentExistingAnnotations := deployment.DeepCopy().GetAnnotations()
+
+				By("updating the default Rollouts deployment with new labels")
+
+				Expect(k8s.UpdateWithoutConflict(ctx, &deployment, k8sClient, func(o client.Object) {
+
+					annots := o.GetAnnotations()
+					annots["new-annotation"] = "new-annotation-value"
+					o.SetAnnotations(annots)
+
+					labels := o.GetLabels()
+					labels["new-label"] = "new-label-value"
+					o.SetLabels(labels)
+
+				})).To(Succeed())
+
+				Consistently(&deployment, "10s", "1s").Should(k8s.HaveLabel("new-label", "new-label-value", k8sClient), "user labels should still be present")
+				Consistently(&deployment, "10s", "1s").Should(k8s.HaveAnnotation("new-annotation", "new-annotation-value", k8sClient), "user labels should still be present")
+
+				for k, v := range deploymentExistingLabels {
+					Expect(&deployment).To(k8s.HaveLabel(k, v, k8sClient), "operator labels should also still be present")
+				}
+				for k, v := range deploymentExistingAnnotations {
+					Expect(&deployment).To(k8s.HaveAnnotation(k, v, k8sClient), "operator labels should also still be present")
+				}
+
+				By("removing the used-defined labels from the Deployment")
+
+				Expect(k8s.UpdateWithoutConflict(ctx, &deployment, k8sClient, func(o client.Object) {
+
+					annots := o.GetAnnotations()
+					delete(annots, "new-annotation")
+					o.SetAnnotations(annots)
+
+					labels := o.GetLabels()
+					delete(labels, "new-label")
+					o.SetLabels(labels)
+
+				})).To(Succeed())
+
+				for k, v := range deploymentExistingLabels {
+					Consistently(&deployment, "5s", "1s").Should(k8s.HaveLabel(k, v, k8sClient), "operator labels should also still be present")
+				}
+				for k, v := range deploymentExistingAnnotations {
+					Consistently(&deployment, "5s", "1s").Should(k8s.HaveAnnotation(k, v, k8sClient), "operator annotations should also still be present")
+				}
+
+			})
+		})
+
 		When("A RolloutManager specifies metadata", func() {
 
 			It("should create the controller with the correct labels and annotations", func() {
