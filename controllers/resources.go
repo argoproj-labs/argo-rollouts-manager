@@ -26,7 +26,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsServiceAccount(ctx context.C
 			Namespace: cr.Namespace,
 		},
 	}
-	setRolloutsLabelsAndAnnotationsToObject(&sa.ObjectMeta, &cr)
+	setRolloutsLabelsAndAnnotationsToObject(&sa.ObjectMeta, cr)
 
 	if err := fetchObject(ctx, r.Client, cr.Namespace, sa.Name, sa); err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -58,7 +58,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRole(ctx context.Context, cr
 			Namespace: cr.Namespace,
 		},
 	}
-	setRolloutsLabelsAndAnnotationsToObject(&role.ObjectMeta, &cr)
+	setRolloutsLabelsAndAnnotationsToObject(&role.ObjectMeta, cr)
 
 	if err := fetchObject(ctx, r.Client, cr.Namespace, role.Name, role); err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -94,7 +94,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsClusterRole(ctx context.Cont
 			Name: DefaultArgoRolloutsResourceName,
 		},
 	}
-	setRolloutsLabelsAndAnnotationsToObject(&clusterRole.ObjectMeta, &cr)
+	setRolloutsLabelsAndAnnotationsToObject(&clusterRole.ObjectMeta, cr)
 
 	if err := fetchObject(ctx, r.Client, "", clusterRole.Name, clusterRole); err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -133,7 +133,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRoleBinding(ctx context.Cont
 			Namespace: cr.Namespace,
 		},
 	}
-	setRolloutsLabelsAndAnnotationsToObject(&expectedRoleBinding.ObjectMeta, &cr)
+	setRolloutsLabelsAndAnnotationsToObject(&expectedRoleBinding.ObjectMeta, cr)
 
 	expectedRoleBinding.RoleRef = rbacv1.RoleRef{
 		APIGroup: rbacv1.GroupName,
@@ -193,7 +193,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsClusterRoleBinding(ctx conte
 			Name: DefaultArgoRolloutsResourceName,
 		},
 	}
-	setRolloutsLabelsAndAnnotationsToObject(&expectedClusterRoleBinding.ObjectMeta, &cr)
+	setRolloutsLabelsAndAnnotationsToObject(&expectedClusterRoleBinding.ObjectMeta, cr)
 
 	expectedClusterRoleBinding.RoleRef = rbacv1.RoleRef{
 		APIGroup: rbacv1.GroupName,
@@ -295,7 +295,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToAdminClusterRole(
 		},
 	}
 	setRolloutsAggregatedClusterRoleLabels(&clusterRole.ObjectMeta, name, aggregationType)
-	setAdditionalRolloutsLabelsAndAnnotationsToObject(&clusterRole.ObjectMeta, &cr)
+	setAdditionalRolloutsLabelsAndAnnotationsToObject(&clusterRole.ObjectMeta, cr)
 
 	if err := fetchObject(ctx, r.Client, "", clusterRole.Name, clusterRole); err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -331,7 +331,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToEditClusterRole(c
 		},
 	}
 	setRolloutsAggregatedClusterRoleLabels(&clusterRole.ObjectMeta, name, aggregationType)
-	setAdditionalRolloutsLabelsAndAnnotationsToObject(&clusterRole.ObjectMeta, &cr)
+	setAdditionalRolloutsLabelsAndAnnotationsToObject(&clusterRole.ObjectMeta, cr)
 
 	if err := fetchObject(ctx, r.Client, "", clusterRole.Name, clusterRole); err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -367,7 +367,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToViewClusterRole(c
 		},
 	}
 	setRolloutsAggregatedClusterRoleLabels(&clusterRole.ObjectMeta, name, aggregationType)
-	setAdditionalRolloutsLabelsAndAnnotationsToObject(&clusterRole.ObjectMeta, &cr)
+	setAdditionalRolloutsLabelsAndAnnotationsToObject(&clusterRole.ObjectMeta, cr)
 
 	if err := fetchObject(ctx, r.Client, "", clusterRole.Name, clusterRole); err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -398,7 +398,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.C
 			Namespace: cr.Namespace,
 		},
 	}
-	setRolloutsLabelsAndAnnotationsToObject(&expectedSvc.ObjectMeta, &cr)
+	setRolloutsLabelsAndAnnotationsToObject(&expectedSvc.ObjectMeta, cr)
 	// overwrite the annotations for Rollouts Metrics Service
 	expectedSvc.ObjectMeta.Labels["app.kubernetes.io/name"] = DefaultArgoRolloutsMetricsServiceName
 	expectedSvc.ObjectMeta.Labels["app.kubernetes.io/component"] = "server"
@@ -512,7 +512,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsSecrets(ctx context.Context,
 		Type: corev1.SecretTypeOpaque,
 	}
 
-	setRolloutsLabelsAndAnnotationsToObject(&secret.ObjectMeta, &cr)
+	setRolloutsLabelsAndAnnotationsToObject(&secret.ObjectMeta, cr)
 
 	if err := fetchObject(ctx, r.Client, cr.Namespace, secret.Name, secret); err != nil {
 		if !apierrors.IsNotFound(err) {

@@ -30,14 +30,14 @@ type pluginItem struct {
 	Sha256   string `json:"sha256" yaml:"sha256"`
 }
 
-func setRolloutsLabelsAndAnnotationsToObject(obj *metav1.ObjectMeta, cr *rolloutsmanagerv1alpha1.RolloutManager) {
+func setRolloutsLabelsAndAnnotationsToObject(obj *metav1.ObjectMeta, cr rolloutsmanagerv1alpha1.RolloutManager) {
 
 	setRolloutsLabelsAndAnnotations(obj)
 
 	setAdditionalRolloutsLabelsAndAnnotationsToObject(obj, cr)
 }
 
-func setAdditionalRolloutsLabelsAndAnnotationsToObject(obj *metav1.ObjectMeta, cr *rolloutsmanagerv1alpha1.RolloutManager) {
+func setAdditionalRolloutsLabelsAndAnnotationsToObject(obj *metav1.ObjectMeta, cr rolloutsmanagerv1alpha1.RolloutManager) {
 
 	if cr.Spec.AdditionalMetadata != nil {
 		if obj.Labels == nil {
@@ -83,6 +83,28 @@ func appendStringMap(src map[string]string, add map[string]string) map[string]st
 		res[key] = val
 	}
 	return res
+}
+
+// combineStringMaps will combine multiple maps: maps defined earlier in the 'maps' slice may have their values overriden by maps defined later in the 'maps' slice.
+func combineStringMaps(maps ...map[string]string) map[string]string {
+
+	if maps == nil {
+		return nil
+	}
+
+	res := make(map[string]string, 0)
+	for idx := range maps {
+		currMap := maps[idx]
+		if currMap == nil {
+			continue
+		}
+		for k, v := range maps[idx] {
+			res[k] = v
+		}
+	}
+
+	return res
+
 }
 
 // Merges two slices of EnvVar entries into a single one. If existing
