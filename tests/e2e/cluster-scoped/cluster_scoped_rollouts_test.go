@@ -266,5 +266,48 @@ var _ = Describe("Cluster-scoped RolloutManager tests", func() {
 			By("1st RM: Create and validate Rollout in 3rd namespace.")
 			utils.ValidateArgoRolloutsResources(ctx, k8sClient, nsName2, 31002, 32002)
 		})
+
+		It("After creating 2 cluster-scoped RolloutManager in a namespace, delete 1st RolloutManager and verify it removes the Failed status of 2nd RolloutManager", func() {
+			By("1st RM: Create cluster-scoped RolloutManager in a namespace.")
+			rolloutsManagerCl, err := utils.CreateRolloutManager(ctx, k8sClient, "test-rollouts-manager-1", fixture.TestE2ENamespace, false)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("1st RM: Verify that RolloutManager is successfully created.")
+			Eventually(rolloutsManagerCl, "1m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseAvailable))
+
+			By("1st RM: Verify that Status.Condition is having success condition.")
+			Eventually(rolloutsManagerCl, "1m", "1s").Should(rmFixture.HaveSuccessCondition())
+
+			By("2nd RM: Create cluster-scoped RolloutManager in a namespace.")
+			rolloutsManagerCl2, err := utils.CreateRolloutManager(ctx, k8sClient, "test-rollouts-manager-2", fixture.TestE2ENamespace, false)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("2nd RM: Verify that RolloutManager is not working.")
+			Eventually(rolloutsManagerCl2, "1m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseFailure))
+
+			By("1st RM: Verify that Status.Condition is now having error message.")
+			Eventually(rolloutsManagerCl, "3m", "1s").Should(rmFixture.HaveCondition(
+				metav1.Condition{
+					Type:    rmv1alpha1.RolloutManagerConditionType,
+					Status:  metav1.ConditionFalse,
+					Reason:  rmv1alpha1.RolloutManagerReasonMultipleClusterScopedRolloutManager,
+					Message: controllers.UnsupportedRolloutManagerConfiguration,
+				}))
+
+			By("2nd RM: Verify that Status.Condition is now having error message.")
+			Eventually(rolloutsManagerCl2, "3m", "1s").Should(rmFixture.HaveCondition(
+				metav1.Condition{
+					Type:    rmv1alpha1.RolloutManagerConditionType,
+					Status:  metav1.ConditionFalse,
+					Reason:  rmv1alpha1.RolloutManagerReasonMultipleClusterScopedRolloutManager,
+					Message: controllers.UnsupportedRolloutManagerConfiguration,
+				}))
+
+			By("1st RM: Delete first RolloutManager.")
+			Expect(k8sClient.Delete(ctx, &rolloutsManagerCl)).To(Succeed())
+
+			By("2nd RM: Verify that Status.Condition is having success condition.")
+			Eventually(rolloutsManagerCl2, "1m", "1s").Should(rmFixture.HaveSuccessCondition())
+		})
 	})
 })
