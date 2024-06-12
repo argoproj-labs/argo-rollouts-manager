@@ -233,6 +233,22 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 				rm.Status.Conditions[0].Reason == rolloutsmanagerv1alpha1.RolloutManagerReasonMultipleClusterScopedRolloutManager &&
 				rm.Status.Conditions[0].Message == UnsupportedRolloutManagerConfiguration &&
 				rm.Status.Conditions[0].Status == metav1.ConditionFalse).To(BeTrue())
+
+			By("1st RM: Delete 1st RolloutManager")
+			Expect(r.Client.Delete(ctx, rm)).To(Succeed())
+			Expect(r.Client.Get(ctx, types.NamespacedName{Name: rm.Name, Namespace: rm.Namespace}, rm)).ToNot(Succeed())
+
+			By("2nd RM: Reconcile 2nd RolloutManager's once again and check whether it has removed failed condition.")
+			res2, err = r.Reconcile(ctx, req2)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(res2.Requeue).Should(BeFalse(), "reconcile should not requeue request")
+
+			By("2nd RM: Check if RolloutManager's Status.Conditions are set.")
+			Expect(r.Client.Get(ctx, types.NamespacedName{Name: rm2.Name, Namespace: rm2.Namespace}, rm2)).To(Succeed())
+			Expect(rm2.Status.Conditions[0].Type == rolloutsmanagerv1alpha1.RolloutManagerConditionType &&
+				rm2.Status.Conditions[0].Reason == rolloutsmanagerv1alpha1.RolloutManagerReasonSuccess &&
+				rm2.Status.Conditions[0].Message == "" &&
+				rm2.Status.Conditions[0].Status == metav1.ConditionTrue).To(BeTrue())
 		})
 	})
 

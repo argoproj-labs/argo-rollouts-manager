@@ -111,30 +111,41 @@ func (r *RolloutManagerReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}
 
-	// Next, fetch and reconcile the RolloutManager instance
-	rolloutManager := &rolloutsmanagerv1alpha1.RolloutManager{}
-	if err := r.Client.Get(ctx, req.NamespacedName, rolloutManager); err != nil {
-		if apierrors.IsNotFound(err) {
-			// Request object not found, could have been deleted after reconcile request.
-			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
-			// Return and don't requeue
-			return reconcile.Result{}, nil
+	// Fetch all RolloutManager instances in the namespace
+	rolloutsmanagerList := rolloutsmanagerv1alpha1.RolloutManagerList{}
+	if err := r.List(ctx, &rolloutsmanagerList, &client.ListOptions{Namespace: req.Namespace}); err != nil {
+		reqLogger.Error(err, "Failed to list RolloutManager instances")
+		return ctrl.Result{}, err
+	}
+
+	// Iterate through the list and reconcile each RolloutManager instance
+	for idx := range rolloutsmanagerList.Items {
+		rolloutManager := rolloutsmanagerList.Items[idx]
+		// Fetch the RolloutManager instance
+		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(&rolloutManager), &rolloutManager); err != nil {
+			if apierrors.IsNotFound(err) {
+				// Request object not found, could have been deleted after reconcile request.
+				// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
+				// Return and don't requeue
+				return reconcile.Result{}, nil
+			}
+			// Error reading the object - requeue the request.
+			return reconcile.Result{}, err
 		}
-		// Error reading the object - requeue the request.
-		return reconcile.Result{}, err
-	}
 
-	res, reconcileErr := r.reconcileRolloutsManager(ctx, *rolloutManager)
+		// Reconcile the RolloutManager instance
+		res, reconcileErr := r.reconcileRolloutsManager(ctx, rolloutManager)
 
-	// Set the condition/phase on the RolloutManager status  (before we check the error from reconcileRolloutManager, below)
-	if err := updateStatusConditionOfRolloutManager(ctx, res, rolloutManager, r.Client, log); err != nil {
-		log.Error(err, "unable to update status of RolloutManager")
-		return reconcile.Result{}, err
-	}
+		// Set the condition/phase on the RolloutManager status
+		if err := updateStatusConditionOfRolloutManager(ctx, res, &rolloutManager, r.Client, log); err != nil {
+			log.Error(err, "Unable to update status of RolloutManager")
+			return reconcile.Result{}, err
+		}
 
-	// Next return the reconcileErr if applicable
-	if reconcileErr != nil {
-		return reconcile.Result{}, reconcileErr
+		// Check the reconcileErr and handle it
+		if reconcileErr != nil {
+			return reconcile.Result{}, reconcileErr
+		}
 	}
 
 	return reconcile.Result{}, nil
