@@ -43,7 +43,7 @@ spec:
     spec:
       containers:
         # based on docker.io/kostiscodefresh/gitops-canary-app:v1.0
-		# mirrored to jgwest-redhat
+        # mirrored to jgwest-redhat
       - image: quay.io/jgwest-redhat/gitops-canary-app@sha256:4fdd3483fa119b413aa9e3c4459bfa2be399c0741ab7565d2a716e362fc1aa41
         name: webserver-simple
         ports:
