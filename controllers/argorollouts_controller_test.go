@@ -486,7 +486,7 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 			nsName := "namespace"
 
 			if namespaceofRolloutManagerStillExists {
-				createNamespace(r, nsName)
+				Expect(createNamespace(r, nsName)).To(Succeed())
 			}
 
 			req := reconcile.Request{
