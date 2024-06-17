@@ -407,7 +407,7 @@ func validateDeployment(ctx context.Context, k8sClient client.Client, rolloutsMa
 	Expect(depl.Spec.Selector.MatchLabels).To(HaveKeyWithValue(controllers.DefaultRolloutsSelectorKey, controllers.DefaultArgoRolloutsResourceName))
 
 	By("Verify that Deployment has correct Strategy")
-	Expect(depl.Spec.Strategy).To(Equal(appsv1.DeploymentStrategy{Type: appsv1.RollingUpdateDeploymentStrategyType}))
+	Expect(depl.Spec.Strategy.Type).To(Equal(appsv1.RollingUpdateDeploymentStrategyType))
 
 	By("Verify that Deployment Template has correct template Labels and AdditionalMetadata")
 	Expect(depl.Spec.Template.Labels).To(HaveKeyWithValue(controllers.DefaultRolloutsSelectorKey, controllers.DefaultArgoRolloutsResourceName))

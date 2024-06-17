@@ -150,6 +150,11 @@ func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(ctx context.Conte
 			return r.createNewRolloutsDeployment(ctx, cr, desiredDeployment)
 		}
 
+		if deploymentsDifferent == "" {
+			log.Error(fmt.Errorf("warning: a difference was detected by DeepEqual, but not by identifyDeploymentDifference"), "")
+			// this error is a warning, only. Continue.
+		}
+
 		actualDeployment.Spec.Strategy = desiredDeployment.Spec.Strategy
 		actualDeployment.Spec.Template.Spec.Containers = desiredDeployment.Spec.Template.Spec.Containers
 		actualDeployment.Spec.Template.Spec.ServiceAccountName = desiredDeployment.Spec.Template.Spec.ServiceAccountName
@@ -193,6 +198,10 @@ func identifyDeploymentDifference(x appsv1.Deployment, y appsv1.Deployment) stri
 
 	if !reflect.DeepEqual(x.Spec.Strategy, y.Spec.Strategy) {
 		return ".Spec.Strategy"
+	}
+
+	if !reflect.DeepEqual(x.Annotations, y.Annotations) {
+		return "Annotations"
 	}
 
 	if !reflect.DeepEqual(x.Labels, y.Labels) {
@@ -392,7 +401,10 @@ func normalizeDeployment(inputParam appsv1.Deployment, cr rolloutsmanagerv1alpha
 				Volumes: []corev1.Volume{inputSpecVolumes[0], inputSpecVolumes[1]},
 			},
 		},
-		Strategy: input.Spec.Strategy,
+		Strategy: appsv1.DeploymentStrategy{
+			Type: input.Spec.Strategy.Type,
+			// we ignore the default values set in RollingUpdate:
+		},
 	}
 
 	if len(input.Spec.Template.Spec.Containers) != 1 {
