@@ -624,6 +624,8 @@ func GetPolicyRules() []rbacv1.PolicyRule {
 				"get",
 				"list",
 				"watch",
+				"update",
+				"patch",
 			},
 		},
 		{
@@ -843,6 +845,7 @@ func GetPolicyRules() []rbacv1.PolicyRule {
 		{
 			APIGroups: []string{
 				"traefik.containo.us",
+				"traefik.io",
 			},
 			Resources: []string{
 				"traefikservices",
