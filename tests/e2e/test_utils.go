@@ -391,7 +391,7 @@ func validateDeployment(ctx context.Context, k8sClient client.Client, rolloutsMa
 	}
 	Eventually(&depl, "10s", "1s").Should(k8s.ExistByName(k8sClient))
 
-	By("Verify that Deployment replica is in Ready state.")
+	By("Verify that Deployment replica is in Ready state")
 	Eventually(func() bool {
 		if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(&depl), &depl); err != nil {
 			return false
@@ -399,27 +399,44 @@ func validateDeployment(ctx context.Context, k8sClient client.Client, rolloutsMa
 		return depl.Status.ReadyReplicas == 1
 	}, "3m", "1s").Should(BeTrue())
 
-	By("Verify that Deployment has correct labels and annotations.")
+	By("Verify that Deployment has correct labels and annotations")
 	validateLabels(&depl.ObjectMeta)
 	expectMetadataOnObjectMeta(&depl.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
 
-	By("Verify that Deployment has correct Selector.")
+	By("Verify that Deployment has correct Selector")
 	Expect(depl.Spec.Selector.MatchLabels).To(HaveKeyWithValue(controllers.DefaultRolloutsSelectorKey, controllers.DefaultArgoRolloutsResourceName))
 
-	By("Verify that Deployment Template has correct Template.")
+	By("Verify that Deployment has correct Strategy")
+	Expect(depl.Spec.Strategy).To(Equal(appsv1.DeploymentStrategy{Type: appsv1.RollingUpdateDeploymentStrategyType}))
+
+	By("Verify that Deployment Template has correct template Labels and AdditionalMetadata")
 	Expect(depl.Spec.Template.Labels).To(HaveKeyWithValue(controllers.DefaultRolloutsSelectorKey, controllers.DefaultArgoRolloutsResourceName))
 	expectMetadataOnObjectMeta(&depl.Spec.Template.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
 
-	By("Verify that Deployment Template has correct NodeSelector.")
+	By("Verify that Deployment Template has correct NodeSelector")
 	Expect(depl.Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"kubernetes.io/os": "linux"}))
 
-	By("Verify that Deployment Template has correct SecurityContext.")
+	By("Verify that Deployment Template has correct SecurityContext")
 	Expect(*depl.Spec.Template.Spec.SecurityContext.RunAsNonRoot).To(BeTrue())
 
-	By("Verify that Deployment Template has correct ServiceAccountName.")
+	By("Verify that Deployment Template has correct ServiceAccountName")
 	Expect(depl.Spec.Template.Spec.ServiceAccountName).To(Equal(controllers.DefaultArgoRolloutsResourceName))
 
-	By("Verify that Deployment Template Container is not empty.")
+	By("Verify that Deployment Template has correct Volumes")
+	Expect(depl.Spec.Template.Spec.Volumes).To(Equal([]corev1.Volume{{
+		Name: "plugin-bin",
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		},
+	},
+		{
+			Name: "tmp",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		}}))
+
+	By("Verify that Deployment Template Container is not empty")
 	Expect(depl.Spec.Template.Spec.Containers[0]).ToNot(Equal(corev1.Container{}))
 }
 

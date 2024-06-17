@@ -10,6 +10,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -57,6 +58,9 @@ func generateDesiredRolloutsDeployment(cr rolloutsmanagerv1alpha1.RolloutManager
 				},
 			},
 		},
+		Strategy: appsv1.DeploymentStrategy{
+			Type: appsv1.RollingUpdateDeploymentStrategyType,
+		},
 	}
 
 	if cr.Spec.NodePlacement != nil {
@@ -80,7 +84,16 @@ func generateDesiredRolloutsDeployment(cr rolloutsmanagerv1alpha1.RolloutManager
 
 	desiredPodSpec.Volumes = []corev1.Volume{
 		{
+			Name: "plugin-bin",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+		{
 			Name: "tmp",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
 		},
 	}
 
@@ -137,6 +150,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(ctx context.Conte
 			return r.createNewRolloutsDeployment(ctx, cr, desiredDeployment)
 		}
 
+		actualDeployment.Spec.Strategy = desiredDeployment.Spec.Strategy
 		actualDeployment.Spec.Template.Spec.Containers = desiredDeployment.Spec.Template.Spec.Containers
 		actualDeployment.Spec.Template.Spec.ServiceAccountName = desiredDeployment.Spec.Template.Spec.ServiceAccountName
 
@@ -175,6 +189,10 @@ func identifyDeploymentDifference(x appsv1.Deployment, y appsv1.Deployment) stri
 
 	if xPodSpec.ServiceAccountName != yPodSpec.ServiceAccountName {
 		return "ServiceAccountName"
+	}
+
+	if !reflect.DeepEqual(x.Spec.Strategy, y.Spec.Strategy) {
+		return ".Spec.Strategy"
 	}
 
 	if !reflect.DeepEqual(x.Labels, y.Labels) {
@@ -268,6 +286,11 @@ func rolloutsContainer(cr rolloutsmanagerv1alpha1.RolloutManager) corev1.Contain
 			SuccessThreshold:    int32(1),
 			TimeoutSeconds:      int32(4),
 		},
+		Resources: corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{
+				corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+			},
+		},
 		SecurityContext: &corev1.SecurityContext{
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{
@@ -275,12 +298,19 @@ func rolloutsContainer(cr rolloutsmanagerv1alpha1.RolloutManager) corev1.Contain
 				},
 			},
 			AllowPrivilegeEscalation: boolPtr(false),
-			ReadOnlyRootFilesystem:   boolPtr(false),
+			ReadOnlyRootFilesystem:   boolPtr(true),
 			RunAsNonRoot:             boolPtr(true),
+			SeccompProfile: &corev1.SeccompProfile{
+				Type: corev1.SeccompProfileTypeRuntimeDefault,
+			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			{
 				MountPath: "/home/argo-rollouts/plugin-bin",
+				Name:      "plugin-bin",
+			},
+			{
+				MountPath: "/tmp",
 				Name:      "tmp",
 			},
 		},
@@ -339,7 +369,7 @@ func normalizeDeployment(inputParam appsv1.Deployment, cr rolloutsmanagerv1alpha
 	}
 
 	inputSpecVolumes := input.Spec.Template.Spec.Volumes
-	if inputSpecVolumes == nil || len(inputSpecVolumes) != 1 {
+	if inputSpecVolumes == nil || len(inputSpecVolumes) != 2 {
 		return appsv1.Deployment{}, fmt.Errorf("missing .spec.template.spec.volumes")
 	}
 
@@ -359,11 +389,10 @@ func normalizeDeployment(inputParam appsv1.Deployment, cr rolloutsmanagerv1alpha
 				SecurityContext: &corev1.PodSecurityContext{
 					RunAsNonRoot: input.Spec.Template.Spec.SecurityContext.RunAsNonRoot,
 				},
-				Volumes: []corev1.Volume{{
-					Name: inputSpecVolumes[0].Name,
-				}},
+				Volumes: []corev1.Volume{inputSpecVolumes[0], inputSpecVolumes[1]},
 			},
 		},
+		Strategy: input.Spec.Strategy,
 	}
 
 	if len(input.Spec.Template.Spec.Containers) != 1 {
@@ -401,7 +430,7 @@ func normalizeDeployment(inputParam appsv1.Deployment, cr rolloutsmanagerv1alpha
 		return appsv1.Deployment{}, fmt.Errorf("incorrect security context")
 	}
 
-	if inputVolumeMounts == nil || len(inputVolumeMounts) != 1 {
+	if inputVolumeMounts == nil || len(inputVolumeMounts) != 2 {
 		return appsv1.Deployment{}, fmt.Errorf("incorrect volume mounts")
 	}
 
@@ -456,6 +485,7 @@ func normalizeDeployment(inputParam appsv1.Deployment, cr rolloutsmanagerv1alpha
 			SuccessThreshold:    inputReadinessProbe.SuccessThreshold,
 			TimeoutSeconds:      inputReadinessProbe.TimeoutSeconds,
 		},
+		Resources: inputContainer.Resources,
 		SecurityContext: &corev1.SecurityContext{
 			Capabilities: &corev1.Capabilities{
 				Drop: inputSecurityContext.Capabilities.Drop,
@@ -463,12 +493,18 @@ func normalizeDeployment(inputParam appsv1.Deployment, cr rolloutsmanagerv1alpha
 			AllowPrivilegeEscalation: inputSecurityContext.AllowPrivilegeEscalation,
 			ReadOnlyRootFilesystem:   inputSecurityContext.ReadOnlyRootFilesystem,
 			RunAsNonRoot:             inputSecurityContext.RunAsNonRoot,
+			SeccompProfile:           inputSecurityContext.SeccompProfile,
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			{
 				Name:      inputVolumeMounts[0].Name,
 				MountPath: inputVolumeMounts[0].MountPath,
-			}},
+			},
+			{
+				Name:      inputVolumeMounts[1].Name,
+				MountPath: inputVolumeMounts[1].MountPath,
+			},
+		},
 	}}
 
 	return res, nil
