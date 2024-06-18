@@ -30,8 +30,12 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logr "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -111,41 +115,30 @@ func (r *RolloutManagerReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}
 
-	// Fetch all RolloutManager instances in the namespace
-	rolloutsmanagerList := rolloutsmanagerv1alpha1.RolloutManagerList{}
-	if err := r.List(ctx, &rolloutsmanagerList, &client.ListOptions{Namespace: req.Namespace}); err != nil {
-		reqLogger.Error(err, "Failed to list RolloutManager instances")
-		return ctrl.Result{}, err
+	// Next, fetch and reconcile the RolloutManager instance
+	rolloutManager := &rolloutsmanagerv1alpha1.RolloutManager{}
+	if err := r.Client.Get(ctx, req.NamespacedName, rolloutManager); err != nil {
+		if apierrors.IsNotFound(err) {
+			// Request object not found, could have been deleted after reconcile request.
+			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
+			// Return and don't requeue
+			return reconcile.Result{}, nil
+		}
+		// Error reading the object - requeue the request.
+		return reconcile.Result{}, err
 	}
 
-	// Iterate through the list and reconcile each RolloutManager instance
-	for idx := range rolloutsmanagerList.Items {
-		rolloutManager := rolloutsmanagerList.Items[idx]
-		// Fetch the RolloutManager instance
-		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(&rolloutManager), &rolloutManager); err != nil {
-			if apierrors.IsNotFound(err) {
-				// Request object not found, could have been deleted after reconcile request.
-				// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
-				// Return and don't requeue
-				return reconcile.Result{}, nil
-			}
-			// Error reading the object - requeue the request.
-			return reconcile.Result{}, err
-		}
+	res, reconcileErr := r.reconcileRolloutsManager(ctx, *rolloutManager)
 
-		// Reconcile the RolloutManager instance
-		res, reconcileErr := r.reconcileRolloutsManager(ctx, rolloutManager)
+	// Set the condition/phase on the RolloutManager status  (before we check the error from reconcileRolloutManager, below)
+	if err := updateStatusConditionOfRolloutManager(ctx, res, rolloutManager, r.Client, log); err != nil {
+		log.Error(err, "unable to update status of RolloutManager")
+		return reconcile.Result{}, err
+	}
 
-		// Set the condition/phase on the RolloutManager status
-		if err := updateStatusConditionOfRolloutManager(ctx, res, &rolloutManager, r.Client, log); err != nil {
-			log.Error(err, "Unable to update status of RolloutManager")
-			return reconcile.Result{}, err
-		}
-
-		// Check the reconcileErr and handle it
-		if reconcileErr != nil {
-			return reconcile.Result{}, reconcileErr
-		}
+	// Next return the reconcileErr if applicable
+	if reconcileErr != nil {
+		return reconcile.Result{}, reconcileErr
 	}
 
 	return reconcile.Result{}, nil
@@ -154,8 +147,14 @@ func (r *RolloutManagerReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 // SetupWithManager sets up the controller with the Manager.
 func (r *RolloutManagerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	bld := ctrl.NewControllerManagedBy(mgr)
-	// Watch for changes to primary resource RolloutManager.
+
 	bld.For(&rolloutsmanagerv1alpha1.RolloutManager{})
+
+	// If the .spec of any RolloutManager changes (or a RM is created/deleted), inform the other RolloutManagers on the cluster
+	bld.Watches(
+		&rolloutsmanagerv1alpha1.RolloutManager{},
+		handler.EnqueueRequestsFromMapFunc(r.queueOtherRolloutManagers),
+		builder.WithPredicates(predicate.Or(predicate.GenerationChangedPredicate{}, createdOrDeletedPredicate())))
 
 	// Watch for changes to ConfigMap sub-resources owned by RolloutManager.
 	bld.Owns(&corev1.ConfigMap{})
@@ -189,6 +188,51 @@ func (r *RolloutManagerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	return bld.Complete(r)
+}
+
+// createdOrDeletedPredicate returns a predicate which filters out
+// only SpaceRequests whose Ready Status are set to true
+func createdOrDeletedPredicate() predicate.Predicate {
+	return predicate.Funcs{
+		CreateFunc: func(createEvent event.CreateEvent) bool {
+			return true
+		},
+		DeleteFunc: func(deleteEvent event.DeleteEvent) bool {
+			return true
+		},
+		GenericFunc: func(genericEvent event.GenericEvent) bool {
+			return false
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			return false
+		},
+	}
+}
+
+func (r *RolloutManagerReconciler) queueOtherRolloutManagers(context context.Context, obj client.Object) []reconcile.Request {
+
+	// List all other RolloutMangers on the cluster
+	rmList := rolloutsmanagerv1alpha1.RolloutManagerList{}
+	if err := r.List(context, &rmList); err != nil {
+		return []reconcile.Request{}
+	}
+
+	requests := []reconcile.Request{}
+
+	for idx := range rmList.Items {
+		rm := rmList.Items[idx]
+
+		if rm.Name == obj.GetName() && rm.Namespace == obj.GetNamespace() {
+			// Don't queue the object itself, we are already handling that elsewhere
+			continue
+		}
+
+		requests = append(requests, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(&rm),
+		})
+	}
+
+	return requests
 }
 
 // doesCRDExist checks if a CRD is present in the cluster, by using the discovery client.
