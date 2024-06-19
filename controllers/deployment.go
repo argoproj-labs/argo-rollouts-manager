@@ -333,8 +333,8 @@ func normalizeDeployment(inputParam appsv1.Deployment, cr rolloutsmanagerv1alpha
 		},
 		Template: corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels:      input.Spec.Template.Labels,
-				Annotations: input.Spec.Template.Annotations,
+				Labels:      normalizeMap(input.Spec.Template.Labels),
+				Annotations: normalizeMap(input.Spec.Template.Annotations),
 			},
 			Spec: corev1.PodSpec{
 				NodeSelector:       input.Spec.Template.Spec.NodeSelector,
@@ -457,6 +457,14 @@ func normalizeDeployment(inputParam appsv1.Deployment, cr rolloutsmanagerv1alpha
 
 	return res, nil
 
+}
+
+// Confirm nil maps to empty map, to allow them to be compared by reflect.DeepEqual()
+func normalizeMap(in map[string]string) map[string]string {
+	if len(in) == 0 {
+		return make(map[string]string, 0)
+	}
+	return in
 }
 
 // boolPtr returns a pointer to val
