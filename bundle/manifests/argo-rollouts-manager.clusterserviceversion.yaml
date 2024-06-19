@@ -21,7 +21,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2024-02-13T23:03:49Z"
+    createdAt: "2024-06-14T22:33:48Z"
     operators.operatorframework.io/builder: operator-sdk-v1.28.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: argo-rollouts-manager.v0.0.1
@@ -97,6 +97,14 @@ spec:
           - ""
           resources:
           - podtemplates
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - apiextensions.k8s.io
+          resources:
+          - customresourcedefinitions
           verbs:
           - get
           - list
@@ -282,6 +290,17 @@ spec:
           - update
           - watch
         - apiGroups:
+          - monitoring.coreos.com
+          resources:
+          - servicemonitors
+          verbs:
+          - create
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
           - networking.istio.io
           resources:
           - destinationrules
@@ -324,6 +343,17 @@ spec:
           verbs:
           - create
           - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - route.openshift.io
+          resources:
+          - routes
+          verbs:
+          - create
           - get
           - list
           - patch

@@ -10,6 +10,7 @@ import (
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -45,7 +46,7 @@ var _ = Describe("Deployment Test", func() {
 		fetchedDeployment := &appsv1.Deployment{}
 		Expect(fetchObject(ctx, r.Client, a.Namespace, DefaultArgoRolloutsResourceName, fetchedDeployment)).To(Succeed())
 
-		expectedDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, "tmp", "linux", DefaultArgoRolloutsResourceName, a)
+		expectedDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", DefaultArgoRolloutsResourceName, a)
 
 		By("verify that the fetched Deployment matches the desired one")
 		Expect(fetchedDeployment.Name).To(Equal(expectedDeployment.Name))
@@ -62,7 +63,7 @@ var _ = Describe("Deployment Test", func() {
 	It("should update the Deployment back to default values, if deployment already exists and has been modified away from default", func() {
 
 		By("create a new Deployment with custom values")
-		existingDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, "test-resource-name", "tmp-test", "linux-test", sa.Name, a)
+		existingDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, "test-resource-name", []string{"plugin-bin-test", "tmp-test"}, "linux-test", sa.Name, a)
 
 		Expect(r.Client.Create(ctx, existingDeployment)).To(Succeed())
 
@@ -73,7 +74,7 @@ var _ = Describe("Deployment Test", func() {
 		fetchedDeployment := &appsv1.Deployment{}
 		Expect(fetchObject(ctx, r.Client, a.Namespace, DefaultArgoRolloutsResourceName, fetchedDeployment)).To(Succeed())
 
-		expectedDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, "tmp", "linux", sa.Name, a)
+		expectedDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", sa.Name, a)
 
 		By("verify that the Deployment has been reconciled back to default values")
 		Expect(fetchedDeployment.Name).To(Equal(expectedDeployment.Name))
@@ -91,10 +92,10 @@ var _ = Describe("Deployment Test", func() {
 	When("the deployment has not changed", func() {
 		It("should not report any difference, both before and after normalization", func() {
 
-			expectedDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, "tmp", "linux", DefaultArgoRolloutsResourceName, a)
+			expectedDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", DefaultArgoRolloutsResourceName, a)
 			Expect(identifyDeploymentDifference(*expectedDeployment, *expectedDeployment)).To(Equal(""))
 
-			expectedDeployment = deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, "tmp", "linux", DefaultArgoRolloutsResourceName, a)
+			expectedDeployment = deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", DefaultArgoRolloutsResourceName, a)
 			expectedDeploymentNormalized, err := normalizeDeployment(*expectedDeployment)
 			Expect(err).To(Succeed())
 
@@ -127,9 +128,9 @@ var _ = Describe("Deployment Test", func() {
 		DescribeTable("controller should detect and revert the change", func(fxn func(deployment *appsv1.Deployment)) {
 
 			By("ensuring that deploymentCR properly detects the change")
-			defaultDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, "tmp", "linux", DefaultArgoRolloutsResourceName, a)
+			defaultDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", DefaultArgoRolloutsResourceName, a)
 
-			defaultDeploymentModified := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, "tmp", "linux", DefaultArgoRolloutsResourceName, a)
+			defaultDeploymentModified := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", DefaultArgoRolloutsResourceName, a)
 
 			Expect(identifyDeploymentDifference(*defaultDeployment, *defaultDeploymentModified)).To(BeEmpty(), "they should be the same before one is modified")
 
@@ -182,12 +183,29 @@ var _ = Describe("Deployment Test", func() {
 					MatchLabels: map[string]string{"my": "label"},
 				}
 			}),
+			Entry("spec.strategy", func(deployment *appsv1.Deployment) {
+				deployment.Spec.Strategy = appsv1.DeploymentStrategy{
+					Type: "not-a-real-strategy",
+				}
+			}),
 			Entry(".spec.template.spec.containers.args", func(deployment *appsv1.Deployment) {
 				deployment.Spec.Template.Spec.Containers[0].Args = []string{"new", "args"}
 			}),
 			Entry(".spec.template.spec.containers.env", func(deployment *appsv1.Deployment) {
 				deployment.Spec.Template.Spec.Containers[0].Env = []corev1.EnvVar{
 					{Name: "my-env", Value: "my-env-value"}}
+			}),
+			Entry(".spec.template.spec.containers.resources", func(deployment *appsv1.Deployment) {
+				deployment.Spec.Template.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceEphemeralStorage: resource.MustParse("20000Gi"),
+					},
+				}
+			}),
+			Entry(".spec.template.spec.containers.volumeMounts", func(deployment *appsv1.Deployment) {
+				deployment.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{
+					{Name: "not-an-expected-name"},
+				}
 			}),
 			Entry(".spec.template.spec.serviceAccountName", func(deployment *appsv1.Deployment) {
 				deployment.Spec.Template.Spec.ServiceAccountName = "different-service-account-name"
@@ -215,7 +233,7 @@ var _ = Describe("Deployment Test", func() {
 
 })
 
-func deploymentCR(name string, namespace string, label string, volumeName string, nodeSelector string, serviceAccount string, rolloutManager v1alpha1.RolloutManager) *appsv1.Deployment {
+func deploymentCR(name string, namespace string, label string, volumeNames []string, nodeSelector string, serviceAccount string, rolloutManager v1alpha1.RolloutManager) *appsv1.Deployment {
 	runAsNonRoot := true
 	deploymentCR := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -239,7 +257,16 @@ func deploymentCR(name string, namespace string, label string, volumeName string
 			Spec: corev1.PodSpec{
 				Volumes: []corev1.Volume{
 					{
-						Name: volumeName,
+						Name: volumeNames[0],
+						VolumeSource: corev1.VolumeSource{
+							EmptyDir: &corev1.EmptyDirVolumeSource{},
+						},
+					},
+					{
+						Name: volumeNames[1],
+						VolumeSource: corev1.VolumeSource{
+							EmptyDir: &corev1.EmptyDirVolumeSource{},
+						},
 					},
 				},
 				NodeSelector: map[string]string{

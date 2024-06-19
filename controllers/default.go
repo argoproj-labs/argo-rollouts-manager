@@ -12,7 +12,7 @@ const (
 	DefaultArgoRolloutsImage = "quay.io/argoproj/argo-rollouts"
 
 	// ArgoRolloutsDefaultVersion is the default version for the Rollouts controller.
-	DefaultArgoRolloutsVersion = "v1.6.6" // v1.6.6
+	DefaultArgoRolloutsVersion = "v1.7.0" // v1.7.0
 
 	// DefaultArgoRolloutsResourceName is the default name for Rollouts controller resources such as
 	// deployment, service, role, rolebinding and serviceaccount.
