@@ -11,6 +11,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -59,41 +60,90 @@ var _ = Describe("Deployment Test", func() {
 		Expect(fetchedDeployment.Spec.Template.Spec.Volumes).To(Equal(expectedDeployment.Spec.Template.Spec.Volumes))
 	})
 
-	It("should update the Deployment back to default values, if deployment already exists and has been modified away from default", func() {
+	When("Rollouts Deployment already exists, but then is modified away from default values", func() {
+		It("should update the Deployment back to default values, but preserve any added annotations/labels", func() {
+			By("create a new Deployment with custom values")
+			existingDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, "tmp-test", "linux-test", sa.Name, a)
 
-		By("create a new Deployment with custom values")
-		existingDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, "test-resource-name", "tmp-test", "linux-test", sa.Name, a)
+			existingDeployment.Labels["new-label"] = "new-label-value"
+			existingDeployment.Annotations["new-annotation"] = "new-annotation-value"
 
-		existingDeployment.Labels["new-label"] = "new-label-value"
-		existingDeployment.Annotations["new-annotation"] = "new-annotation-value"
+			Expect(r.Client.Create(ctx, existingDeployment)).To(Succeed())
 
-		Expect(r.Client.Create(ctx, existingDeployment)).To(Succeed())
+			By("calling reconcileRolloutsDeployment")
+			Expect(r.reconcileRolloutsDeployment(ctx, a, *sa)).To(Succeed())
 
-		By("calling reconcileRolloutsDeployment")
-		Expect(r.reconcileRolloutsDeployment(ctx, a, *sa)).To(Succeed())
+			By("fetch the Deployment")
+			fetchedDeployment := &appsv1.Deployment{}
+			Expect(fetchObject(ctx, r.Client, a.Namespace, DefaultArgoRolloutsResourceName, fetchedDeployment)).To(Succeed())
 
-		By("fetch the Deployment")
-		fetchedDeployment := &appsv1.Deployment{}
-		Expect(fetchObject(ctx, r.Client, a.Namespace, DefaultArgoRolloutsResourceName, fetchedDeployment)).To(Succeed())
+			expectedDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, "tmp", "linux", sa.Name, a)
 
-		expectedDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, "tmp", "linux", sa.Name, a)
+			By("verifing that the Deployment has been reconciled back to default values")
+			Expect(fetchedDeployment.Name).To(Equal(expectedDeployment.Name))
+			for k, v := range expectedDeployment.Labels {
+				Expect(fetchedDeployment.Labels).To(HaveKeyWithValue(k, v), "operator-added labels should still be present")
+			}
 
-		By("verify that the Deployment has been reconciled back to default values")
-		Expect(fetchedDeployment.Name).To(Equal(expectedDeployment.Name))
-		for k, v := range expectedDeployment.Labels {
-			Expect(fetchedDeployment.Labels).To(HaveKeyWithValue(k, v), "operator-added labels should still be present")
-		}
+			Expect(fetchedDeployment.Labels).To(HaveKeyWithValue("new-label", "new-label-value"), "user label should still be present")
+			Expect(fetchedDeployment.Annotations).To(HaveKeyWithValue("new-annotation", "new-annotation-value"), "user annotation should still be present")
 
-		Expect(fetchedDeployment.Labels).To(HaveKeyWithValue("new-label", "new-label-value"), "user label should still be present")
-		Expect(fetchedDeployment.Annotations).To(HaveKeyWithValue("new-annotation", "new-annotation-value"), "user annotation should still be present")
+			Expect(fetchedDeployment.Spec.Template.Spec.ServiceAccountName).To(Equal(expectedDeployment.Spec.Template.Spec.ServiceAccountName))
+			Expect(fetchedDeployment.Spec.Template.Labels).To(Equal(expectedDeployment.Spec.Template.Labels))
+			Expect(fetchedDeployment.Spec.Selector).To(Equal(expectedDeployment.Spec.Selector))
+			Expect(fetchedDeployment.Spec.Template.Spec.NodeSelector).To(Equal(expectedDeployment.Spec.Template.Spec.NodeSelector))
+			Expect(fetchedDeployment.Spec.Template.Spec.Tolerations).To(Equal(expectedDeployment.Spec.Template.Spec.Tolerations))
+			Expect(fetchedDeployment.Spec.Template.Spec.SecurityContext).To(Equal(expectedDeployment.Spec.Template.Spec.SecurityContext))
+			Expect(fetchedDeployment.Spec.Template.Spec.Volumes).To(Equal(expectedDeployment.Spec.Template.Spec.Volumes))
 
-		Expect(fetchedDeployment.Spec.Template.Spec.ServiceAccountName).To(Equal(expectedDeployment.Spec.Template.Spec.ServiceAccountName))
-		Expect(fetchedDeployment.Spec.Template.Labels).To(Equal(expectedDeployment.Spec.Template.Labels))
-		Expect(fetchedDeployment.Spec.Selector).To(Equal(expectedDeployment.Spec.Selector))
-		Expect(fetchedDeployment.Spec.Template.Spec.NodeSelector).To(Equal(expectedDeployment.Spec.Template.Spec.NodeSelector))
-		Expect(fetchedDeployment.Spec.Template.Spec.Tolerations).To(Equal(expectedDeployment.Spec.Template.Spec.Tolerations))
-		Expect(fetchedDeployment.Spec.Template.Spec.SecurityContext).To(Equal(expectedDeployment.Spec.Template.Spec.SecurityContext))
-		Expect(fetchedDeployment.Spec.Template.Spec.Volumes).To(Equal(expectedDeployment.Spec.Template.Spec.Volumes))
+		})
+	})
+
+	When("Rollouts deployment already exists, but then RolloutManager is modified in a way that requires updating either .spec.selector of the existing Deployment", func() {
+
+		It("should cause the existing Deployment to be deleted, and a new Deployment to be created with the updated .spec.selector", func() {
+
+			By("create a basic Rollout Deployment")
+			existingDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, "tmp", "linux", DefaultArgoRolloutsResourceName, a)
+
+			By("assigning a fake UID to the original deployment, so we can detected when it is deleted/recreated")
+			existingDeployment.ObjectMeta.UID = "original-deployment"
+
+			Expect(r.Client.Create(ctx, existingDeployment)).To(Succeed())
+
+			By("calling reconcileRolloutsDeployment")
+			Expect(r.reconcileRolloutsDeployment(ctx, a, *sa)).To(Succeed())
+
+			fetchedDeployment := &appsv1.Deployment{}
+			Expect(fetchObject(ctx, r.Client, a.Namespace, DefaultArgoRolloutsResourceName, fetchedDeployment)).To(Succeed())
+			Expect(fetchedDeployment.ObjectMeta.UID).To(Equal(types.UID("original-deployment")))
+
+			// In this case, because we are updating .spec.additionalMetadata, that causes .spec.selector of the Deployment to be modified, which requires recreating the Deployment below
+
+			By("adding a new label to RolloutManager .spec.additionalMetadata.labels field")
+			a.Spec.AdditionalMetadata = &v1alpha1.ResourceMetadata{
+				Labels: map[string]string{"new-label": "new-label-value"},
+			}
+			Expect(r.Client.Update(ctx, &a)).To(Succeed())
+
+			By("calling reconcileRolloutsDeployment again")
+			Expect(r.reconcileRolloutsDeployment(ctx, a, *sa)).To(Succeed())
+
+			By("fetching the Deployment after reconcile was called, to verify it performed as expected")
+			fetchedDeployment = &appsv1.Deployment{}
+			Expect(fetchObject(ctx, r.Client, a.Namespace, DefaultArgoRolloutsResourceName, fetchedDeployment)).To(Succeed())
+			Expect(fetchedDeployment.ObjectMeta.UID).To(Equal(types.UID("")), "UID should be empty, because the original Deployment was deleted and recreated")
+
+			expectedDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, "tmp", "linux", sa.Name, a)
+
+			By("verifying that the Deployment has been reconciled back to default labels")
+			Expect(fetchedDeployment.Name).To(Equal(expectedDeployment.Name))
+			for k, v := range expectedDeployment.Labels {
+				Expect(fetchedDeployment.Labels).To(HaveKeyWithValue(k, v), "operator-added labels should still be present")
+			}
+
+			Expect(fetchedDeployment.Labels).To(HaveKeyWithValue("new-label", "new-label-value"), "user label should still be present")
+		})
 
 	})
 
@@ -101,7 +151,7 @@ var _ = Describe("Deployment Test", func() {
 		It("should not report any difference, both before and after normalization", func() {
 
 			expectedDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, "tmp", "linux", DefaultArgoRolloutsResourceName, a)
-			Expect(identifyDeploymentDifference(*expectedDeployment, *expectedDeployment)).To(Equal(""))
+			Expect(identifyDeploymentDifference(*expectedDeployment, *expectedDeployment)).To(Equal(""), "comparing the object with itself should always report no differences")
 
 			expectedDeployment = deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, "tmp", "linux", DefaultArgoRolloutsResourceName, a)
 			expectedDeploymentNormalized, err := normalizeDeployment(*expectedDeployment, a)
@@ -253,7 +303,7 @@ var _ = Describe("Deployment Test", func() {
 
 })
 
-func deploymentCR(name string, namespace string, label string, volumeName string, nodeSelector string, serviceAccount string, rolloutManager v1alpha1.RolloutManager) *appsv1.Deployment {
+func deploymentCR(name string, namespace string, rolloutsSelectorLabel string, volumeName string, nodeSelector string, serviceAccount string, rolloutManager v1alpha1.RolloutManager) *appsv1.Deployment {
 	runAsNonRoot := true
 	deploymentCR := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -265,14 +315,15 @@ func deploymentCR(name string, namespace string, label string, volumeName string
 	deploymentCR.Spec = appsv1.DeploymentSpec{
 		Selector: &metav1.LabelSelector{
 			MatchLabels: map[string]string{
-				DefaultRolloutsSelectorKey: label,
+				DefaultRolloutsSelectorKey: rolloutsSelectorLabel,
 			},
 		},
 		Template: corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
-					DefaultRolloutsSelectorKey: label,
+					DefaultRolloutsSelectorKey: rolloutsSelectorLabel,
 				},
+				Annotations: make(map[string]string, 0),
 			},
 			Spec: corev1.PodSpec{
 				Volumes: []corev1.Volume{
