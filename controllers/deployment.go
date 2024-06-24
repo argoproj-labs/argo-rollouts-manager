@@ -114,11 +114,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(ctx context.Conte
 			return fmt.Errorf("failed to get the Deployment %s: %w", DefaultArgoRolloutsResourceName, err)
 		}
 
-		if err := controllerutil.SetControllerReference(&cr, &desiredDeployment, r.Scheme); err != nil {
-			return err
-		}
-		log.Info(fmt.Sprintf("Creating Deployment %s", DefaultArgoRolloutsResourceName))
-		return r.Client.Create(ctx, &desiredDeployment)
+		return r.createNewRolloutsDeployment(ctx, cr, desiredDeployment)
 	}
 
 	normalizedActualDeployment, err := normalizeDeployment(*actualDeployment, cr)
@@ -128,6 +124,18 @@ func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(ctx context.Conte
 		deploymentsDifferent := identifyDeploymentDifference(normalizedActualDeployment, normalizedDesiredDeployment)
 
 		log.Info("updating Deployment due to detected difference: " + deploymentsDifferent)
+
+		if !reflect.DeepEqual(normalizedActualDeployment.Spec.Selector, normalizedDesiredDeployment.Spec.Selector) {
+			// delete and recreate the Deployment if the .spec.selector field changes: this field is immutable.
+
+			log.Info("deleting and recreating Deployment, as the .spec.selector field of the Deployment has changed. Since this field is immutable, the Deployment needs to be recreated.")
+
+			if err := r.Client.Delete(ctx, &desiredDeployment); err != nil {
+				return fmt.Errorf("unable to delete Rollouts Deployment after .spec.selector change: %w", err)
+			}
+
+			return r.createNewRolloutsDeployment(ctx, cr, desiredDeployment)
+		}
 
 		actualDeployment.Spec.Template.Spec.Containers = desiredDeployment.Spec.Template.Spec.Containers
 		actualDeployment.Spec.Template.Spec.ServiceAccountName = desiredDeployment.Spec.Template.Spec.ServiceAccountName
@@ -145,6 +153,14 @@ func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(ctx context.Conte
 		return r.Client.Update(ctx, actualDeployment)
 	}
 	return nil
+}
+
+func (r *RolloutManagerReconciler) createNewRolloutsDeployment(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager, desiredDeployment appsv1.Deployment) error {
+	if err := controllerutil.SetControllerReference(&cr, &desiredDeployment, r.Scheme); err != nil {
+		return err
+	}
+	log.Info(fmt.Sprintf("Creating Deployment %s", DefaultArgoRolloutsResourceName))
+	return r.Client.Create(ctx, &desiredDeployment)
 }
 
 // identifyDeploymentDifference is a simple comparison of the contents of two deployments, returning "" if they are the same, otherwise returning the name of the field that changed.
@@ -329,7 +345,7 @@ func normalizeDeployment(inputParam appsv1.Deployment, cr rolloutsmanagerv1alpha
 
 	res.Spec = appsv1.DeploymentSpec{
 		Selector: &metav1.LabelSelector{
-			MatchLabels: input.Spec.Selector.MatchLabels,
+			MatchLabels: normalizeMap(input.Spec.Selector.MatchLabels),
 		},
 		Template: corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
