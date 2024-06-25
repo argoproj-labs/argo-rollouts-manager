@@ -166,7 +166,7 @@ func (r *RolloutManagerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// If the .spec of any RolloutManager changes (or a RM is created/deleted), inform the other RolloutManagers on the cluster
 	bld.Watches(
 		&rolloutsmanagerv1alpha1.RolloutManager{},
-		handler.EnqueueRequestsFromMapFunc(r.queueOtherRolloutManagers),
+		handler.EnqueueRequestsFromMapFunc(r.enqueueOtherRolloutManagersExceptObj),
 		builder.WithPredicates(predicate.Or(predicate.GenerationChangedPredicate{}, createdOrDeletedPredicate())))
 
 	// Watch for changes to ConfigMap sub-resources owned by RolloutManager.
@@ -226,11 +226,14 @@ func createdOrDeletedPredicate() predicate.Predicate {
 	}
 }
 
-func (r *RolloutManagerReconciler) queueOtherRolloutManagers(context context.Context, obj client.Object) []reconcile.Request {
+// enqueueOtherRolloutManagersExceptObj will queue other RolloutManagers on the cluster, excluding the object itself.
+// This is different from 'enqueueAllRolloutManagers': 'enqueueAllRolloutManagers' will not filter out the object itself.
+func (r *RolloutManagerReconciler) enqueueOtherRolloutManagersExceptObj(context context.Context, obj client.Object) []reconcile.Request {
 
 	// List all other RolloutMangers on the cluster
 	rmList := rolloutsmanagerv1alpha1.RolloutManagerList{}
 	if err := r.List(context, &rmList); err != nil {
+		log.Error(err, "Unable to list all RolloutManagers in queueOtherRolloutManagers")
 		return []reconcile.Request{}
 	}
 
