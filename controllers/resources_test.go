@@ -184,6 +184,54 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 		It("Test for reconcileRolloutsSecrets function", func() {
 			Expect(r.reconcileRolloutsSecrets(ctx, a)).To(Succeed())
 		})
+
+		It("test for removeClusterScopedResourcesIfApplicable function", func() {
+
+			By("creating default cluster-scoped ClusterRole/ClusterRoleBinding. These should be deleted by the call to removeClusterScopedResourcesIfApplicable")
+			clusterRole := &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: DefaultArgoRolloutsResourceName,
+				},
+			}
+			Expect(r.Client.Create(ctx, clusterRole)).To(Succeed())
+
+			clusterRoleBinding := &rbacv1.ClusterRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: DefaultArgoRolloutsResourceName,
+				},
+			}
+			Expect(r.Client.Create(ctx, clusterRoleBinding)).To(Succeed())
+
+			By("creating default cluster-scoped ClusterRole/ClusterRoleBinding with a different name. These should not be deleted")
+
+			unrelatedRole := &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "unrelated-resource-should-not-be-deleted",
+				},
+			}
+			Expect(r.Client.Create(ctx, unrelatedRole)).To(Succeed())
+
+			unrelatedRoleBinding := &rbacv1.ClusterRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "unrelated-resource-should-not-be-deleted",
+				},
+			}
+			Expect(r.Client.Create(ctx, unrelatedRoleBinding)).To(Succeed())
+
+			By("calling removeClusterScopedResourcesIfApplicable, which should delete the cluster scoped resources")
+			Expect(r.removeClusterScopedResourcesIfApplicable(ctx)).To(Succeed())
+
+			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(clusterRole), clusterRole)).ToNot(Succeed(),
+				"ClusterRole should have been deleted")
+			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(clusterRoleBinding), clusterRoleBinding)).ToNot(Succeed(), "ClusterRoleBinding should have been deleted")
+
+			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(unrelatedRole), unrelatedRole)).To(Succeed(),
+				"Unrelated ClusterRole should not have been deleted")
+			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(unrelatedRoleBinding), unrelatedRoleBinding)).To(Succeed(), "Unrelated ClusterRoleBinding should not have been deleted")
+
+			Expect(r.removeClusterScopedResourcesIfApplicable(ctx)).To(Succeed(), "calling the function again should not return an error")
+
+		})
 	})
 
 	Context("Resource Cleanup test", func() {

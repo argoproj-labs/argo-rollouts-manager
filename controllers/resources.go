@@ -7,13 +7,13 @@ import (
 
 	rolloutsmanagerv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 	monitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	crdv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -227,6 +227,54 @@ func (r *RolloutManagerReconciler) reconcileRolloutsClusterRoleBinding(ctx conte
 		actualClusterRoleBinding.Subjects = expectedClusterRoleBinding.Subjects
 		if err := r.Client.Update(ctx, actualClusterRoleBinding); err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+// removeClusterScopedResourcesIfApplicable will remove the ClusterRole and ClusterRoleBinding that are created when a cluster-scoped RolloutManager is created.
+func (r *RolloutManagerReconciler) removeClusterScopedResourcesIfApplicable(ctx context.Context) error {
+
+	clusterRole := &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: DefaultArgoRolloutsResourceName,
+		},
+	}
+	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(clusterRole), clusterRole); err != nil {
+		if !apierrors.IsNotFound(err) {
+			log.Error(err, "error on retrieving rollouts ClusterRole")
+			return err
+		}
+		// ClusterRole doesn't exist, which is the desired state.
+	} else {
+		// ClusterRole does exist, so delete it.
+		log.Info("deleting Rollouts ClusterRole for RolloutManager that no longer exists")
+		if err := r.Client.Delete(ctx, clusterRole); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return err
+			}
+		}
+	}
+
+	clusterRoleBinding := &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: DefaultArgoRolloutsResourceName,
+		},
+	}
+	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(clusterRoleBinding), clusterRoleBinding); err != nil {
+		if !apierrors.IsNotFound(err) {
+			log.Error(err, "error on retrieving rollouts ClusterRoleBinding")
+			return err
+		}
+		// ClusterRoleBinding doesn't exist, which is the desired state.
+	} else {
+		// ClusterRoleBinding does exist, so delete it.
+		log.Info("deleting Rollouts ClusterRoleBinding for RolloutManager that no longer exists")
+		if err := r.Client.Delete(ctx, clusterRoleBinding); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return err
+			}
 		}
 	}
 
@@ -480,88 +528,6 @@ func (r *RolloutManagerReconciler) reconcileRolloutsSecrets(ctx context.Context,
 	}
 
 	// secret found, do nothing
-	return nil
-}
-
-// Deletes rollout resources when the corresponding rollout CR is deleted.
-//
-// TODO: Remove the nolint:all once this function is called
-//
-//nolint:unused
-func (r *RolloutManagerReconciler) deleteRolloutResources(ctx context.Context, cr *rolloutsmanagerv1alpha1.RolloutManager) error {
-
-	if cr.DeletionTimestamp != nil {
-		log.Info(fmt.Sprintf("Argo Rollout resource in %s namespace is deleted, Deleting the Argo Rollout workloads",
-			cr.Namespace))
-
-		serviceAccount := &corev1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      DefaultArgoRolloutsResourceName,
-				Namespace: cr.Namespace,
-			},
-		}
-
-		if err := r.Client.Delete(ctx, serviceAccount); err != nil {
-			log.Error(err, fmt.Sprintf("Error deleting the service account %s in %s",
-				DefaultArgoRolloutsResourceName, cr.Namespace))
-		}
-
-		role := &rbacv1.Role{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      DefaultArgoRolloutsResourceName,
-				Namespace: cr.Namespace,
-			},
-		}
-		if err := r.Client.Delete(ctx, role); err != nil {
-			log.Error(err, fmt.Sprintf("Error deleting role %s in %s",
-				DefaultArgoRolloutsResourceName, cr.Namespace))
-		}
-
-		rolebinding := &rbacv1.RoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      DefaultArgoRolloutsResourceName,
-				Namespace: cr.Namespace,
-			},
-		}
-		if err := r.Client.Delete(ctx, rolebinding); err != nil {
-			log.Error(err, fmt.Sprintf("Error deleting the rolebinding %s in %s",
-				DefaultArgoRolloutsResourceName, cr.Namespace))
-		}
-
-		secret := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      DefaultRolloutsNotificationSecretName,
-				Namespace: cr.Namespace,
-			},
-		}
-		if err := r.Client.Delete(ctx, secret); err != nil {
-			log.Error(err, fmt.Sprintf("Error deleting the secret %s in %s",
-				DefaultRolloutsNotificationSecretName, cr.Namespace))
-		}
-
-		deploy := &appsv1.Deployment{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      DefaultArgoRolloutsResourceName,
-				Namespace: cr.Namespace,
-			},
-		}
-		if err := r.Client.Delete(ctx, deploy); err != nil {
-			log.Error(err, fmt.Sprintf("Error deleting the deployment %s in %s",
-				DefaultArgoRolloutsResourceName, cr.Namespace))
-		}
-
-		svc := &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      DefaultArgoRolloutsResourceName,
-				Namespace: cr.Namespace,
-			},
-		}
-		if err := r.Client.Delete(ctx, svc); err != nil {
-			log.Error(err, fmt.Sprintf("Error deleting the service %s in %s",
-				DefaultArgoRolloutsResourceName, cr.Namespace))
-		}
-	}
-
 	return nil
 }
 
