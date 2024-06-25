@@ -26,7 +26,7 @@ func generateDesiredRolloutsDeployment(cr rolloutsmanagerv1alpha1.RolloutManager
 			Namespace: cr.Namespace,
 		},
 	}
-	setRolloutsLabelsAndAnnotationsToObject(&desiredDeployment.ObjectMeta, &cr)
+	setRolloutsLabelsAndAnnotationsToObject(&desiredDeployment.ObjectMeta, cr)
 
 	// Add labels and annotations as well to the pod template
 	labels := map[string]string{
@@ -92,7 +92,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(ctx context.Conte
 
 	desiredDeployment := generateDesiredRolloutsDeployment(cr, sa)
 
-	normalizedDesiredDeployment, err := normalizeDeployment(desiredDeployment)
+	normalizedDesiredDeployment, err := normalizeDeployment(desiredDeployment, cr)
 	if err != nil {
 		// If you see this warning in the logs, verify that normalizedDeployment is fully consistent with generateDesiredRolloutsDeployment. See normalizeDeployment for details.
 		log.Error(fmt.Errorf("unexpected fail on normalizing generated rollouts Deployment"), "", "err", err)
@@ -114,14 +114,10 @@ func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(ctx context.Conte
 			return fmt.Errorf("failed to get the Deployment %s: %w", DefaultArgoRolloutsResourceName, err)
 		}
 
-		if err := controllerutil.SetControllerReference(&cr, &desiredDeployment, r.Scheme); err != nil {
-			return err
-		}
-		log.Info(fmt.Sprintf("Creating Deployment %s", DefaultArgoRolloutsResourceName))
-		return r.Client.Create(ctx, &desiredDeployment)
+		return r.createNewRolloutsDeployment(ctx, cr, desiredDeployment)
 	}
 
-	normalizedActualDeployment, err := normalizeDeployment(*actualDeployment)
+	normalizedActualDeployment, err := normalizeDeployment(*actualDeployment, cr)
 
 	if err != nil || !reflect.DeepEqual(normalizedActualDeployment, normalizedDesiredDeployment) {
 
@@ -129,9 +125,24 @@ func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(ctx context.Conte
 
 		log.Info("updating Deployment due to detected difference: " + deploymentsDifferent)
 
+		if !reflect.DeepEqual(normalizedActualDeployment.Spec.Selector, normalizedDesiredDeployment.Spec.Selector) {
+			// delete and recreate the Deployment if the .spec.selector field changes: this field is immutable.
+
+			log.Info("deleting and recreating Deployment, as the .spec.selector field of the Deployment has changed. Since this field is immutable, the Deployment needs to be recreated.")
+
+			if err := r.Client.Delete(ctx, &desiredDeployment); err != nil {
+				return fmt.Errorf("unable to delete Rollouts Deployment after .spec.selector change: %w", err)
+			}
+
+			return r.createNewRolloutsDeployment(ctx, cr, desiredDeployment)
+		}
+
 		actualDeployment.Spec.Template.Spec.Containers = desiredDeployment.Spec.Template.Spec.Containers
 		actualDeployment.Spec.Template.Spec.ServiceAccountName = desiredDeployment.Spec.Template.Spec.ServiceAccountName
-		actualDeployment.Labels = desiredDeployment.Labels
+
+		actualDeployment.Labels = combineStringMaps(actualDeployment.Labels, desiredDeployment.Labels)
+		actualDeployment.Annotations = combineStringMaps(actualDeployment.Annotations, desiredDeployment.Annotations)
+
 		actualDeployment.Spec.Template.Labels = desiredDeployment.Spec.Template.Labels
 		actualDeployment.Spec.Template.Annotations = desiredDeployment.Spec.Template.Annotations
 		actualDeployment.Spec.Selector = desiredDeployment.Spec.Selector
@@ -142,6 +153,14 @@ func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(ctx context.Conte
 		return r.Client.Update(ctx, actualDeployment)
 	}
 	return nil
+}
+
+func (r *RolloutManagerReconciler) createNewRolloutsDeployment(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager, desiredDeployment appsv1.Deployment) error {
+	if err := controllerutil.SetControllerReference(&cr, &desiredDeployment, r.Scheme); err != nil {
+		return err
+	}
+	log.Info(fmt.Sprintf("Creating Deployment %s", DefaultArgoRolloutsResourceName))
+	return r.Client.Create(ctx, &desiredDeployment)
 }
 
 // identifyDeploymentDifference is a simple comparison of the contents of two deployments, returning "" if they are the same, otherwise returning the name of the field that changed.
@@ -160,6 +179,10 @@ func identifyDeploymentDifference(x appsv1.Deployment, y appsv1.Deployment) stri
 
 	if !reflect.DeepEqual(x.Labels, y.Labels) {
 		return "Labels"
+	}
+
+	if !reflect.DeepEqual(x.Annotations, y.Annotations) {
+		return "Annotations"
 	}
 
 	if !reflect.DeepEqual(x.Spec.Template.Labels, y.Spec.Template.Labels) {
@@ -267,17 +290,17 @@ func rolloutsContainer(cr rolloutsmanagerv1alpha1.RolloutManager) corev1.Contain
 
 // One of the goals of an operator is to reconcile the live state of a resource on the cluster, with a target state for that resource. However, one of the challenges in doing so is that some fields of the resource will naturally differ from the values that are generated: for example, some field have default values which are only set after creation. This can make it challenging to compare the live/target status. Various strategies exist to handle.
 //
-// The strategy used in this file is implemented here in normalizeDeployment: normalizeDeployment will created a normalized representation of any input Deployment: the normal form will only contains fields which are relevant/useful to the operator. All other fields will be ingorewd.
+// The strategy used in this file is implemented here in normalizeDeployment: normalizeDeployment will created a normalized representation of any input Deployment: the normal form will only contains fields which are relevant/useful to the operator. All other fields will be discarded.
 //
-// You can then use:
+// You can then use...
 //
 //	reflect.DeepEqual( normalizeDeployment( /* desired deployment */), normalizeDeployment( /* actual deployment from k8s*/))
 //
-// To determine if the actual deployment from k8s needs to be updated.
+// ... to determine if the actual deployment from k8s needs to be updated.
 //
 // NOTE: When updating 'generateDesiredRolloutsDeployment', ensure this function is updated as well.
 // - Specifically, in generateDesiredRolloutsDeployment, if a new field of Deployment is modified, it should be added to the copy logic here.
-func normalizeDeployment(inputParam appsv1.Deployment) (appsv1.Deployment, error) {
+func normalizeDeployment(inputParam appsv1.Deployment, cr rolloutsmanagerv1alpha1.RolloutManager) (appsv1.Deployment, error) {
 
 	input := inputParam.DeepCopy()
 
@@ -288,6 +311,21 @@ func normalizeDeployment(inputParam appsv1.Deployment) (appsv1.Deployment, error
 			Labels:      input.ObjectMeta.Labels,
 			Annotations: input.ObjectMeta.Annotations,
 		},
+	}
+
+	// Remove labels/annotations from the Deployment that are not in the set of labels/annotations that the operator will add to resources.
+	standardLabelsAndAnnotations := input.ObjectMeta.DeepCopy()
+	setRolloutsLabelsAndAnnotationsToObject(standardLabelsAndAnnotations, cr)
+
+	for k := range res.Labels {
+		if _, exists := standardLabelsAndAnnotations.Labels[k]; !exists {
+			delete(res.Labels, k)
+		}
+	}
+	for k := range res.Annotations {
+		if _, exists := standardLabelsAndAnnotations.Annotations[k]; !exists {
+			delete(res.Annotations, k)
+		}
 	}
 
 	if input.Spec.Selector == nil {
@@ -307,12 +345,12 @@ func normalizeDeployment(inputParam appsv1.Deployment) (appsv1.Deployment, error
 
 	res.Spec = appsv1.DeploymentSpec{
 		Selector: &metav1.LabelSelector{
-			MatchLabels: input.Spec.Selector.MatchLabels,
+			MatchLabels: normalizeMap(input.Spec.Selector.MatchLabels),
 		},
 		Template: corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels:      input.Spec.Template.Labels,
-				Annotations: input.Spec.Template.Annotations,
+				Labels:      normalizeMap(input.Spec.Template.Labels),
+				Annotations: normalizeMap(input.Spec.Template.Annotations),
 			},
 			Spec: corev1.PodSpec{
 				NodeSelector:       input.Spec.Template.Spec.NodeSelector,
@@ -435,6 +473,14 @@ func normalizeDeployment(inputParam appsv1.Deployment) (appsv1.Deployment, error
 
 	return res, nil
 
+}
+
+// Confirm nil maps to empty map, to allow them to be compared by reflect.DeepEqual()
+func normalizeMap(in map[string]string) map[string]string {
+	if len(in) == 0 {
+		return make(map[string]string, 0)
+	}
+	return in
 }
 
 // boolPtr returns a pointer to val

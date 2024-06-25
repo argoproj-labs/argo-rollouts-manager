@@ -270,6 +270,28 @@ var _ = Describe("checkForExistingRolloutManager tests", func() {
 	})
 })
 
+var _ = Describe("combineStringMaps tests", func() {
+
+	DescribeTable("test combineStringMaps", func(maps []map[string]string, expectedResult map[string]string) {
+		res := combineStringMaps(maps...)
+		Expect(res).To(Equal(expectedResult))
+	},
+		Entry("single element", append([]map[string]string{},
+			map[string]string{"a": "b", "1": "2"}),
+			map[string]string{"a": "b", "1": "2"}),
+		Entry("multiple elements, no overlap", append([]map[string]string{},
+			map[string]string{"a": "b", "1": "2"}, map[string]string{"c": "d", "3": "4"}),
+			map[string]string{"a": "b", "1": "2", "c": "d", "3": "4"}),
+		Entry("multiple elements with overlap, final element should take precedence", append([]map[string]string{},
+			map[string]string{"a": "b", "1": "2", "overlap1": "Z"}, map[string]string{"c": "d", "3": "4", "overlap1": "X"}),
+			map[string]string{"a": "b", "1": "2", "c": "d", "3": "4", "overlap1": "X"}),
+		Entry("nil param", nil, nil),
+		Entry("nil one param", append([]map[string]string{},
+			map[string]string{"a": "b", "1": "2"}, nil),
+			map[string]string{"a": "b", "1": "2"}),
+	)
+})
+
 var _ = Describe("validateRolloutsScope tests", func() {
 
 	var (

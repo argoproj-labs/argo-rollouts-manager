@@ -43,3 +43,39 @@ func UpdateWithoutConflict(ctx context.Context, obj client.Object, k8sClient cli
 
 	return err
 }
+
+func HaveLabel(keyParam, valueParam string, k8sClient client.Client) matcher.GomegaMatcher {
+
+	return WithTransform(func(k8sObject client.Object) bool {
+
+		err := k8sClient.Get(context.Background(), client.ObjectKeyFromObject(k8sObject), k8sObject)
+		Expect(err).ToNot(HaveOccurred())
+
+		for key, value := range k8sObject.GetLabels() {
+			if key == keyParam && value == valueParam {
+				return true
+			}
+		}
+
+		return false
+
+	}, BeTrue())
+}
+
+func HaveAnnotation(keyParam, valueParam string, k8sClient client.Client) matcher.GomegaMatcher {
+
+	return WithTransform(func(k8sObject client.Object) bool {
+
+		err := k8sClient.Get(context.Background(), client.ObjectKeyFromObject(k8sObject), k8sObject)
+		Expect(err).ToNot(HaveOccurred())
+
+		for key, value := range k8sObject.GetAnnotations() {
+			if key == keyParam && value == valueParam {
+				return true
+			}
+		}
+
+		return false
+
+	}, BeTrue())
+}
