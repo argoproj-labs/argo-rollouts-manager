@@ -664,6 +664,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.C
 
 // Reconciles Secrets for Rollouts controller
 func (r *RolloutManagerReconciler) reconcileRolloutsSecrets(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager) error {
+
 	expectedSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultRolloutsNotificationSecretName,
@@ -674,19 +675,43 @@ func (r *RolloutManagerReconciler) reconcileRolloutsSecrets(ctx context.Context,
 
 	setRolloutsLabelsAndAnnotationsToObject(&expectedSecret.ObjectMeta, cr)
 
+	// If the Secret doesn't exist (or an unrelated error occurred)....
 	liveSecret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: expectedSecret.Name, Namespace: expectedSecret.Namespace}}
 	if err := fetchObject(ctx, r.Client, cr.Namespace, liveSecret.Name, liveSecret); err != nil {
-		if !apierrors.IsNotFound(err) {
+		if !apierrors.IsNotFound(err) { // unrelated error: return
 			return fmt.Errorf("failed to get the Secret %s: %w", liveSecret.Name, err)
 		}
 
+		if cr.Spec.SkipNotificationSecretDeployment {
+			// Secret does not exist, but SkipNotificationSecretDeployment is set to true, hence skipping the creation
+			return nil
+		}
+
+		// Secret does not exist (and SkipNotificationSecretDeployment is set to false) so create Secret
 		if err := controllerutil.SetControllerReference(&cr, expectedSecret, r.Scheme); err != nil {
 			return err
 		}
 
 		log.Info(fmt.Sprintf("Creating Secret %s", expectedSecret.Name))
 		return r.Client.Create(ctx, expectedSecret)
+
 	}
+
+	// If SkipNotificationSecretDeployment is true, and the secret exists, delete it
+	if cr.Spec.SkipNotificationSecretDeployment {
+
+		// If the controller created/owns the Secret, delete it
+		controller := metav1.GetControllerOf(liveSecret)
+		if controller != nil && controller.Name == cr.Name {
+			log.Info(fmt.Sprintf("SkipNotificationSecretDeployment has been set to true, deleting secret %s", liveSecret.Name))
+			return r.Client.Delete(ctx, liveSecret)
+		}
+
+		// Otherwise, the secret exists, but the controller didn't create it, so just return (don't touch it)
+		return nil
+	}
+
+	// Otherwise, the Secret exists, so update it if the labels/annotations are inconsistent
 
 	updateNeeded := false
 

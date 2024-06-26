@@ -503,6 +503,118 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 					return deployment.Spec.Template.Spec.Containers[0].Resources.Limits[corev1.ResourceCPU] == resource.MustParse("555m")
 
 				}, "1m", "1s").Should(BeTrue(), "Deployment should switch to the new CPU limit on update of RolloutManager CR")
+			})
+		})
+
+		When("A RolloutManager is created with the SkipNotificationSecretDeployment option to true", func() {
+			It("should create the controller without the notification secret", func() {
+
+				rolloutsManager := rolloutsmanagerv1alpha1.RolloutManager{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "basic-rollouts-manager-with-skip-notification-secret",
+						Namespace: fixture.TestE2ENamespace,
+					},
+					Spec: rolloutsmanagerv1alpha1.RolloutManagerSpec{
+						NamespaceScoped:                  namespaceScopedParam,
+						SkipNotificationSecretDeployment: true,
+					},
+				}
+
+				Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
+
+				Eventually(rolloutsManager, "1m", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
+
+				secret := corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultRolloutsNotificationSecretName, Namespace: rolloutManager.Namespace},
+				}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&secret), &secret)).ToNot(Succeed())
+
+				By("Setting the SkipNotificationSecretDeployment to false")
+				err := k8s.UpdateWithoutConflict(ctx, &rolloutsManager, k8sClient, func(obj client.Object) {
+					goObj, ok := obj.(*rolloutsmanagerv1alpha1.RolloutManager)
+					Expect(ok).To(BeTrue())
+					goObj.Spec.SkipNotificationSecretDeployment = false
+				})
+
+				Expect(err).ToNot(HaveOccurred())
+				Eventually(&secret, "10s", "1s").Should(k8s.ExistByName(k8sClient))
+
+			})
+		})
+
+		When("A RolloutManager is created with the SkipNotificationSecretDeployment option to false", func() {
+			It("should create the controller with the notification secret", func() {
+
+				rolloutsManager := rolloutsmanagerv1alpha1.RolloutManager{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "basic-rollouts-manager-without-skip-notification-secret",
+						Namespace: fixture.TestE2ENamespace,
+					},
+					Spec: rolloutsmanagerv1alpha1.RolloutManagerSpec{
+						NamespaceScoped:                  namespaceScopedParam,
+						SkipNotificationSecretDeployment: false,
+					},
+				}
+
+				Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
+
+				Eventually(rolloutsManager, "1m", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
+
+				secret := corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultRolloutsNotificationSecretName, Namespace: rolloutManager.Namespace},
+				}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&secret), &secret)).To(Succeed())
+
+				By("Setting the SkipNotificationSecretDeployment to true")
+				err := k8s.UpdateWithoutConflict(ctx, &rolloutsManager, k8sClient, func(obj client.Object) {
+					goObj, ok := obj.(*rolloutsmanagerv1alpha1.RolloutManager)
+					Expect(ok).To(BeTrue())
+					goObj.Spec.SkipNotificationSecretDeployment = true
+				})
+
+				Expect(err).ToNot(HaveOccurred())
+				Eventually(&secret, "10s", "1s").ShouldNot(k8s.ExistByName(k8sClient))
+
+			})
+		})
+
+		When("A RolloutManager is deleted but the notification secret is owned by another controller", func() {
+			It("should not delete the secret", func() {
+
+				rolloutsManager := rolloutsmanagerv1alpha1.RolloutManager{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "basic-rollouts-manager-without-secret",
+						Namespace: fixture.TestE2ENamespace,
+					},
+					Spec: rolloutsmanagerv1alpha1.RolloutManagerSpec{
+						NamespaceScoped:                  namespaceScopedParam,
+						SkipNotificationSecretDeployment: true,
+					},
+				}
+
+				Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
+
+				Eventually(rolloutsManager, "1m", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
+
+				secret := corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultRolloutsNotificationSecretName, Namespace: rolloutManager.Namespace},
+				}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&secret), &secret)).ToNot(Succeed())
+
+				By("Creating the secret with another owner")
+				secret.OwnerReferences = append(secret.OwnerReferences, metav1.OwnerReference{
+					Name:       "another-owner",
+					APIVersion: "v1",
+					Kind:       "OwnerKind",
+					UID:        "1234",
+				})
+				Expect(k8sClient.Create(ctx, &secret)).To(Succeed())
+				Eventually(&secret, "10s", "1s").Should(k8s.ExistByName(k8sClient))
+
+				By("Deleting the RolloutManager")
+				Expect(k8sClient.Delete(ctx, &rolloutsManager)).To(Succeed())
+
+				Eventually(&secret, "10s", "1s").Should(k8s.ExistByName(k8sClient))
 
 			})
 		})

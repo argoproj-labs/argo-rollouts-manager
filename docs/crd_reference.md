@@ -78,7 +78,7 @@ spec:
 ```
 
 
-### RolloutManager example with metadata for the resources generatd
+### RolloutManager example with metadata for the resources generated
 
 You can provide labels and annotation for all the resources generated (Argo Rollouts controller, ConfigMap, etc.).
 
@@ -118,3 +118,18 @@ spec:
       memory: "128Mi"
       cpu: "500m"
 ```
+
+
+### RolloutManager example with an option to skip the argo rollouts notification secret deployment
+
+``` yaml
+apiVersion: argoproj.io/v1alpha1
+kind: RolloutManager
+metadata:
+  name: argo-rollout
+  labels:
+    example: with-metadata-example
+spec:
+  skipNotificationSecretDeployment: true
+```
+

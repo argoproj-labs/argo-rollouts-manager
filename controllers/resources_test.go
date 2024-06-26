@@ -993,6 +993,104 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 		})
 	})
 
+	Context("Rollouts notification secret reconciliation tests", func() {
+		var (
+			ctx context.Context
+			a   v1alpha1.RolloutManager
+			r   *RolloutManagerReconciler
+		)
+
+		BeforeEach(func() {
+			ctx = context.Background()
+			a = *makeTestRolloutManager()
+			r = makeTestReconciler(&a)
+			err := createNamespace(r, a.Namespace)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("Verify that RolloutManager with SkipNotificationSecretDeployment doesn't create a secret", func() {
+
+			By("Creating RolloutManager with SkipNotificationSecretDeployment set to true")
+			a.Spec.SkipNotificationSecretDeployment = true
+			Expect(r.reconcileRolloutsSecrets(ctx, a)).To(Succeed())
+
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      DefaultRolloutsNotificationSecretName,
+					Namespace: a.Namespace,
+				},
+				Type: corev1.SecretTypeOpaque,
+			}
+			Expect(fetchObject(ctx, r.Client, a.Namespace, secret.Name, secret)).ToNot(Succeed(), "secret should not exist after reconcile call")
+
+			By("Updating the RolloutManager with SkipNotificationSecretDeployment set to false")
+			a.Spec.SkipNotificationSecretDeployment = false
+			Expect(r.reconcileRolloutsSecrets(ctx, a)).To(Succeed())
+			Expect(fetchObject(ctx, r.Client, a.Namespace, secret.Name, secret)).To(Succeed(), "secret should exist after reconcile call")
+		})
+
+		It("Verify that RolloutManager can handle the case where SkipNotificationSecretDeployment is set on an existing instance", func() {
+			By("Creating RolloutManager with SkipNotificationSecretDeployment set to false")
+			a.Spec.SkipNotificationSecretDeployment = false
+			Expect(r.reconcileRolloutsSecrets(ctx, a)).To(Succeed())
+
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      DefaultRolloutsNotificationSecretName,
+					Namespace: a.Namespace,
+				},
+				Type: corev1.SecretTypeOpaque,
+			}
+			Expect(fetchObject(ctx, r.Client, a.Namespace, secret.Name, secret)).To(Succeed(), "secret should exist after reconcile call")
+
+			By("Updating the RolloutManager with SkipNotificationSecretDeployment set to true")
+			a.Spec.SkipNotificationSecretDeployment = true
+			Expect(r.reconcileRolloutsSecrets(ctx, a)).To(Succeed())
+			Expect(fetchObject(ctx, r.Client, a.Namespace, secret.Name, secret)).ToNot(Succeed(), "secret should not exist after reconcile call")
+		})
+
+		It("Verify that RolloutManager does not update an existing notification secret if it doesn't have the ownership", func() {
+			By("Creating RolloutManager with SkipNotificationSecretDeployment set to true")
+
+			a.Spec.SkipNotificationSecretDeployment = true
+			Expect(r.reconcileRolloutsSecrets(ctx, a)).To(Succeed())
+
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      DefaultRolloutsNotificationSecretName,
+					Namespace: a.Namespace,
+				},
+				Type: corev1.SecretTypeOpaque,
+			}
+			Expect(fetchObject(ctx, r.Client, a.Namespace, secret.Name, secret)).ToNot(Succeed(), "secret should exist after reconcile call")
+
+			By("Create the secret without the owner reference")
+			Expect(r.Client.Create(ctx, secret)).To(Succeed())
+
+			By("Updating the RolloutManager")
+			Expect(r.reconcileRolloutsSecrets(ctx, a)).To(Succeed())
+
+			By("Verifying that the secret was not updated")
+			Expect(fetchObject(ctx, r.Client, a.Namespace, secret.Name, secret)).To(Succeed(), "secret should exist after reconcile call")
+			Expect(secret.OwnerReferences).To(BeNil())
+
+			By("Adding another owner reference")
+			testRef := metav1.OwnerReference{
+				Name: "test",
+			}
+			secret.OwnerReferences = append(secret.OwnerReferences, testRef)
+			Expect(r.Client.Update(ctx, secret)).To(Succeed())
+
+			By("Updating the RolloutManager")
+			Expect(r.reconcileRolloutsSecrets(ctx, a)).To(Succeed())
+
+			By("Verifying that the secret was not updated")
+			Expect(fetchObject(ctx, r.Client, a.Namespace, secret.Name, secret)).To(Succeed(), "secret should exist after reconcile call")
+			Expect(secret.OwnerReferences).To(ContainElement(testRef))
+			Expect(len(secret.OwnerReferences)).To(Equal(1))
+		})
+	})
+
 })
 
 func serviceMonitor() *monitoringv1.ServiceMonitor {
