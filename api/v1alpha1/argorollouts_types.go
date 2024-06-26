@@ -49,6 +49,9 @@ type RolloutManagerSpec struct {
 
 	// Resources requests/limits for Argo Rollout controller
 	ControllerResources *corev1.ResourceRequirements `json:"controllerResources,omitempty"`
+
+	// SkipNotificationSecretDeployment lets you specify if the argo notification secret should be deployed
+	SkipNotificationSecretDeployment bool `json:"skipNotificationSecretDeployment,omitempty"`
 }
 
 // ArgoRolloutsNodePlacementSpec is used to specify NodeSelector and Tolerations for Rollouts workloads
