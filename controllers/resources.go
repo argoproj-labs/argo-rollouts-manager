@@ -456,6 +456,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.C
 
 // Reconciles Secrets for Rollouts controller
 func (r *RolloutManagerReconciler) reconcileRolloutsSecrets(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager) error {
+
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultRolloutsNotificationSecretName,
@@ -471,16 +472,30 @@ func (r *RolloutManagerReconciler) reconcileRolloutsSecrets(ctx context.Context,
 			return fmt.Errorf("failed to get the Secret %s: %w", secret.Name, err)
 		}
 
-		if err := controllerutil.SetControllerReference(&cr, secret, r.Scheme); err != nil {
-			return err
+		if !cr.Spec.SkipNotificationSecretDeployment {
+			if err := controllerutil.SetControllerReference(&cr, secret, r.Scheme); err != nil {
+				return err
+			}
+
+			log.Info(fmt.Sprintf("Creating Secret %s", secret.Name))
+			return r.Client.Create(ctx, secret)
+		} else {
+			// Secret not found, but SkipNotificationSecretDeployment is set to true, hence skipping the creation
+			return nil
 		}
+	} else {
 
-		log.Info(fmt.Sprintf("Creating Secret %s", secret.Name))
-		return r.Client.Create(ctx, secret)
+		// Secret found, delete it if required by the spec
+		if cr.Spec.SkipNotificationSecretDeployment {
+			controller := metav1.GetControllerOf(secret)
+			if controller != nil && controller.Name == cr.Name {
+				log.Info(fmt.Sprintf("SkipNotificationSecretDeployment has been set to true, deleting secret %s", secret.Name))
+				return r.Client.Delete(ctx, secret)
+			}
+			// If the controller is not the current owner, then do nothing
+		}
+		return nil
 	}
-
-	// secret found, do nothing
-	return nil
 }
 
 // Deletes rollout resources when the corresponding rollout CR is deleted.
@@ -534,9 +549,23 @@ func (r *RolloutManagerReconciler) deleteRolloutResources(ctx context.Context, c
 				Namespace: cr.Namespace,
 			},
 		}
-		if err := r.Client.Delete(ctx, secret); err != nil {
-			log.Error(err, fmt.Sprintf("Error deleting the secret %s in %s",
+
+		err := fetchObject(ctx, r.Client, cr.Namespace, secret.Name, secret)
+		if err != nil && !apierrors.IsNotFound(err) {
+			log.Error(err, fmt.Sprintf("Error getting the secret %s in %s",
 				DefaultRolloutsNotificationSecretName, cr.Namespace))
+		} else {
+			controller := metav1.GetControllerOf(secret)
+			if controller == nil || controller.Name != cr.Name {
+				log.Info(fmt.Sprintf("The secret %s in %s is not owned by %s, skipping deletion",
+					DefaultRolloutsNotificationSecretName, cr.Namespace, cr.Name))
+			} else {
+				err = r.Client.Delete(ctx, secret)
+				if err != nil {
+					log.Error(err, fmt.Sprintf("Error deleting the secret %s in %s",
+						DefaultRolloutsNotificationSecretName, cr.Namespace))
+				}
+			}
 		}
 
 		deploy := &appsv1.Deployment{

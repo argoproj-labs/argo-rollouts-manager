@@ -46,6 +46,9 @@ type RolloutManagerSpec struct {
 
 	// Metadata to apply to the generated resources
 	AdditionalMetadata *ResourceMetadata `json:"additionalMetadata,omitempty"`
+
+	// SkipNotificationSecretDeployment lets you specify if the argo notification secret should be deployed
+	SkipNotificationSecretDeployment bool `json:"skipNotificationSecretDeployment,omitempty"`
 }
 
 // ArgoRolloutsNodePlacementSpec is used to specify NodeSelector and Tolerations for Rollouts workloads
