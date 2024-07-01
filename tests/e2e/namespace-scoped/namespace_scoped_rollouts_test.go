@@ -30,6 +30,17 @@ var _ = Describe("Namespace-scoped RolloutManager tests", func() {
 
 	Context("Testing namespace-scoped RolloutManager behaviour", func() {
 
+		// Use slightly different NodePorts from default, to avoid conflicting with any other Services using NodePorts on the cluster. This is not an issue when running E2E tests via GitHub actions, but is more likely to be an issue when running against, e.g. a large cluster like default OpenShift.
+		const (
+			testServiceNodePort_31000 = 31130
+			testServiceNodePort_31001 = 31131
+			testServiceNodePort_31002 = 31132
+
+			testServiceNodePort_32000 = 32230
+			testServiceNodePort_32001 = 32231
+			testServiceNodePort_32002 = 32232
+			testServiceNodePort_32003 = 32_233
+		)
 		var (
 			err       error
 			ctx       context.Context
@@ -73,7 +84,7 @@ var _ = Describe("Namespace-scoped RolloutManager tests", func() {
 			By("Verify argo Rollouts controller is able to reconcile CR.")
 
 			By("Create and validate rollouts.")
-			utils.ValidateArgoRolloutsResources(ctx, k8sClient, nsName, 31000, 32000)
+			utils.ValidateArgoRolloutsResources(ctx, k8sClient, nsName, testServiceNodePort_31000, testServiceNodePort_32000)
 		})
 
 		/*
@@ -100,7 +111,7 @@ var _ = Describe("Namespace-scoped RolloutManager tests", func() {
 			By("1st RM: Verify argo Rollouts controller of 1st namespace is able to reconcile CR created in 1st namespace.")
 
 			By("1st RM: Create and validate rollouts.")
-			utils.ValidateArgoRolloutsResources(ctx, k8sClient, fixture.TestE2ENamespace, 31000, 32000)
+			utils.ValidateArgoRolloutsResources(ctx, k8sClient, fixture.TestE2ENamespace, testServiceNodePort_31000, testServiceNodePort_32000)
 
 			By("2nd RM: Create 2nd namespace.")
 			Expect(utils.CreateNamespace(ctx, k8sClient, nsName1)).To(Succeed())
@@ -118,7 +129,7 @@ var _ = Describe("Namespace-scoped RolloutManager tests", func() {
 			By("2nd RM: Verify argo Rollouts controller of 2nd namespace is able to reconcile CR created in 2nd namespace.")
 
 			By("2nd RM: Create and validate rollouts in 2nd namespace.")
-			utils.ValidateArgoRolloutsResources(ctx, k8sClient, nsName1, 31001, 32001)
+			utils.ValidateArgoRolloutsResources(ctx, k8sClient, nsName1, testServiceNodePort_31001, testServiceNodePort_32001)
 
 			By("1st RM: Update 1st RolloutManager, after reconciliation it should still work.")
 			err = k8s.UpdateWithoutConflict(ctx, &rolloutsManagerNs1, k8sClient, func(obj client.Object) {
@@ -197,11 +208,11 @@ var _ = Describe("Namespace-scoped RolloutManager tests", func() {
 			Expect(utils.CreateNamespace(ctx, k8sClient, nsName2)).To(Succeed())
 
 			By("2nd NS: Create active and preview services required for Rollout CR in 2nd namespace.")
-			rolloutServiceActive, err := utils.CreateService(ctx, k8sClient, utils.RolloutsActiveServiceName, nsName2, 31000)
+			rolloutServiceActive, err := utils.CreateService(ctx, k8sClient, utils.RolloutsActiveServiceName, nsName2, testServiceNodePort_31000)
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(&rolloutServiceActive, "10s", "1s").Should(k8s.ExistByName(k8sClient))
 
-			rolloutServicePreview, err := utils.CreateService(ctx, k8sClient, utils.RolloutsPreviewServiceName, nsName2, 32000)
+			rolloutServicePreview, err := utils.CreateService(ctx, k8sClient, utils.RolloutsPreviewServiceName, nsName2, testServiceNodePort_32000)
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(&rolloutServicePreview, "10s", "1s").Should(k8s.ExistByName(k8sClient))
 
@@ -280,16 +291,16 @@ var _ = Describe("Namespace-scoped RolloutManager tests", func() {
 			Eventually(rolloutsManagerNs, "1m", "1s").Should(rmFixture.HaveSuccessCondition())
 
 			By("1st RM: Create Rollout CR in 1st namespace and ensure it is reconciled.")
-			utils.ValidateArgoRolloutsResources(ctx, k8sClient, fixture.TestE2ENamespace, 31000, 32000)
+			utils.ValidateArgoRolloutsResources(ctx, k8sClient, fixture.TestE2ENamespace, testServiceNodePort_31000, testServiceNodePort_32000)
 
 			By("2nd RM: Create Rollout in 2nd namespace and it should not be reconciled as 2nd RolloutManager failed.")
 
 			By("2nd RM: Create active and preview services in 2nd namespace.")
-			rolloutServiceActive, err := utils.CreateService(ctx, k8sClient, utils.RolloutsActiveServiceName, nsName, 31001)
+			rolloutServiceActive, err := utils.CreateService(ctx, k8sClient, utils.RolloutsActiveServiceName, nsName, testServiceNodePort_31001)
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(&rolloutServiceActive, "10s", "1s").Should(k8s.ExistByName(k8sClient))
 
-			rolloutServicePreview, err := utils.CreateService(ctx, k8sClient, utils.RolloutsPreviewServiceName, nsName, 32002)
+			rolloutServicePreview, err := utils.CreateService(ctx, k8sClient, utils.RolloutsPreviewServiceName, nsName, testServiceNodePort_32002)
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(&rolloutServicePreview, "10s", "1s").Should(k8s.ExistByName(k8sClient))
 
@@ -344,7 +355,7 @@ var _ = Describe("Namespace-scoped RolloutManager tests", func() {
 			By("Verify argo Rollouts controller is able to reconcile CR.")
 
 			By("Create and validate rollouts.")
-			utils.ValidateArgoRolloutsResources(ctx, k8sClient, nsName, 31000, 32000)
+			utils.ValidateArgoRolloutsResources(ctx, k8sClient, nsName, testServiceNodePort_31000, testServiceNodePort_32000)
 		})
 	})
 })

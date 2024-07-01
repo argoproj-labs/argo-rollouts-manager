@@ -28,6 +28,18 @@ var _ = Describe("Cluster-scoped RolloutManager tests", func() {
 
 	Context("Testing cluster-scoped RolloutManager behaviour", func() {
 
+		// Use slightly different NodePorts from default, to avoid conflicting with any other Services using NodePorts on the cluster. This is not an issue when running E2E tests via GitHub actions, but is more likely to be an issue when running against, e.g. a large cluster like default OpenShift.
+		const (
+			testServiceNodePort_31000 = 31130
+			testServiceNodePort_31001 = 31131
+			testServiceNodePort_31002 = 31132
+
+			testServiceNodePort_32000 = 32230
+			testServiceNodePort_32001 = 32231
+			testServiceNodePort_32002 = 32232
+			testServiceNodePort_32003 = 32233
+		)
+
 		var (
 			err       error
 			ctx       context.Context
@@ -81,7 +93,7 @@ var _ = Describe("Cluster-scoped RolloutManager tests", func() {
 			Expect(utils.CreateNamespace(ctx, k8sClient, nsName)).To(Succeed())
 
 			By("Create and validate rollouts.")
-			utils.ValidateArgoRolloutsResources(ctx, k8sClient, nsName, 31000, 32000)
+			utils.ValidateArgoRolloutsResources(ctx, k8sClient, nsName, testServiceNodePort_31000, testServiceNodePort_32000)
 		})
 
 		/*
@@ -115,13 +127,13 @@ var _ = Describe("Cluster-scoped RolloutManager tests", func() {
 			Expect(utils.CreateNamespace(ctx, k8sClient, nsName2)).To(Succeed())
 
 			By("1st Namespace: Create and validate Rollout in 1st namespace.")
-			utils.ValidateArgoRolloutsResources(ctx, k8sClient, nsName2, 31000, 32000)
+			utils.ValidateArgoRolloutsResources(ctx, k8sClient, nsName2, testServiceNodePort_31000, testServiceNodePort_32000)
 
 			By("2nd Namespace: Create a another namespace for 2nd Rollout.")
 			Expect(utils.CreateNamespace(ctx, k8sClient, nsName3)).To(Succeed())
 
 			By("2nd Namespace: Create and validate Rollout in 2nd namespace.")
-			utils.ValidateArgoRolloutsResources(ctx, k8sClient, nsName3, 31001, 32002)
+			utils.ValidateArgoRolloutsResources(ctx, k8sClient, nsName3, testServiceNodePort_31001, testServiceNodePort_32002)
 		})
 
 		/*
@@ -147,7 +159,7 @@ var _ = Describe("Cluster-scoped RolloutManager tests", func() {
 			Eventually(rolloutsManagerCl, "1m", "1s").Should(rmFixture.HaveSuccessCondition())
 
 			By("1st RM: Create and validate Rollout in 1st namespace.")
-			utils.ValidateArgoRolloutsResources(ctx, k8sClient, fixture.TestE2ENamespace, 31000, 32000)
+			utils.ValidateArgoRolloutsResources(ctx, k8sClient, fixture.TestE2ENamespace, testServiceNodePort_31000, testServiceNodePort_32000)
 
 			By("2nd RM: Create 2nd namespace.")
 			Expect(utils.CreateNamespace(ctx, k8sClient, nsName1)).To(Succeed())
@@ -169,7 +181,7 @@ var _ = Describe("Cluster-scoped RolloutManager tests", func() {
 				}))
 
 			By("2nd RM: Create and validate Rollout in 2nd namespace.")
-			utils.ValidateArgoRolloutsResources(ctx, k8sClient, nsName1, 31001, 32002)
+			utils.ValidateArgoRolloutsResources(ctx, k8sClient, nsName1, testServiceNodePort_31001, testServiceNodePort_32002)
 
 			By("1st RM: Update cluster-scoped RolloutManager, after reconciliation it should still work.")
 			err = k8s.UpdateWithoutConflict(ctx, &rolloutsManagerCl, k8sClient, func(obj client.Object) {
@@ -190,7 +202,7 @@ var _ = Describe("Cluster-scoped RolloutManager tests", func() {
 			Expect(utils.CreateNamespace(ctx, k8sClient, nsName2)).To(Succeed())
 
 			By("2nd RM: Create and validate Rollout in 3rd namespace.")
-			utils.ValidateArgoRolloutsResources(ctx, k8sClient, nsName2, 31002, 32003)
+			utils.ValidateArgoRolloutsResources(ctx, k8sClient, nsName2, testServiceNodePort_31002, testServiceNodePort_32003)
 		})
 
 		/*
@@ -218,7 +230,7 @@ var _ = Describe("Cluster-scoped RolloutManager tests", func() {
 			Eventually(rolloutsManagerCl, "1m", "1s").Should(rmFixture.HaveSuccessCondition())
 
 			By("1st RM: Create and validate Rollout in 1st namespace.")
-			utils.ValidateArgoRolloutsResources(ctx, k8sClient, fixture.TestE2ENamespace, 31000, 32000)
+			utils.ValidateArgoRolloutsResources(ctx, k8sClient, fixture.TestE2ENamespace, testServiceNodePort_31000, testServiceNodePort_32000)
 
 			By("2nd RM: Create 2nd namespace.")
 			Expect(utils.CreateNamespace(ctx, k8sClient, nsName1)).To(Succeed())
@@ -240,7 +252,7 @@ var _ = Describe("Cluster-scoped RolloutManager tests", func() {
 				}))
 
 			By("2nd RM: Create and validate Rollout in 2nd namespace.")
-			utils.ValidateArgoRolloutsResources(ctx, k8sClient, nsName1, 31001, 32001)
+			utils.ValidateArgoRolloutsResources(ctx, k8sClient, nsName1, testServiceNodePort_31001, testServiceNodePort_32001)
 
 			By("1st RM: Update first RolloutManager, after reconciliation it should also stop working.")
 			err = k8s.UpdateWithoutConflict(ctx, &rolloutsManagerCl, k8sClient, func(obj client.Object) {
@@ -267,7 +279,7 @@ var _ = Describe("Cluster-scoped RolloutManager tests", func() {
 			Expect(utils.CreateNamespace(ctx, k8sClient, nsName2)).To(Succeed())
 
 			By("1st RM: Create and validate Rollout in 3rd namespace.")
-			utils.ValidateArgoRolloutsResources(ctx, k8sClient, nsName2, 31002, 32002)
+			utils.ValidateArgoRolloutsResources(ctx, k8sClient, nsName2, testServiceNodePort_31002, testServiceNodePort_32002)
 		})
 
 		It("After creating 2 cluster-scoped RolloutManager in a namespace, delete 1st RolloutManager and verify it removes the Failed status of 2nd RolloutManager", func() {
