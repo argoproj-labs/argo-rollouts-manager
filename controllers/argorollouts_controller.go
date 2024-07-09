@@ -233,7 +233,7 @@ func (r *RolloutManagerReconciler) enqueueOtherRolloutManagersExceptObj(context 
 	// List all other RolloutMangers on the cluster
 	rmList := rolloutsmanagerv1alpha1.RolloutManagerList{}
 	if err := r.List(context, &rmList); err != nil {
-		log.Error(err, "Unable to list all RolloutManagers in queueOtherRolloutManagers")
+		log.Error(err, "Unable to list all RolloutManagers in enqueueOtherRolloutManagersExceptObj")
 		return []reconcile.Request{}
 	}
 
