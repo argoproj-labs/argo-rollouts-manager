@@ -1,8 +1,6 @@
 module github.com/argoproj-labs/argo-rollouts-manager
 
-go 1.22
-
-toolchain go1.22.2
+go 1.21
 
 require (
 	github.com/coreos/prometheus-operator v0.40.0

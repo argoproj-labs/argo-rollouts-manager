@@ -200,10 +200,6 @@ func identifyDeploymentDifference(x appsv1.Deployment, y appsv1.Deployment) stri
 		return ".Spec.Strategy"
 	}
 
-	if !reflect.DeepEqual(x.Annotations, y.Annotations) {
-		return "Annotations"
-	}
-
 	if !reflect.DeepEqual(x.Labels, y.Labels) {
 		return "Labels"
 	}
