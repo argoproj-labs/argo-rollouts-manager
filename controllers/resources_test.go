@@ -29,42 +29,74 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 		BeforeEach(func() {
 			ctx = context.Background()
 			a = *makeTestRolloutManager()
+
+			a.Spec = v1alpha1.RolloutManagerSpec{
+				AdditionalMetadata: &v1alpha1.ResourceMetadata{
+					Labels: map[string]string{
+						"keylabel": "valuelabel",
+					},
+					Annotations: map[string]string{
+						"keyannotation": "valueannotation",
+					},
+				},
+			}
+
 			r = makeTestReconciler(&a)
 			err := createNamespace(r, a.Namespace)
 			Expect(err).ToNot(HaveOccurred())
+
 		})
 
 		It("Test for reconcileRolloutsServiceAccount function", func() {
-			_, err := r.reconcileRolloutsServiceAccount(ctx, a)
+			sa, err := r.reconcileRolloutsServiceAccount(ctx, a)
 			Expect(err).ToNot(HaveOccurred())
+			Expect(sa.ObjectMeta.Labels["keylabel"]).To(Equal(a.Spec.AdditionalMetadata.Labels["keylabel"]))
+			Expect(sa.ObjectMeta.Annotations["keyannotation"]).To(Equal(a.Spec.AdditionalMetadata.Annotations["keyannotation"]))
 		})
 
 		It("Test for reconcileRolloutsRole function", func() {
 			role, err := r.reconcileRolloutsRole(ctx, a)
 			Expect(err).ToNot(HaveOccurred())
+			Expect(role.ObjectMeta.Labels["keylabel"]).To(Equal(a.Spec.AdditionalMetadata.Labels["keylabel"]))
+			Expect(role.ObjectMeta.Annotations["keyannotation"]).To(Equal(a.Spec.AdditionalMetadata.Annotations["keyannotation"]))
 
 			By("Modify Rules of Role.")
 			role.Rules[0].Verbs = append(role.Rules[0].Verbs, "test")
 			Expect(r.Client.Update(ctx, role)).To(Succeed())
 
+			By("Modify Labels of RM to verify whether label is updated in Role.")
+			a.Spec.AdditionalMetadata.Labels["keylabel"] = "keylabel-update"
+			Expect(r.Client.Update(ctx, &a)).To(Succeed())
+
 			By("Reconciler should revert modifications.")
 			role, err = r.reconcileRolloutsRole(ctx, a)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(role.Rules).To(Equal(GetPolicyRules()))
+			Expect(role.ObjectMeta.Labels["keylabel"]).To(Equal(a.Spec.AdditionalMetadata.Labels["keylabel"]))
+			Expect(role.ObjectMeta.Annotations["keyannotation"]).To(Equal(a.Spec.AdditionalMetadata.Annotations["keyannotation"]))
 		})
 
 		It("Test for reconcileRolloutsClusterRole function", func() {
 			clusterRole, err := r.reconcileRolloutsClusterRole(ctx, a)
 			Expect(err).ToNot(HaveOccurred())
+			Expect(clusterRole.ObjectMeta.Labels["keylabel"]).To(Equal(a.Spec.AdditionalMetadata.Labels["keylabel"]))
+			Expect(clusterRole.ObjectMeta.Annotations["keyannotation"]).To(Equal(a.Spec.AdditionalMetadata.Annotations["keyannotation"]))
 
-			By("Modify Rules of Role.")
+			By("Modify Rules of ClusterRole.")
 			clusterRole.Rules[0].Verbs = append(clusterRole.Rules[0].Verbs, "test")
 			Expect(r.Client.Update(ctx, clusterRole)).To(Succeed())
+
+			By("Modify Labels of RM to verify whether label and annotation is updated in ClusterRole.")
+			a.Spec.AdditionalMetadata.Labels["keylabel"] = "keylabel-update"
+			a.Spec.AdditionalMetadata.Annotations["keyannotation"] = "keyannotation-update"
+			Expect(r.Client.Update(ctx, &a)).To(Succeed())
 
 			By("Reconciler should revert modifications.")
 			clusterRole, err = r.reconcileRolloutsClusterRole(ctx, a)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(clusterRole.Rules).To(Equal(GetPolicyRules()))
+			Expect(clusterRole.ObjectMeta.Labels["keylabel"]).To(Equal(a.Spec.AdditionalMetadata.Labels["keylabel"]))
+			Expect(clusterRole.ObjectMeta.Annotations["keyannotation"]).To(Equal(a.Spec.AdditionalMetadata.Annotations["keyannotation"]))
 		})
 
 		It("Test for reconcileRolloutsRoleBinding function", func() {
@@ -75,7 +107,6 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 
 			Expect(r.reconcileRolloutsRoleBinding(ctx, a, role, sa)).To(Succeed())
 
-			By("Modify Subject of RoleBinding.")
 			rb := &rbacv1.RoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      DefaultArgoRolloutsResourceName,
@@ -84,14 +115,26 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 			}
 			Expect(fetchObject(ctx, r.Client, a.Namespace, rb.Name, rb)).To(Succeed())
 
+			By("Verify labels and annotations of RoleBinding are updated.")
+			Expect(rb.ObjectMeta.Labels["keylabel"]).To(Equal(a.Spec.AdditionalMetadata.Labels["keylabel"]))
+			Expect(rb.ObjectMeta.Annotations["keyannotation"]).To(Equal(a.Spec.AdditionalMetadata.Annotations["keyannotation"]))
+
+			By("Modify Subject of RoleBinding.")
 			subTemp := rb.Subjects
 			rb.Subjects = append(rb.Subjects, rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Name: "test", Namespace: "test"})
 			Expect(r.Client.Update(ctx, rb)).To(Succeed())
+
+			By("Modify Labels of RM to verify whether label and annotation is updated in RoleBinding(.")
+			a.Spec.AdditionalMetadata.Labels["keylabel"] = "keylabel-update"
+			a.Spec.AdditionalMetadata.Annotations["keyannotation"] = "keyannotation-update"
+			Expect(r.Client.Update(ctx, &a)).To(Succeed())
 
 			By("Reconciler should revert modifications.")
 			Expect(r.reconcileRolloutsRoleBinding(ctx, a, role, sa)).To(Succeed())
 			Expect(fetchObject(ctx, r.Client, a.Namespace, rb.Name, rb)).To(Succeed())
 			Expect(rb.Subjects).To(Equal(subTemp))
+			Expect(rb.ObjectMeta.Labels["keylabel"]).To(Equal(a.Spec.AdditionalMetadata.Labels["keylabel"]))
+			Expect(rb.ObjectMeta.Annotations["keyannotation"]).To(Equal(a.Spec.AdditionalMetadata.Annotations["keyannotation"]))
 		})
 
 		It("Test for reconcileRolloutsClusterRoleBinding function", func() {
@@ -102,7 +145,6 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 
 			Expect(r.reconcileRolloutsClusterRoleBinding(ctx, clusterRole, sa, a)).To(Succeed())
 
-			By("Modify Subject of ClusterRoleBinding.")
 			crb := &rbacv1.ClusterRoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: DefaultArgoRolloutsResourceName,
@@ -110,79 +152,145 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 			}
 			Expect(fetchObject(ctx, r.Client, "", crb.Name, crb)).To(Succeed())
 
+			By("Verify labels and annotations of ClusterRoleBinding are updated.")
+			Expect(crb.ObjectMeta.Labels["keylabel"]).To(Equal(a.Spec.AdditionalMetadata.Labels["keylabel"]))
+			Expect(crb.ObjectMeta.Annotations["keyannotation"]).To(Equal(a.Spec.AdditionalMetadata.Annotations["keyannotation"]))
+
+			By("Modify Subject of ClusterRoleBinding.")
 			subTemp := crb.Subjects
 			crb.Subjects = append(crb.Subjects, rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Name: "test", Namespace: "test"})
 			Expect(r.Client.Update(ctx, crb)).To(Succeed())
+
+			By("Modify Labels of RM to verify whether label and annotation is updated in ClusterRoleBinding.")
+			a.Spec.AdditionalMetadata.Labels["keylabel"] = "keylabel-update"
+			a.Spec.AdditionalMetadata.Annotations["keyannotation"] = "keyannotation-update"
+			Expect(r.Client.Update(ctx, &a)).To(Succeed())
 
 			By("Reconciler should revert modifications.")
 			Expect(r.reconcileRolloutsClusterRoleBinding(ctx, clusterRole, sa, a)).To(Succeed())
 			Expect(fetchObject(ctx, r.Client, "", crb.Name, crb)).To(Succeed())
 			Expect(crb.Subjects).To(Equal(subTemp))
+			Expect(crb.ObjectMeta.Labels["keylabel"]).To(Equal(a.Spec.AdditionalMetadata.Labels["keylabel"]))
+			Expect(crb.ObjectMeta.Annotations["keyannotation"]).To(Equal(a.Spec.AdditionalMetadata.Annotations["keyannotation"]))
 		})
 
 		It("Test for reconcileRolloutsAggregateToAdminClusterRole function", func() {
 			Expect(r.reconcileRolloutsAggregateToAdminClusterRole(ctx, a)).To(Succeed())
 
-			By("Modify Rules of ClusterRole.")
 			clusterRole := &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "argo-rollouts-aggregate-to-admin",
 				},
 			}
 			Expect(fetchObject(ctx, r.Client, "", clusterRole.Name, clusterRole)).To(Succeed())
+
+			By("Verify labels and annotations of ClusterRole are updated.")
+			Expect(clusterRole.ObjectMeta.Labels["keylabel"]).To(Equal(a.Spec.AdditionalMetadata.Labels["keylabel"]))
+			Expect(clusterRole.ObjectMeta.Annotations["keyannotation"]).To(Equal(a.Spec.AdditionalMetadata.Annotations["keyannotation"]))
+
+			By("Modify Rules of ClusterRole.")
 			clusterRole.Rules[0].Verbs = append(clusterRole.Rules[0].Verbs, "test")
 			Expect(r.Client.Update(ctx, clusterRole)).To(Succeed())
+
+			By("Modify Labels of RM to verify whether label and annotation is updated in ClusterRole.")
+			a.Spec.AdditionalMetadata.Labels["keylabel"] = "keylabel-update"
+			a.Spec.AdditionalMetadata.Annotations["keyannotation"] = "keyannotation-update"
+			Expect(r.Client.Update(ctx, &a)).To(Succeed())
 
 			By("Reconciler should revert modifications.")
 			Expect(r.reconcileRolloutsAggregateToAdminClusterRole(ctx, a)).To(Succeed())
 			Expect(fetchObject(ctx, r.Client, "", clusterRole.Name, clusterRole)).To(Succeed())
 			Expect(clusterRole.Rules).To(Equal(GetAggregateToAdminPolicyRules()))
+			Expect(clusterRole.ObjectMeta.Labels["keylabel"]).To(Equal(a.Spec.AdditionalMetadata.Labels["keylabel"]))
+			Expect(clusterRole.ObjectMeta.Annotations["keyannotation"]).To(Equal(a.Spec.AdditionalMetadata.Annotations["keyannotation"]))
 		})
 
 		It("Test for reconcileRolloutsAggregateToEditClusterRole function", func() {
 			Expect(r.reconcileRolloutsAggregateToEditClusterRole(ctx, a)).To(Succeed())
 
-			By("Modify Rules of ClusterRole.")
 			clusterRole := &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "argo-rollouts-aggregate-to-edit",
 				},
 			}
 			Expect(fetchObject(ctx, r.Client, "", clusterRole.Name, clusterRole)).To(Succeed())
+
+			By("Verify labels and annotations of ClusterRole are updated.")
+			Expect(clusterRole.ObjectMeta.Labels["keylabel"]).To(Equal(a.Spec.AdditionalMetadata.Labels["keylabel"]))
+			Expect(clusterRole.ObjectMeta.Annotations["keyannotation"]).To(Equal(a.Spec.AdditionalMetadata.Annotations["keyannotation"]))
+
+			By("Modify Rules of ClusterRole.")
 			clusterRole.Rules[0].Verbs = append(clusterRole.Rules[0].Verbs, "test")
 			Expect(r.Client.Update(ctx, clusterRole)).To(Succeed())
+
+			By("Modify Labels of RM to verify whether label and annotation is updated in ClusterRole.")
+			a.Spec.AdditionalMetadata.Labels["keylabel"] = "keylabel-update"
+			a.Spec.AdditionalMetadata.Annotations["keyannotation"] = "keyannotation-update"
+			Expect(r.Client.Update(ctx, &a)).To(Succeed())
 
 			By("Reconciler should revert modifications.")
 			Expect(r.reconcileRolloutsAggregateToEditClusterRole(ctx, a)).To(Succeed())
 			Expect(fetchObject(ctx, r.Client, "", clusterRole.Name, clusterRole)).To(Succeed())
 			Expect(clusterRole.Rules).To(Equal(GetAggregateToEditPolicyRules()))
+			Expect(clusterRole.ObjectMeta.Labels["keylabel"]).To(Equal(a.Spec.AdditionalMetadata.Labels["keylabel"]))
+			Expect(clusterRole.ObjectMeta.Annotations["keyannotation"]).To(Equal(a.Spec.AdditionalMetadata.Annotations["keyannotation"]))
 		})
 
 		It("Test for reconcileRolloutsAggregateToViewClusterRole function", func() {
 			Expect(r.reconcileRolloutsAggregateToViewClusterRole(ctx, a)).To(Succeed())
 
-			By("Modify Rules of ClusterRole.")
 			clusterRole := &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "argo-rollouts-aggregate-to-view",
 				},
 			}
 			Expect(fetchObject(ctx, r.Client, "", clusterRole.Name, clusterRole)).To(Succeed())
+
+			By("Verify labels and annotations of ClusterRole are updated.")
+			Expect(clusterRole.ObjectMeta.Labels["keylabel"]).To(Equal(a.Spec.AdditionalMetadata.Labels["keylabel"]))
+			Expect(clusterRole.ObjectMeta.Annotations["keyannotation"]).To(Equal(a.Spec.AdditionalMetadata.Annotations["keyannotation"]))
+
+			By("Modify Rules of ClusterRole.")
 			clusterRole.Rules[0].Verbs = append(clusterRole.Rules[0].Verbs, "test")
 			Expect(r.Client.Update(ctx, clusterRole)).To(Succeed())
+
+			By("Modify Labels of RM to verify whether label and annotation is updated in ClusterRole.")
+			a.Spec.AdditionalMetadata.Labels["keylabel"] = "keylabel-update"
+			a.Spec.AdditionalMetadata.Annotations["keyannotation"] = "keyannotation-update"
+			Expect(r.Client.Update(ctx, &a)).To(Succeed())
 
 			By("Reconciler should revert modifications.")
 			Expect(r.reconcileRolloutsAggregateToViewClusterRole(ctx, a)).To(Succeed())
 			Expect(fetchObject(ctx, r.Client, "", clusterRole.Name, clusterRole)).To(Succeed())
 			Expect(clusterRole.Rules).To(Equal(GetAggregateToViewPolicyRules()))
+			Expect(clusterRole.ObjectMeta.Labels["keylabel"]).To(Equal(a.Spec.AdditionalMetadata.Labels["keylabel"]))
+			Expect(clusterRole.ObjectMeta.Annotations["keyannotation"]).To(Equal(a.Spec.AdditionalMetadata.Annotations["keyannotation"]))
 		})
 
 		It("Test for reconcileRolloutsMetricsService function", func() {
 			Expect(r.reconcileRolloutsMetricsService(ctx, a)).To(Succeed())
+			service := &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      DefaultArgoRolloutsMetricsServiceName,
+					Namespace: a.Namespace,
+				},
+			}
+			Expect(fetchObject(ctx, r.Client, a.Namespace, service.Name, service)).To(Succeed())
+			Expect(service.ObjectMeta.Labels["keylabel"]).To(Equal(a.Spec.AdditionalMetadata.Labels["keylabel"]))
+			Expect(service.ObjectMeta.Annotations["keyannotation"]).To(Equal(a.Spec.AdditionalMetadata.Annotations["keyannotation"]))
 		})
 
 		It("Test for reconcileRolloutsSecrets function", func() {
 			Expect(r.reconcileRolloutsSecrets(ctx, a)).To(Succeed())
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      DefaultRolloutsNotificationSecretName,
+					Namespace: a.Namespace,
+				},
+			}
+			Expect(fetchObject(ctx, r.Client, a.Namespace, secret.Name, secret)).To(Succeed())
+			Expect(secret.ObjectMeta.Labels["keylabel"]).To(Equal(a.Spec.AdditionalMetadata.Labels["keylabel"]))
+			Expect(secret.ObjectMeta.Annotations["keyannotation"]).To(Equal(a.Spec.AdditionalMetadata.Annotations["keyannotation"]))
 		})
 
 		It("test for removeClusterScopedResourcesIfApplicable function", func() {
@@ -231,6 +339,228 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 
 			Expect(r.removeClusterScopedResourcesIfApplicable(ctx)).To(Succeed(), "calling the function again should not return an error")
 
+		})
+
+		Context("Verify whether existing labels are not getting removed from resources", func() {
+			var err error
+			It("verify for ServiceAccount", func() {
+				serviceAccount := createServiceAccount(DefaultArgoRolloutsResourceName, a.Namespace, map[string]string{
+					"my-label": "my-value",
+				})
+				Expect(r.Client.Create(ctx, serviceAccount)).To(Succeed())
+
+				serviceAccount, err = r.reconcileRolloutsServiceAccount(ctx, a)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(serviceAccount.ObjectMeta.Labels["my-label"]).ToNot(BeEmpty())
+				Expect(serviceAccount.ObjectMeta.Labels["my-label"]).To(Equal("my-value"))
+				Expect(serviceAccount.ObjectMeta.Labels["keylabel"]).To(Equal(a.Spec.AdditionalMetadata.Labels["keylabel"]))
+				Expect(serviceAccount.ObjectMeta.Annotations["keyannotation"]).To(Equal(a.Spec.AdditionalMetadata.Annotations["keyannotation"]))
+			})
+
+			It("verify for Role", func() {
+				role := createRole(DefaultArgoRolloutsResourceName, a.Namespace, map[string]string{
+					"my-label": "my-value",
+				})
+				Expect(r.Client.Create(ctx, role)).To(Succeed())
+
+				role, err = r.reconcileRolloutsRole(ctx, a)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(role.ObjectMeta.Labels["my-label"]).ToNot(BeEmpty())
+				Expect(role.ObjectMeta.Labels["my-label"]).To(Equal("my-value"))
+				Expect(role.ObjectMeta.Labels["keylabel"]).To(Equal(a.Spec.AdditionalMetadata.Labels["keylabel"]))
+				Expect(role.ObjectMeta.Annotations["keyannotation"]).To(Equal(a.Spec.AdditionalMetadata.Annotations["keyannotation"]))
+			})
+
+			It("verify for ClusterRole", func() {
+				clusterRole := createClusterRole(DefaultArgoRolloutsResourceName, map[string]string{
+					"my-label": "my-value",
+				})
+				Expect(r.Client.Create(ctx, clusterRole)).To(Succeed())
+
+				clusterRole, err = r.reconcileRolloutsClusterRole(ctx, a)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(clusterRole.ObjectMeta.Labels["my-label"]).ToNot(BeEmpty())
+				Expect(clusterRole.ObjectMeta.Labels["my-label"]).To(Equal("my-value"))
+				Expect(clusterRole.ObjectMeta.Labels["keylabel"]).To(Equal(a.Spec.AdditionalMetadata.Labels["keylabel"]))
+				Expect(clusterRole.ObjectMeta.Annotations["keyannotation"]).To(Equal(a.Spec.AdditionalMetadata.Annotations["keyannotation"]))
+			})
+			It("verify for RoleBinding", func() {
+				serviceAccount := createServiceAccount(DefaultArgoRolloutsResourceName, a.Namespace, map[string]string{
+					"my-label": "my-value",
+				})
+				Expect(r.Client.Create(ctx, serviceAccount)).To(Succeed())
+
+				role := createRole(DefaultArgoRolloutsResourceName, a.Namespace, map[string]string{
+					"my-label": "my-value",
+				})
+				Expect(r.Client.Create(ctx, role)).To(Succeed())
+
+				rb := &rbacv1.RoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      DefaultArgoRolloutsResourceName,
+						Namespace: a.Namespace,
+						Labels: map[string]string{
+							"my-label": "my-value",
+						},
+					},
+				}
+				Expect(r.Client.Create(ctx, rb)).To(Succeed())
+
+				err = r.reconcileRolloutsRoleBinding(ctx, a, role, serviceAccount)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(fetchObject(ctx, r.Client, a.Namespace, rb.Name, rb)).To(Succeed())
+
+				Expect(rb.ObjectMeta.Labels["my-label"]).ToNot(BeEmpty())
+				Expect(rb.ObjectMeta.Labels["my-label"]).To(Equal("my-value"))
+				Expect(rb.ObjectMeta.Labels["keylabel"]).To(Equal(a.Spec.AdditionalMetadata.Labels["keylabel"]))
+				Expect(rb.ObjectMeta.Annotations["keyannotation"]).To(Equal(a.Spec.AdditionalMetadata.Annotations["keyannotation"]))
+			})
+
+			It("verify for ClusterRoleBinding", func() {
+				serviceAccount := createServiceAccount(DefaultArgoRolloutsResourceName, a.Namespace, map[string]string{
+					"my-label": "my-value",
+				})
+				Expect(r.Client.Create(ctx, serviceAccount)).To(Succeed())
+
+				clusterRole := createClusterRole(DefaultArgoRolloutsResourceName, map[string]string{
+					"my-label": "my-value",
+				})
+				Expect(r.Client.Create(ctx, clusterRole)).To(Succeed())
+				crb := &rbacv1.ClusterRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: DefaultArgoRolloutsResourceName,
+						Labels: map[string]string{
+							"my-label": "my-value",
+						},
+					},
+				}
+				Expect(r.Client.Create(ctx, crb)).To(Succeed())
+
+				err = r.reconcileRolloutsClusterRoleBinding(ctx, clusterRole, serviceAccount, a)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(fetchObject(ctx, r.Client, "", crb.Name, crb)).To(Succeed())
+
+				Expect(crb.ObjectMeta.Labels["my-label"]).ToNot(BeEmpty())
+				Expect(crb.ObjectMeta.Labels["my-label"]).To(Equal("my-value"))
+				Expect(crb.ObjectMeta.Labels["keylabel"]).To(Equal(a.Spec.AdditionalMetadata.Labels["keylabel"]))
+				Expect(crb.ObjectMeta.Annotations["keyannotation"]).To(Equal(a.Spec.AdditionalMetadata.Annotations["keyannotation"]))
+			})
+
+			It("verify for aggregate-to-admin ClusterRole", func() {
+				clusterRoleAggregateToAdmin := &rbacv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "argo-rollouts-aggregate-to-admin",
+						Labels: map[string]string{
+							"my-label": "my-value",
+						},
+					},
+				}
+				Expect(r.Client.Create(ctx, clusterRoleAggregateToAdmin)).To(Succeed())
+
+				err = r.reconcileRolloutsAggregateToAdminClusterRole(ctx, a)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(fetchObject(ctx, r.Client, "", clusterRoleAggregateToAdmin.Name, clusterRoleAggregateToAdmin)).To(Succeed())
+
+				Expect(clusterRoleAggregateToAdmin.ObjectMeta.Labels["my-label"]).ToNot(BeEmpty())
+				Expect(clusterRoleAggregateToAdmin.ObjectMeta.Labels["my-label"]).To(Equal("my-value"))
+				Expect(clusterRoleAggregateToAdmin.ObjectMeta.Labels["keylabel"]).To(Equal(a.Spec.AdditionalMetadata.Labels["keylabel"]))
+				Expect(clusterRoleAggregateToAdmin.ObjectMeta.Annotations["keyannotation"]).To(Equal(a.Spec.AdditionalMetadata.Annotations["keyannotation"]))
+			})
+
+			It("verify for aggregate-to-edit ClusterRole", func() {
+				clusterRoleAggregateToEdit := &rbacv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "argo-rollouts-aggregate-to-edit",
+						Labels: map[string]string{
+							"my-label": "my-value",
+						},
+					},
+				}
+				Expect(r.Client.Create(ctx, clusterRoleAggregateToEdit)).To(Succeed())
+
+				err = r.reconcileRolloutsAggregateToEditClusterRole(ctx, a)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(fetchObject(ctx, r.Client, "", clusterRoleAggregateToEdit.Name, clusterRoleAggregateToEdit)).To(Succeed())
+
+				Expect(clusterRoleAggregateToEdit.ObjectMeta.Labels["my-label"]).ToNot(BeEmpty())
+				Expect(clusterRoleAggregateToEdit.ObjectMeta.Labels["my-label"]).To(Equal("my-value"))
+				Expect(clusterRoleAggregateToEdit.ObjectMeta.Labels["keylabel"]).To(Equal(a.Spec.AdditionalMetadata.Labels["keylabel"]))
+				Expect(clusterRoleAggregateToEdit.ObjectMeta.Annotations["keyannotation"]).To(Equal(a.Spec.AdditionalMetadata.Annotations["keyannotation"]))
+			})
+			It("verify for aggregate-to-view ClusterRole", func() {
+				clusterRoleAggregateToView := &rbacv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "argo-rollouts-aggregate-to-view",
+						Labels: map[string]string{
+							"my-label": "my-value",
+						},
+					},
+				}
+				Expect(r.Client.Create(ctx, clusterRoleAggregateToView)).To(Succeed())
+
+				err = r.reconcileRolloutsAggregateToViewClusterRole(ctx, a)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(fetchObject(ctx, r.Client, "", clusterRoleAggregateToView.Name, clusterRoleAggregateToView)).To(Succeed())
+
+				Expect(clusterRoleAggregateToView.ObjectMeta.Labels["my-label"]).ToNot(BeEmpty())
+				Expect(clusterRoleAggregateToView.ObjectMeta.Labels["my-label"]).To(Equal("my-value"))
+				Expect(clusterRoleAggregateToView.ObjectMeta.Labels["keylabel"]).To(Equal(a.Spec.AdditionalMetadata.Labels["keylabel"]))
+				Expect(clusterRoleAggregateToView.ObjectMeta.Annotations["keyannotation"]).To(Equal(a.Spec.AdditionalMetadata.Annotations["keyannotation"]))
+			})
+
+			It("verify for Service", func() {
+				svc := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      DefaultArgoRolloutsMetricsServiceName,
+						Namespace: a.Namespace,
+						Labels: map[string]string{
+							"my-label": "my-value",
+						},
+					},
+				}
+				Expect(r.Client.Create(ctx, svc)).To(Succeed())
+
+				err = r.reconcileRolloutsMetricsService(ctx, a)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(fetchObject(ctx, r.Client, a.Namespace, svc.Name, svc)).To(Succeed())
+
+				Expect(svc.ObjectMeta.Labels["my-label"]).ToNot(BeEmpty())
+				Expect(svc.ObjectMeta.Labels["my-label"]).To(Equal("my-value"))
+				Expect(svc.ObjectMeta.Labels["keylabel"]).To(Equal(a.Spec.AdditionalMetadata.Labels["keylabel"]))
+				Expect(svc.ObjectMeta.Annotations["keyannotation"]).To(Equal(a.Spec.AdditionalMetadata.Annotations["keyannotation"]))
+			})
+
+			It("verify for Secret", func() {
+				secret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      DefaultRolloutsNotificationSecretName,
+						Namespace: a.Namespace,
+						Labels: map[string]string{
+							"my-label": "my-value",
+						},
+					},
+					Type: corev1.SecretTypeOpaque,
+				}
+				Expect(r.Client.Create(ctx, secret)).To(Succeed())
+
+				err = r.reconcileRolloutsSecrets(ctx, a)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(fetchObject(ctx, r.Client, a.Namespace, secret.Name, secret)).To(Succeed())
+
+				Expect(secret.ObjectMeta.Labels["my-label"]).ToNot(BeEmpty())
+				Expect(secret.ObjectMeta.Labels["my-label"]).To(Equal("my-value"))
+				Expect(secret.ObjectMeta.Labels["keylabel"]).To(Equal(a.Spec.AdditionalMetadata.Labels["keylabel"]))
+				Expect(secret.ObjectMeta.Annotations["keyannotation"]).To(Equal(a.Spec.AdditionalMetadata.Annotations["keyannotation"]))
+			})
 		})
 	})
 
@@ -470,4 +800,33 @@ func serviceMonitor() *monitoringv1.ServiceMonitor {
 		},
 	}
 	return sm
+}
+
+func createServiceAccount(name, namespace string, labels map[string]string) *corev1.ServiceAccount {
+	return &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels:    labels,
+		},
+	}
+}
+
+func createRole(name, namespace string, labels map[string]string) *rbacv1.Role {
+	return &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels:    labels,
+		},
+	}
+}
+
+func createClusterRole(name string, labels map[string]string) *rbacv1.ClusterRole {
+	return &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: labels,
+		},
+	}
 }

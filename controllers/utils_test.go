@@ -382,6 +382,79 @@ var _ = Describe("validateRolloutsScope tests", func() {
 	})
 })
 
+var _ = Describe("removeUserLabelsAndAnnotations tests", func() {
+	var (
+		obj       metav1.ObjectMeta
+		cr        rolloutsmanagerv1alpha1.RolloutManager
+		ctx       context.Context
+		k8sClient client.WithWatch
+	)
+
+	BeforeEach(func() {
+		s := scheme.Scheme
+		Expect(rolloutsmanagerv1alpha1.AddToScheme(s)).To(Succeed())
+
+		ctx = context.Background()
+		log = logger.FromContext(ctx)
+		k8sClient = fake.NewClientBuilder().WithStatusSubresource(&rolloutsmanagerv1alpha1.RolloutManager{}).WithScheme(s).Build()
+
+		cr = rolloutsmanagerv1alpha1.RolloutManager{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-rm-1",
+				Namespace: "test-ns-1",
+			},
+			Spec: rolloutsmanagerv1alpha1.RolloutManagerSpec{
+				NamespaceScoped: false,
+			},
+		}
+	})
+
+	DescribeTable("should correctly remove user labels and annotations",
+		func(initialLabels, initialAnnotations, expectedLabels, expectedAnnotations map[string]string) {
+			obj = metav1.ObjectMeta{
+				Labels:      initialLabels,
+				Annotations: initialAnnotations,
+			}
+
+			Expect(k8sClient.Create(ctx, &cr)).To(Succeed())
+			setRolloutsLabelsAndAnnotations(&obj)
+
+			removeUserLabelsAndAnnotations(&obj, cr)
+
+			Expect(obj.Labels).To(Equal(expectedLabels))
+			Expect(obj.Annotations).To(Equal(expectedAnnotations))
+		},
+		Entry("when no user-defined labels or annotations exist",
+			map[string]string{}, map[string]string{},
+			map[string]string{"app.kubernetes.io/name": DefaultArgoRolloutsResourceName,
+				"app.kubernetes.io/part-of":   DefaultArgoRolloutsResourceName,
+				"app.kubernetes.io/component": DefaultArgoRolloutsResourceName},
+			map[string]string{},
+		),
+		Entry("when user-defined labels and annotations are present",
+			map[string]string{"user-label": "value"}, map[string]string{"user-annotation": "value"},
+			map[string]string{"app.kubernetes.io/name": DefaultArgoRolloutsResourceName,
+				"app.kubernetes.io/part-of":   DefaultArgoRolloutsResourceName,
+				"app.kubernetes.io/component": DefaultArgoRolloutsResourceName},
+			map[string]string{},
+		),
+		Entry("when user-defined labels are present and annotations are empty",
+			map[string]string{"user-label": "value"}, map[string]string{},
+			map[string]string{"app.kubernetes.io/name": DefaultArgoRolloutsResourceName,
+				"app.kubernetes.io/part-of":   DefaultArgoRolloutsResourceName,
+				"app.kubernetes.io/component": DefaultArgoRolloutsResourceName},
+			map[string]string{},
+		),
+		Entry("when user-defined labels are present and annotations are empty",
+			map[string]string{}, map[string]string{"user-annotation": "value"},
+			map[string]string{"app.kubernetes.io/name": DefaultArgoRolloutsResourceName,
+				"app.kubernetes.io/part-of":   DefaultArgoRolloutsResourceName,
+				"app.kubernetes.io/component": DefaultArgoRolloutsResourceName},
+			map[string]string{},
+		),
+	)
+})
+
 const (
 	testNamespace          = "rollouts"
 	testRolloutManagerName = "rollouts"
