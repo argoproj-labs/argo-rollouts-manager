@@ -19,101 +19,151 @@ import (
 
 // Reconciles Rollouts ServiceAccount.
 func (r *RolloutManagerReconciler) reconcileRolloutsServiceAccount(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager) (*corev1.ServiceAccount, error) {
-
-	sa := &corev1.ServiceAccount{
+	expectedServiceAccount := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultArgoRolloutsResourceName,
 			Namespace: cr.Namespace,
 		},
 	}
-	setRolloutsLabelsAndAnnotationsToObject(&sa.ObjectMeta, cr)
+	setRolloutsLabelsAndAnnotationsToObject(&expectedServiceAccount.ObjectMeta, cr)
 
-	if err := fetchObject(ctx, r.Client, cr.Namespace, sa.Name, sa); err != nil {
+	liveServiceAccount := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: expectedServiceAccount.Name, Namespace: expectedServiceAccount.Namespace}}
+	if err := fetchObject(ctx, r.Client, cr.Namespace, liveServiceAccount.Name, liveServiceAccount); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("failed to get the ServiceAccount associated with %s: %w", sa.Name, err)
+			return nil, fmt.Errorf("failed to get the ServiceAccount associated with %s: %w", liveServiceAccount.Name, err)
 		}
 
-		if err := controllerutil.SetControllerReference(&cr, sa, r.Scheme); err != nil {
+		if err := controllerutil.SetControllerReference(&cr, expectedServiceAccount, r.Scheme); err != nil {
 			return nil, err
 		}
 
-		log.Info(fmt.Sprintf("Creating ServiceAccount %s", sa.Name))
-		err := r.Client.Create(ctx, sa)
-		if err != nil {
-			return nil, err
-		}
-
+		log.Info(fmt.Sprintf("Creating ServiceAccount %s", expectedServiceAccount.Name))
+		return expectedServiceAccount, r.Client.Create(ctx, expectedServiceAccount)
 	}
-	return sa, nil
+
+	updateNeeded := false
+
+	normalizedLiveServiceAccount := liveServiceAccount.DeepCopy()
+	removeUserLabelsAndAnnotations(&normalizedLiveServiceAccount.ObjectMeta, cr)
+
+	if !reflect.DeepEqual(normalizedLiveServiceAccount.Labels, expectedServiceAccount.Labels) || !reflect.DeepEqual(normalizedLiveServiceAccount.Annotations, expectedServiceAccount.Annotations) {
+		updateNeeded = true
+		log.Info(fmt.Sprintf("Labels/Annotations of ServiceAccount %s do not match the expected state, hence updating it", liveServiceAccount.Name))
+
+		liveServiceAccount.Labels = combineStringMaps(liveServiceAccount.Labels, expectedServiceAccount.Labels)
+		liveServiceAccount.Annotations = combineStringMaps(liveServiceAccount.Annotations, expectedServiceAccount.Annotations)
+	}
+
+	if updateNeeded {
+		// Update if the Role already exists and needs to be modified
+		return liveServiceAccount, r.Client.Update(ctx, liveServiceAccount)
+	}
+
+	return liveServiceAccount, nil
 }
 
 // Reconciles Rollouts Role.
 func (r *RolloutManagerReconciler) reconcileRolloutsRole(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager) (*rbacv1.Role, error) {
-
 	expectedPolicyRules := GetPolicyRules()
 
-	role := &rbacv1.Role{
+	expectedRole := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultArgoRolloutsResourceName,
 			Namespace: cr.Namespace,
 		},
 	}
-	setRolloutsLabelsAndAnnotationsToObject(&role.ObjectMeta, cr)
+	setRolloutsLabelsAndAnnotationsToObject(&expectedRole.ObjectMeta, cr)
 
-	if err := fetchObject(ctx, r.Client, cr.Namespace, role.Name, role); err != nil {
+	liveRole := &rbacv1.Role{ObjectMeta: metav1.ObjectMeta{Name: expectedRole.Name, Namespace: expectedRole.Namespace}}
+
+	if err := fetchObject(ctx, r.Client, cr.Namespace, liveRole.Name, liveRole); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("failed to reconcile the Role for the ServiceAccount associated with %s: %w", role.Name, err)
+			return nil, fmt.Errorf("failed to reconcile the Role for the ServiceAccount associated with %s: %w", liveRole.Name, err)
 		}
 
-		if err = controllerutil.SetControllerReference(&cr, role, r.Scheme); err != nil {
+		if err = controllerutil.SetControllerReference(&cr, expectedRole, r.Scheme); err != nil {
 			return nil, err
 		}
 
-		log.Info(fmt.Sprintf("Creating Role %s", role.Name))
-		role.Rules = expectedPolicyRules
-		return role, r.Client.Create(ctx, role)
+		log.Info(fmt.Sprintf("Creating Role %s", expectedRole.Name))
+		expectedRole.Rules = expectedPolicyRules
+		return expectedRole, r.Client.Create(ctx, expectedRole)
 	}
 
-	// Reconcile if the Role already exists and modified.
-	if !reflect.DeepEqual(role.Rules, expectedPolicyRules) {
-		log.Info(fmt.Sprintf("PolicyRules of Role %s do not match the expected state, hence updating it", role.Name))
-		role.Rules = expectedPolicyRules
-		return role, r.Client.Update(ctx, role)
+	updateNeeded := false
+
+	if !reflect.DeepEqual(liveRole.Rules, expectedPolicyRules) {
+		updateNeeded = true
+
+		log.Info(fmt.Sprintf("PolicyRules of Role %s do not match the expected state, hence updating it", liveRole.Name))
+		liveRole.Rules = expectedPolicyRules
 	}
 
-	return role, nil
+	normalizedLiveRole := liveRole.DeepCopy()
+
+	removeUserLabelsAndAnnotations(&normalizedLiveRole.ObjectMeta, cr)
+
+	if !reflect.DeepEqual(normalizedLiveRole.Labels, expectedRole.Labels) || !reflect.DeepEqual(normalizedLiveRole.Annotations, expectedRole.Annotations) {
+		updateNeeded = true
+		log.Info(fmt.Sprintf("Labels/Annotations of Role %s do not match the expected state, hence updating it", liveRole.Name))
+
+		liveRole.Labels = combineStringMaps(liveRole.Labels, expectedRole.Labels)
+		liveRole.Annotations = combineStringMaps(liveRole.Annotations, expectedRole.Annotations)
+	}
+
+	if updateNeeded {
+		// Update if the Role already exists and needs to be modified
+		return liveRole, r.Client.Update(ctx, liveRole)
+	}
+
+	return liveRole, nil
 }
 
 // Reconciles Rollouts ClusterRole.
 func (r *RolloutManagerReconciler) reconcileRolloutsClusterRole(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager) (*rbacv1.ClusterRole, error) {
-
 	expectedPolicyRules := GetPolicyRules()
 
-	clusterRole := &rbacv1.ClusterRole{
+	expectedClusterRole := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: DefaultArgoRolloutsResourceName,
 		},
 	}
-	setRolloutsLabelsAndAnnotationsToObject(&clusterRole.ObjectMeta, cr)
-
-	if err := fetchObject(ctx, r.Client, "", clusterRole.Name, clusterRole); err != nil {
+	setRolloutsLabelsAndAnnotationsToObject(&expectedClusterRole.ObjectMeta, cr)
+	liveClusterRole := &rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: expectedClusterRole.Name, Namespace: expectedClusterRole.Namespace}}
+	if err := fetchObject(ctx, r.Client, "", liveClusterRole.Name, liveClusterRole); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("failed to Reconcile the ClusterRole for the ServiceAccount associated with %s: %w", clusterRole.Name, err)
+			return nil, fmt.Errorf("failed to Reconcile the ClusterRole for the ServiceAccount associated with %s: %w", liveClusterRole.Name, err)
 		}
 
-		log.Info(fmt.Sprintf("Creating ClusterRole %s", clusterRole.Name))
-		clusterRole.Rules = expectedPolicyRules
-		return clusterRole, r.Client.Create(ctx, clusterRole)
+		log.Info(fmt.Sprintf("Creating ClusterRole %s", liveClusterRole.Name))
+		expectedClusterRole.Rules = expectedPolicyRules
+		return expectedClusterRole, r.Client.Create(ctx, expectedClusterRole)
 	}
 
-	// Reconcile if the ClusterRole already exists and modified.
-	if !reflect.DeepEqual(clusterRole.Rules, expectedPolicyRules) {
-		log.Info(fmt.Sprintf("PolicyRules of ClusterRole %s do not match the expected state, hence updating it", clusterRole.Name))
-		clusterRole.Rules = expectedPolicyRules
-		return clusterRole, r.Client.Update(ctx, clusterRole)
+	updateNeeded := false
+
+	if !reflect.DeepEqual(liveClusterRole.Rules, expectedPolicyRules) {
+		updateNeeded = true
+		log.Info(fmt.Sprintf("PolicyRules of ClusterRole %s do not match the expected state, hence updating it", liveClusterRole.Name))
+		liveClusterRole.Rules = expectedPolicyRules
 	}
 
-	return clusterRole, nil
+	normalizedLiveClusterRole := liveClusterRole.DeepCopy()
+	removeUserLabelsAndAnnotations(&normalizedLiveClusterRole.ObjectMeta, cr)
+
+	if !reflect.DeepEqual(normalizedLiveClusterRole.Labels, expectedClusterRole.Labels) || !reflect.DeepEqual(normalizedLiveClusterRole.Annotations, expectedClusterRole.Annotations) {
+		updateNeeded = true
+		log.Info(fmt.Sprintf("Labels/Annotations of Role %s do not match the expected state, hence updating it", liveClusterRole.Name))
+
+		liveClusterRole.Labels = combineStringMaps(liveClusterRole.Labels, expectedClusterRole.Labels)
+		liveClusterRole.Annotations = combineStringMaps(liveClusterRole.Annotations, expectedClusterRole.Annotations)
+	}
+
+	if updateNeeded {
+		// Update if the ClusterRole already exists and needs to be modified
+		return liveClusterRole, r.Client.Update(ctx, liveClusterRole)
+	}
+	return liveClusterRole, nil
 }
 
 // Reconcile Rollouts RoleBinding.
@@ -149,10 +199,9 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRoleBinding(ctx context.Cont
 		},
 	}
 
-	actualRoleBinding := &rbacv1.RoleBinding{}
-
 	// Fetch the RoleBinding if exists and store that in actualRoleBinding.
-	if err := fetchObject(ctx, r.Client, cr.Namespace, expectedRoleBinding.Name, actualRoleBinding); err != nil {
+	liveRoleBinding := &rbacv1.RoleBinding{ObjectMeta: metav1.ObjectMeta{Name: expectedRoleBinding.Name, Namespace: expectedRoleBinding.Namespace}}
+	if err := fetchObject(ctx, r.Client, cr.Namespace, liveRoleBinding.Name, liveRoleBinding); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to get the RoleBinding associated with %s: %w", expectedRoleBinding.Name, err)
 		}
@@ -165,11 +214,29 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRoleBinding(ctx context.Cont
 		return r.Client.Create(ctx, expectedRoleBinding)
 	}
 
+	updateNeeded := false
+
 	// Reconcile if the RoleBinding already exists and modified.
-	if !reflect.DeepEqual(expectedRoleBinding.Subjects, actualRoleBinding.Subjects) {
-		log.Info(fmt.Sprintf("Subjects of RoleBinding %s do not match the expected state, hence updating it", actualRoleBinding.Name))
-		actualRoleBinding.Subjects = expectedRoleBinding.Subjects
-		if err := r.Client.Update(ctx, actualRoleBinding); err != nil {
+	if !reflect.DeepEqual(expectedRoleBinding.Subjects, liveRoleBinding.Subjects) {
+		updateNeeded = true
+		log.Info(fmt.Sprintf("Subjects of RoleBinding %s do not match the expected state, hence updating it", liveRoleBinding.Name))
+		liveRoleBinding.Subjects = expectedRoleBinding.Subjects
+
+	}
+
+	normalizedLiveRoleBinding := liveRoleBinding.DeepCopy()
+	removeUserLabelsAndAnnotations(&normalizedLiveRoleBinding.ObjectMeta, cr)
+	if !reflect.DeepEqual(normalizedLiveRoleBinding.Labels, expectedRoleBinding.Labels) || !reflect.DeepEqual(normalizedLiveRoleBinding.Annotations, expectedRoleBinding.Annotations) {
+		updateNeeded = true
+		log.Info(fmt.Sprintf("Labels/Annotations of RoleBinding %s do not match the expected state, hence updating it", liveRoleBinding.Name))
+
+		liveRoleBinding.Labels = combineStringMaps(liveRoleBinding.Labels, expectedRoleBinding.Labels)
+		liveRoleBinding.Annotations = combineStringMaps(liveRoleBinding.Annotations, expectedRoleBinding.Annotations)
+	}
+
+	if updateNeeded {
+		// Update if the RoleBinding already exists and needs to be modified
+		if err := r.Client.Update(ctx, liveRoleBinding); err != nil {
 			return err
 		}
 	}
@@ -209,10 +276,9 @@ func (r *RolloutManagerReconciler) reconcileRolloutsClusterRoleBinding(ctx conte
 		},
 	}
 
-	actualClusterRoleBinding := &rbacv1.ClusterRoleBinding{}
-
 	// Fetch the ClusterRoleBinding if exists and store that in actualClusterRoleBinding.
-	if err := fetchObject(ctx, r.Client, "", expectedClusterRoleBinding.Name, actualClusterRoleBinding); err != nil {
+	liveClusterRoleBinding := &rbacv1.ClusterRoleBinding{ObjectMeta: metav1.ObjectMeta{Name: expectedClusterRoleBinding.Name}}
+	if err := fetchObject(ctx, r.Client, "", liveClusterRoleBinding.Name, liveClusterRoleBinding); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to get the ClusterRoleBinding associated with %s: %w", expectedClusterRoleBinding.Name, err)
 		}
@@ -221,11 +287,27 @@ func (r *RolloutManagerReconciler) reconcileRolloutsClusterRoleBinding(ctx conte
 		return r.Client.Create(ctx, expectedClusterRoleBinding)
 	}
 
-	// Reconcile if the ClusterRoleBinding already exists and modified.
-	if !reflect.DeepEqual(expectedClusterRoleBinding.Subjects, actualClusterRoleBinding.Subjects) {
+	updateNeeded := false
+
+	if !reflect.DeepEqual(expectedClusterRoleBinding.Subjects, liveClusterRoleBinding.Subjects) {
+		updateNeeded = true
 		log.Info(fmt.Sprintf("Subjects of ClusterRoleBinding %s do not match the expected state, hence updating it", expectedClusterRoleBinding.Name))
-		actualClusterRoleBinding.Subjects = expectedClusterRoleBinding.Subjects
-		if err := r.Client.Update(ctx, actualClusterRoleBinding); err != nil {
+		liveClusterRoleBinding.Subjects = expectedClusterRoleBinding.Subjects
+	}
+
+	normalizedLiveClusterRoleBinding := liveClusterRoleBinding.DeepCopy()
+	removeUserLabelsAndAnnotations(&normalizedLiveClusterRoleBinding.ObjectMeta, cr)
+	if !reflect.DeepEqual(normalizedLiveClusterRoleBinding.Labels, expectedClusterRoleBinding.Labels) || !reflect.DeepEqual(normalizedLiveClusterRoleBinding.Annotations, expectedClusterRoleBinding.Annotations) {
+		updateNeeded = true
+		log.Info(fmt.Sprintf("Labels/Annotations of ClusterRoleBinding %s do not match the expected state, hence updating it", liveClusterRoleBinding.Name))
+
+		liveClusterRoleBinding.Labels = combineStringMaps(liveClusterRoleBinding.Labels, expectedClusterRoleBinding.Labels)
+		liveClusterRoleBinding.Annotations = combineStringMaps(liveClusterRoleBinding.Annotations, expectedClusterRoleBinding.Annotations)
+	}
+
+	if updateNeeded {
+		// Update if the ClusterRoleBinding already exists and needs to be modified
+		if err := r.Client.Update(ctx, liveClusterRoleBinding); err != nil {
 			return err
 		}
 	}
@@ -289,31 +371,47 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToAdminClusterRole(
 
 	expectedPolicyRules := GetAggregateToAdminPolicyRules()
 
-	clusterRole := &rbacv1.ClusterRole{
+	expectedClusterRole := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 	}
-	setRolloutsAggregatedClusterRoleLabels(&clusterRole.ObjectMeta, name, aggregationType)
-	setAdditionalRolloutsLabelsAndAnnotationsToObject(&clusterRole.ObjectMeta, cr)
+	setRolloutsAggregatedClusterRoleLabels(&expectedClusterRole.ObjectMeta, name, aggregationType)
+	setAdditionalRolloutsLabelsAndAnnotationsToObject(&expectedClusterRole.ObjectMeta, cr)
 
-	if err := fetchObject(ctx, r.Client, "", clusterRole.Name, clusterRole); err != nil {
+	liveClusterRole := &rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: expectedClusterRole.Name}}
+	if err := fetchObject(ctx, r.Client, "", liveClusterRole.Name, liveClusterRole); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to reconcile the aggregated ClusterRole %s: %w", clusterRole.Name, err)
+			return fmt.Errorf("failed to reconcile the aggregated ClusterRole %s: %w", liveClusterRole.Name, err)
 		}
 
-		log.Info(fmt.Sprintf("Creating aggregated ClusterRole %s", clusterRole.Name))
-		clusterRole.Rules = expectedPolicyRules
-		return r.Client.Create(ctx, clusterRole)
+		log.Info(fmt.Sprintf("Creating aggregated ClusterRole %s", liveClusterRole.Name))
+		expectedClusterRole.Rules = expectedPolicyRules
+		return r.Client.Create(ctx, expectedClusterRole)
 	}
 
-	// Reconcile if the aggregated CusterRole already exists and modified.
-	if !reflect.DeepEqual(clusterRole.Rules, expectedPolicyRules) {
-		log.Info(fmt.Sprintf("PolicyRules of ClusterRole %s do not match the expected state, hence updating it", clusterRole.Name))
-		clusterRole.Rules = expectedPolicyRules
-		return r.Client.Update(ctx, clusterRole)
+	updateNeeded := false
+
+	if !reflect.DeepEqual(liveClusterRole.Rules, expectedPolicyRules) {
+		updateNeeded = true
+		log.Info(fmt.Sprintf("PolicyRules of ClusterRole %s do not match the expected state, hence updating it", liveClusterRole.Name))
+		liveClusterRole.Rules = expectedPolicyRules
 	}
 
+	normalizedLiveClusterRole := liveClusterRole.DeepCopy()
+	removeUserLabelsAndAnnotations(&normalizedLiveClusterRole.ObjectMeta, cr)
+	if !reflect.DeepEqual(normalizedLiveClusterRole.Labels, expectedClusterRole.Labels) || !reflect.DeepEqual(normalizedLiveClusterRole.Annotations, expectedClusterRole.Annotations) {
+		updateNeeded = true
+		log.Info(fmt.Sprintf("Labels/Annotations of aggregated ClusterRole %s do not match the expected state, hence updating it", liveClusterRole.Name))
+
+		liveClusterRole.Labels = combineStringMaps(liveClusterRole.Labels, expectedClusterRole.Labels)
+		liveClusterRole.Annotations = combineStringMaps(liveClusterRole.Annotations, expectedClusterRole.Annotations)
+	}
+
+	if updateNeeded {
+		// Update if the aggregated ClusterRole already exists and needs to be modified
+		return r.Client.Update(ctx, liveClusterRole)
+	}
 	return nil
 }
 
@@ -325,31 +423,47 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToEditClusterRole(c
 
 	expectedPolicyRules := GetAggregateToEditPolicyRules()
 
-	clusterRole := &rbacv1.ClusterRole{
+	expectedClusterRole := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 	}
-	setRolloutsAggregatedClusterRoleLabels(&clusterRole.ObjectMeta, name, aggregationType)
-	setAdditionalRolloutsLabelsAndAnnotationsToObject(&clusterRole.ObjectMeta, cr)
+	setRolloutsAggregatedClusterRoleLabels(&expectedClusterRole.ObjectMeta, name, aggregationType)
+	setAdditionalRolloutsLabelsAndAnnotationsToObject(&expectedClusterRole.ObjectMeta, cr)
 
-	if err := fetchObject(ctx, r.Client, "", clusterRole.Name, clusterRole); err != nil {
+	liveClusterRole := &rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: expectedClusterRole.Name}}
+	if err := fetchObject(ctx, r.Client, "", liveClusterRole.Name, liveClusterRole); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to reconcile the aggregated ClusterRole %s: %w", clusterRole.Name, err)
+			return fmt.Errorf("failed to reconcile the aggregated ClusterRole %s: %w", liveClusterRole.Name, err)
 		}
 
-		log.Info(fmt.Sprintf("Creating aggregated ClusterRole %s", clusterRole.Name))
-		clusterRole.Rules = expectedPolicyRules
-		return r.Client.Create(ctx, clusterRole)
+		log.Info(fmt.Sprintf("Creating aggregated ClusterRole %s", expectedClusterRole.Name))
+		expectedClusterRole.Rules = expectedPolicyRules
+		return r.Client.Create(ctx, expectedClusterRole)
 	}
 
-	// Reconcile if the aggregated ClusterRole already exists and modified.
-	if !reflect.DeepEqual(clusterRole.Rules, expectedPolicyRules) {
-		log.Info(fmt.Sprintf("PolicyRules of ClusterRole %s do not match the expected state, hence updating it", clusterRole.Name))
-		clusterRole.Rules = expectedPolicyRules
-		return r.Client.Update(ctx, clusterRole)
+	updateNeeded := false
+
+	if !reflect.DeepEqual(liveClusterRole.Rules, expectedPolicyRules) {
+		updateNeeded = true
+		log.Info(fmt.Sprintf("PolicyRules of ClusterRole %s do not match the expected state, hence updating it", liveClusterRole.Name))
+		liveClusterRole.Rules = expectedPolicyRules
 	}
 
+	normalizedLiveClusterRole := liveClusterRole.DeepCopy()
+	removeUserLabelsAndAnnotations(&normalizedLiveClusterRole.ObjectMeta, cr)
+	if !reflect.DeepEqual(normalizedLiveClusterRole.Labels, expectedClusterRole.Labels) || !reflect.DeepEqual(normalizedLiveClusterRole.Annotations, expectedClusterRole.Annotations) {
+		updateNeeded = true
+		log.Info(fmt.Sprintf("Labels/Annotations of aggregated ClusterRole %s do not match the expected state, hence updating it", liveClusterRole.Name))
+
+		liveClusterRole.Labels = combineStringMaps(liveClusterRole.Labels, expectedClusterRole.Labels)
+		liveClusterRole.Annotations = combineStringMaps(liveClusterRole.Annotations, expectedClusterRole.Annotations)
+	}
+
+	if updateNeeded {
+		// Update if the aggregated ClusterRole already exists and needs to be modified
+		return r.Client.Update(ctx, liveClusterRole)
+	}
 	return nil
 }
 
@@ -361,29 +475,46 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToViewClusterRole(c
 
 	expectedPolicyRules := GetAggregateToViewPolicyRules()
 
-	clusterRole := &rbacv1.ClusterRole{
+	expectedClusterRole := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 	}
-	setRolloutsAggregatedClusterRoleLabels(&clusterRole.ObjectMeta, name, aggregationType)
-	setAdditionalRolloutsLabelsAndAnnotationsToObject(&clusterRole.ObjectMeta, cr)
+	setRolloutsAggregatedClusterRoleLabels(&expectedClusterRole.ObjectMeta, name, aggregationType)
+	setAdditionalRolloutsLabelsAndAnnotationsToObject(&expectedClusterRole.ObjectMeta, cr)
 
-	if err := fetchObject(ctx, r.Client, "", clusterRole.Name, clusterRole); err != nil {
+	liveClusterRole := &rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: expectedClusterRole.Name, Namespace: expectedClusterRole.Namespace}}
+	if err := fetchObject(ctx, r.Client, "", liveClusterRole.Name, liveClusterRole); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to reconcile the aggregated ClusterRole %s: %w", clusterRole.Name, err)
+			return fmt.Errorf("failed to reconcile the aggregated ClusterRole %s: %w", liveClusterRole.Name, err)
 		}
 
-		log.Info(fmt.Sprintf("Creating aggregated ClusterRole %s", clusterRole.Name))
-		clusterRole.Rules = expectedPolicyRules
-		return r.Client.Create(ctx, clusterRole)
+		log.Info(fmt.Sprintf("Creating aggregated ClusterRole %s", expectedClusterRole.Name))
+		expectedClusterRole.Rules = expectedPolicyRules
+		return r.Client.Create(ctx, expectedClusterRole)
 	}
 
-	// Reconcile if the aggregated ClusterRole already exists and modified.
-	if !reflect.DeepEqual(clusterRole.Rules, expectedPolicyRules) {
-		log.Info(fmt.Sprintf("PolicyRules of ClusterRole %s do not match the expected state, hence updating it", clusterRole.Name))
-		clusterRole.Rules = expectedPolicyRules
-		return r.Client.Update(ctx, clusterRole)
+	updateNeeded := false
+
+	if !reflect.DeepEqual(liveClusterRole.Rules, expectedPolicyRules) {
+		updateNeeded = true
+		log.Info(fmt.Sprintf("PolicyRules of ClusterRole %s do not match the expected state, hence updating it", liveClusterRole.Name))
+		liveClusterRole.Rules = expectedPolicyRules
+	}
+
+	normalizedLiveClusterRole := liveClusterRole.DeepCopy()
+	removeUserLabelsAndAnnotations(&normalizedLiveClusterRole.ObjectMeta, cr)
+	if !reflect.DeepEqual(normalizedLiveClusterRole.Labels, expectedClusterRole.Labels) || !reflect.DeepEqual(normalizedLiveClusterRole.Annotations, expectedClusterRole.Annotations) {
+		updateNeeded = true
+		log.Info(fmt.Sprintf("Labels/Annotations of aggregated ClusterRole %s do not match the expected state, hence updating it", liveClusterRole.Name))
+
+		liveClusterRole.Labels = combineStringMaps(liveClusterRole.Labels, expectedClusterRole.Labels)
+		liveClusterRole.Annotations = combineStringMaps(liveClusterRole.Annotations, expectedClusterRole.Annotations)
+	}
+
+	if updateNeeded {
+		// Update if the aggregated ClusterRole already exists and needs to be modified
+		return r.Client.Update(ctx, liveClusterRole)
 	}
 
 	return nil
@@ -416,10 +547,8 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.C
 		DefaultRolloutsSelectorKey: DefaultArgoRolloutsResourceName,
 	}
 
-	actualSvc := &corev1.Service{}
-
-	// Fetch the Service if exists and store that in actualSvc.
-	if err := fetchObject(ctx, r.Client, cr.Namespace, expectedSvc.Name, actualSvc); err != nil {
+	liveService := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: expectedSvc.Name, Namespace: expectedSvc.Namespace}}
+	if err := fetchObject(ctx, r.Client, cr.Namespace, liveService.Name, liveService); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to get the Service %s: %w", expectedSvc.Name, err)
 		}
@@ -433,13 +562,32 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.C
 			log.Error(err, "Error creating Service", "Name", expectedSvc.Name)
 			return err
 		}
-		actualSvc = expectedSvc
+		liveService = expectedSvc
 
-	} else if !reflect.DeepEqual(actualSvc.Spec.Ports, expectedSvc.Spec.Ports) {
-		log.Info(fmt.Sprintf("Ports of Service %s do not match the expected state, hence updating it", actualSvc.Name))
-		actualSvc.Spec.Ports = expectedSvc.Spec.Ports
-		if err := r.Client.Update(ctx, actualSvc); err != nil {
-			log.Error(err, "Error updating Ports of Service", "Name", actualSvc.Name)
+	}
+
+	updateNeeded := false
+
+	if !reflect.DeepEqual(liveService.Spec.Ports, expectedSvc.Spec.Ports) {
+		updateNeeded = true
+		log.Info(fmt.Sprintf("Ports of metrics Service %s do not match the expected state, hence updating it", liveService.Name))
+		liveService.Spec.Ports = expectedSvc.Spec.Ports
+	}
+
+	normalizedLiveService := liveService.DeepCopy()
+	removeUserLabelsAndAnnotations(&normalizedLiveService.ObjectMeta, cr)
+	if !reflect.DeepEqual(normalizedLiveService.Labels, expectedSvc.Labels) || !reflect.DeepEqual(normalizedLiveService.Annotations, expectedSvc.Annotations) {
+		updateNeeded = true
+		log.Info(fmt.Sprintf("Labels/Annotations of metrics Service %s do not match the expected state, hence updating it", liveService.Name))
+
+		liveService.Labels = combineStringMaps(liveService.Labels, expectedSvc.Labels)
+		liveService.Annotations = combineStringMaps(liveService.Annotations, expectedSvc.Annotations)
+	}
+
+	if updateNeeded {
+		// Update if the Service already exists and needs to be modified
+		if err := r.Client.Update(ctx, liveService); err != nil {
+			log.Error(err, "Error updating Ports of metrics Service", "Name", liveService.Name)
 			return err
 		}
 	}
@@ -468,7 +616,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.C
 			return nil
 
 		} else {
-			log.Error(err, "Error querying for ServiceMonitor", "Namespace", cr.Namespace, "Name", actualSvc.Name)
+			log.Error(err, "Error querying for ServiceMonitor", "Namespace", cr.Namespace, "Name", liveService.Name)
 			return err
 		}
 
@@ -477,13 +625,13 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.C
 			"Namespace", existingServiceMonitor.Namespace, "Name", existingServiceMonitor.Name)
 
 		// Check if existing ServiceMonitor matches expected content
-		if !serviceMonitorMatches(existingServiceMonitor, actualSvc.Name) {
+		if !serviceMonitorMatches(existingServiceMonitor, liveService.Name) {
 			log.Info("Updating existing ServiceMonitor instance",
 				"Namespace", existingServiceMonitor.Namespace, "Name", existingServiceMonitor.Name)
 
 			// Update ServiceMonitor with expected content
 			existingServiceMonitor.Spec.Selector.MatchLabels = map[string]string{
-				"app.kubernetes.io/name": actualSvc.Name,
+				"app.kubernetes.io/name": liveService.Name,
 			}
 			existingServiceMonitor.Spec.Endpoints = []monitoringv1.Endpoint{
 				{
@@ -504,7 +652,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.C
 
 // Reconciles Secrets for Rollouts controller
 func (r *RolloutManagerReconciler) reconcileRolloutsSecrets(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager) error {
-	secret := &corev1.Secret{
+	expectedSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultRolloutsNotificationSecretName,
 			Namespace: cr.Namespace,
@@ -512,19 +660,38 @@ func (r *RolloutManagerReconciler) reconcileRolloutsSecrets(ctx context.Context,
 		Type: corev1.SecretTypeOpaque,
 	}
 
-	setRolloutsLabelsAndAnnotationsToObject(&secret.ObjectMeta, cr)
+	setRolloutsLabelsAndAnnotationsToObject(&expectedSecret.ObjectMeta, cr)
 
-	if err := fetchObject(ctx, r.Client, cr.Namespace, secret.Name, secret); err != nil {
+	liveSecret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: expectedSecret.Name, Namespace: expectedSecret.Namespace}}
+	if err := fetchObject(ctx, r.Client, cr.Namespace, liveSecret.Name, liveSecret); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to get the Secret %s: %w", secret.Name, err)
+			return fmt.Errorf("failed to get the Secret %s: %w", liveSecret.Name, err)
 		}
 
-		if err := controllerutil.SetControllerReference(&cr, secret, r.Scheme); err != nil {
+		if err := controllerutil.SetControllerReference(&cr, expectedSecret, r.Scheme); err != nil {
 			return err
 		}
 
-		log.Info(fmt.Sprintf("Creating Secret %s", secret.Name))
-		return r.Client.Create(ctx, secret)
+		log.Info(fmt.Sprintf("Creating Secret %s", expectedSecret.Name))
+		return r.Client.Create(ctx, expectedSecret)
+	}
+
+	updateNeeded := false
+
+	normalizedLiveSecret := liveSecret.DeepCopy()
+	removeUserLabelsAndAnnotations(&normalizedLiveSecret.ObjectMeta, cr)
+
+	if !reflect.DeepEqual(normalizedLiveSecret.Labels, expectedSecret.Labels) || !reflect.DeepEqual(normalizedLiveSecret.Annotations, expectedSecret.Annotations) {
+		updateNeeded = true
+		log.Info(fmt.Sprintf("Labels/Annotations of Secret %s do not match the expected state, hence updating it", liveSecret.Name))
+
+		liveSecret.Labels = combineStringMaps(liveSecret.Labels, expectedSecret.Labels)
+		liveSecret.Annotations = combineStringMaps(liveSecret.Annotations, expectedSecret.Annotations)
+	}
+
+	if updateNeeded {
+		// Update if the Secret already exists and needs to be modified
+		return r.Client.Update(ctx, liveSecret)
 	}
 
 	// secret found, do nothing
