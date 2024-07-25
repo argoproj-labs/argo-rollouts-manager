@@ -83,10 +83,10 @@ var _ = Describe("updateStatusConditionOfRolloutManager tests", func() {
 	})
 
 	When("reconcileStatusResult contains a new condition to set on RolloutManger Status", func() {
-		It("should set condition on status", func() {
+		DescribeTable("ensure that status conditions are set accordingly", func(reason ...string) {
 			Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
 
-			newCondition := createCondition("my condition")
+			newCondition := createCondition("my condition", reason...)
 
 			rsr := reconcileStatusResult{
 				condition: newCondition,
@@ -97,8 +97,10 @@ var _ = Describe("updateStatusConditionOfRolloutManager tests", func() {
 
 			Expect(rolloutsManager.Status.Conditions).To(HaveLen(1))
 			Expect(rolloutsManager.Status.Conditions[0].Message).To(Equal(newCondition.Message))
-
-		})
+			Expect(rolloutsManager.Status.Conditions[0].Reason).To(Equal(newCondition.Reason))
+		},
+			Entry("should set condition on status"),
+			Entry("should return error when len(reason) > 1", "my reason 1", "my reason 2"))
 	})
 
 })
