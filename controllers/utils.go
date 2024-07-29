@@ -402,7 +402,7 @@ func createCondition(message string, reason ...string) metav1.Condition {
 	}
 }
 
-// removeUserLabelsAndAnnotations will remove any miscellaneous labels/annotations from obj, that are not used or expected by argo-rollouts-manager. For example, if a user added a label, "my-key": "my-value", to annotations of a Role that is created by our operator, this function wouls remove that label from 'obj'.
+// removeUserLabelsAndAnnotations will remove any miscellaneous labels/annotations from obj, that are not used or expected by argo-rollouts-manager. For example, if a user added a label, "my-key": "my-value", to annotations of a Role that is created by our operator, this function would remove that label from 'obj'.
 func removeUserLabelsAndAnnotations(obj *metav1.ObjectMeta, cr rolloutsmanagerv1alpha1.RolloutManager) {
 
 	defaultLabelsAndAnnotations := metav1.ObjectMeta{}

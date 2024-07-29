@@ -122,7 +122,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsManager(ctx context.Context,
 	}
 
 	log.Info("reconciling Rollouts Metrics Service")
-	if err := r.reconcileRolloutsMetricsService(ctx, cr); err != nil {
+	if err := r.reconcileRolloutsMetricsServiceAndMonitor(ctx, cr); err != nil {
 		log.Error(err, "failed to reconcile Rollout's Metrics Service.")
 		return wrapCondition(createCondition(err.Error())), err
 	}
