@@ -520,8 +520,74 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToViewClusterRole(c
 	return nil
 }
 
-// Reconcile Rollouts Metrics Service.
-func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager) error {
+// reconcileRolloutsMetricsServiceAndMonitor reconciles the Rollouts Metrics Service and ServiceMonitor
+func (r *RolloutManagerReconciler) reconcileRolloutsMetricsServiceAndMonitor(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager) error {
+
+	reconciledSvc, err := r.reconcileRolloutsMetricsService(ctx, cr)
+	if err != nil {
+		return fmt.Errorf("unable to reconcile metrics service: %w", err)
+	}
+
+	// Checks if user is using the Prometheus operator by checking CustomResourceDefinition for ServiceMonitor
+	smCRD := &crdv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: serviceMonitorsCRDName,
+		},
+	}
+
+	if err := fetchObject(ctx, r.Client, smCRD.Namespace, smCRD.Name, smCRD); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return fmt.Errorf("failed to get the ServiceMonitor %s : %s", smCRD.Name, err)
+		}
+		return nil
+	}
+
+	// Create ServiceMonitor for Rollouts metrics
+	existingServiceMonitor := &monitoringv1.ServiceMonitor{}
+	if err := fetchObject(ctx, r.Client, cr.Namespace, DefaultArgoRolloutsResourceName, existingServiceMonitor); err != nil {
+		if apierrors.IsNotFound(err) {
+			if err := r.createServiceMonitorIfAbsent(ctx, cr.Namespace, cr, DefaultArgoRolloutsResourceName, reconciledSvc.Name); err != nil {
+				return err
+			}
+			return nil
+
+		} else {
+			log.Error(err, "Error querying for ServiceMonitor", "Namespace", cr.Namespace, "Name", reconciledSvc.Name)
+			return err
+		}
+
+	} else {
+		log.Info("A ServiceMonitor instance already exists",
+			"Namespace", existingServiceMonitor.Namespace, "Name", existingServiceMonitor.Name)
+
+		// Check if existing ServiceMonitor matches expected content
+		if !serviceMonitorMatches(existingServiceMonitor, reconciledSvc.Name) {
+			log.Info("Updating existing ServiceMonitor instance",
+				"Namespace", existingServiceMonitor.Namespace, "Name", existingServiceMonitor.Name)
+
+			// Update ServiceMonitor with expected content
+			existingServiceMonitor.Spec.Selector.MatchLabels = map[string]string{
+				"app.kubernetes.io/name": reconciledSvc.Name,
+			}
+			existingServiceMonitor.Spec.Endpoints = []monitoringv1.Endpoint{
+				{
+					Port: "metrics",
+				},
+			}
+
+			if err := r.Client.Update(ctx, existingServiceMonitor); err != nil {
+				log.Error(err, "Error updating existing ServiceMonitor instance",
+					"Namespace", existingServiceMonitor.Namespace, "Name", existingServiceMonitor.Name)
+				return err
+			}
+		}
+		return nil
+	}
+
+}
+
+// reconcileRolloutsMetricsService reconciles the Service which is used to gather metrics from Rollouts install
+func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager) (*corev1.Service, error) {
 
 	expectedSvc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -550,17 +616,17 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.C
 	liveService := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: expectedSvc.Name, Namespace: expectedSvc.Namespace}}
 	if err := fetchObject(ctx, r.Client, cr.Namespace, liveService.Name, liveService); err != nil {
 		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to get the Service %s: %w", expectedSvc.Name, err)
+			return nil, fmt.Errorf("failed to get the Service %s: %w", expectedSvc.Name, err)
 		}
 
 		if err := controllerutil.SetControllerReference(&cr, expectedSvc, r.Scheme); err != nil {
-			return err
+			return nil, err
 		}
 
 		log.Info(fmt.Sprintf("Creating Service %s", expectedSvc.Name))
 		if err := r.Client.Create(ctx, expectedSvc); err != nil {
 			log.Error(err, "Error creating Service", "Name", expectedSvc.Name)
-			return err
+			return nil, err
 		}
 		liveService = expectedSvc
 
@@ -588,65 +654,11 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.C
 		// Update if the Service already exists and needs to be modified
 		if err := r.Client.Update(ctx, liveService); err != nil {
 			log.Error(err, "Error updating Ports of metrics Service", "Name", liveService.Name)
-			return err
+			return liveService, err
 		}
 	}
 
-	// Checks if user is using the Prometheus operator by checking CustomResourceDefinition for ServiceMonitor
-	smCRD := &crdv1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: serviceMonitorsCRDName,
-		},
-	}
-
-	if err := fetchObject(ctx, r.Client, smCRD.Namespace, smCRD.Name, smCRD); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to get the ServiceMonitor %s : %s", smCRD.Name, err)
-		}
-		return nil
-	}
-
-	// Create ServiceMonitor for Rollouts metrics
-	existingServiceMonitor := &monitoringv1.ServiceMonitor{}
-	if err := fetchObject(ctx, r.Client, cr.Namespace, DefaultArgoRolloutsResourceName, existingServiceMonitor); err != nil {
-		if apierrors.IsNotFound(err) {
-			if err := r.createServiceMonitorIfAbsent(ctx, cr.Namespace, cr, DefaultArgoRolloutsResourceName, expectedSvc.Name); err != nil {
-				return err
-			}
-			return nil
-
-		} else {
-			log.Error(err, "Error querying for ServiceMonitor", "Namespace", cr.Namespace, "Name", liveService.Name)
-			return err
-		}
-
-	} else {
-		log.Info("A ServiceMonitor instance already exists",
-			"Namespace", existingServiceMonitor.Namespace, "Name", existingServiceMonitor.Name)
-
-		// Check if existing ServiceMonitor matches expected content
-		if !serviceMonitorMatches(existingServiceMonitor, liveService.Name) {
-			log.Info("Updating existing ServiceMonitor instance",
-				"Namespace", existingServiceMonitor.Namespace, "Name", existingServiceMonitor.Name)
-
-			// Update ServiceMonitor with expected content
-			existingServiceMonitor.Spec.Selector.MatchLabels = map[string]string{
-				"app.kubernetes.io/name": liveService.Name,
-			}
-			existingServiceMonitor.Spec.Endpoints = []monitoringv1.Endpoint{
-				{
-					Port: "metrics",
-				},
-			}
-
-			if err := r.Client.Update(ctx, existingServiceMonitor); err != nil {
-				log.Error(err, "Error updating existing ServiceMonitor instance",
-					"Namespace", existingServiceMonitor.Namespace, "Name", existingServiceMonitor.Name)
-				return err
-			}
-		}
-		return nil
-	}
+	return liveService, nil
 
 }
 

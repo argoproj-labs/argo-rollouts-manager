@@ -19,7 +19,222 @@ import (
 
 var _ = Describe("Resource creation and cleanup tests", func() {
 
-	Context("Resource creation test", func() {
+	Context("Verify resource creation when RolloutManger does not contain a user-defined label/annotation", func() {
+		var (
+			ctx context.Context
+			a   v1alpha1.RolloutManager
+			r   *RolloutManagerReconciler
+		)
+
+		BeforeEach(func() {
+			ctx = context.Background()
+			a = *makeTestRolloutManager()
+			r = makeTestReconciler(&a)
+			err := createNamespace(r, a.Namespace)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("Test for reconcileRolloutsServiceAccount function", func() {
+			_, err := r.reconcileRolloutsServiceAccount(ctx, a)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("Test for reconcileRolloutsRole function", func() {
+			role, err := r.reconcileRolloutsRole(ctx, a)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("Modify Rules of Role.")
+			role.Rules[0].Verbs = append(role.Rules[0].Verbs, "test")
+			Expect(r.Client.Update(ctx, role)).To(Succeed())
+
+			By("Reconciler should revert modifications.")
+			role, err = r.reconcileRolloutsRole(ctx, a)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(role.Rules).To(Equal(GetPolicyRules()))
+		})
+
+		It("Test for reconcileRolloutsClusterRole function", func() {
+			clusterRole, err := r.reconcileRolloutsClusterRole(ctx, a)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("Modify Rules of Role.")
+			clusterRole.Rules[0].Verbs = append(clusterRole.Rules[0].Verbs, "test")
+			Expect(r.Client.Update(ctx, clusterRole)).To(Succeed())
+
+			By("Reconciler should revert modifications.")
+			clusterRole, err = r.reconcileRolloutsClusterRole(ctx, a)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(clusterRole.Rules).To(Equal(GetPolicyRules()))
+		})
+
+		It("Test for reconcileRolloutsRoleBinding function", func() {
+			sa, err := r.reconcileRolloutsServiceAccount(ctx, a)
+			Expect(err).ToNot(HaveOccurred())
+			role, err := r.reconcileRolloutsRole(ctx, a)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(r.reconcileRolloutsRoleBinding(ctx, a, role, sa)).To(Succeed())
+
+			By("Modify Subject of RoleBinding.")
+			rb := &rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      DefaultArgoRolloutsResourceName,
+					Namespace: a.Namespace,
+				},
+			}
+			Expect(fetchObject(ctx, r.Client, a.Namespace, rb.Name, rb)).To(Succeed())
+
+			subTemp := rb.Subjects
+			rb.Subjects = append(rb.Subjects, rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Name: "test", Namespace: "test"})
+			Expect(r.Client.Update(ctx, rb)).To(Succeed())
+
+			By("Reconciler should revert modifications.")
+			Expect(r.reconcileRolloutsRoleBinding(ctx, a, role, sa)).To(Succeed())
+			Expect(fetchObject(ctx, r.Client, a.Namespace, rb.Name, rb)).To(Succeed())
+			Expect(rb.Subjects).To(Equal(subTemp))
+		})
+
+		It("Test for reconcileRolloutsClusterRoleBinding function", func() {
+			sa, err := r.reconcileRolloutsServiceAccount(ctx, a)
+			Expect(err).ToNot(HaveOccurred())
+			clusterRole, err := r.reconcileRolloutsClusterRole(ctx, a)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(r.reconcileRolloutsClusterRoleBinding(ctx, clusterRole, sa, a)).To(Succeed())
+
+			By("Modify Subject of ClusterRoleBinding.")
+			crb := &rbacv1.ClusterRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: DefaultArgoRolloutsResourceName,
+				},
+			}
+			Expect(fetchObject(ctx, r.Client, "", crb.Name, crb)).To(Succeed())
+
+			subTemp := crb.Subjects
+			crb.Subjects = append(crb.Subjects, rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Name: "test", Namespace: "test"})
+			Expect(r.Client.Update(ctx, crb)).To(Succeed())
+
+			By("Reconciler should revert modifications.")
+			Expect(r.reconcileRolloutsClusterRoleBinding(ctx, clusterRole, sa, a)).To(Succeed())
+			Expect(fetchObject(ctx, r.Client, "", crb.Name, crb)).To(Succeed())
+			Expect(crb.Subjects).To(Equal(subTemp))
+		})
+
+		It("Test for reconcileRolloutsAggregateToAdminClusterRole function", func() {
+			Expect(r.reconcileRolloutsAggregateToAdminClusterRole(ctx, a)).To(Succeed())
+
+			By("Modify Rules of ClusterRole.")
+			clusterRole := &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "argo-rollouts-aggregate-to-admin",
+				},
+			}
+			Expect(fetchObject(ctx, r.Client, "", clusterRole.Name, clusterRole)).To(Succeed())
+			clusterRole.Rules[0].Verbs = append(clusterRole.Rules[0].Verbs, "test")
+			Expect(r.Client.Update(ctx, clusterRole)).To(Succeed())
+
+			By("Reconciler should revert modifications.")
+			Expect(r.reconcileRolloutsAggregateToAdminClusterRole(ctx, a)).To(Succeed())
+			Expect(fetchObject(ctx, r.Client, "", clusterRole.Name, clusterRole)).To(Succeed())
+			Expect(clusterRole.Rules).To(Equal(GetAggregateToAdminPolicyRules()))
+		})
+
+		It("Test for reconcileRolloutsAggregateToEditClusterRole function", func() {
+			Expect(r.reconcileRolloutsAggregateToEditClusterRole(ctx, a)).To(Succeed())
+
+			By("Modify Rules of ClusterRole.")
+			clusterRole := &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "argo-rollouts-aggregate-to-edit",
+				},
+			}
+			Expect(fetchObject(ctx, r.Client, "", clusterRole.Name, clusterRole)).To(Succeed())
+			clusterRole.Rules[0].Verbs = append(clusterRole.Rules[0].Verbs, "test")
+			Expect(r.Client.Update(ctx, clusterRole)).To(Succeed())
+
+			By("Reconciler should revert modifications.")
+			Expect(r.reconcileRolloutsAggregateToEditClusterRole(ctx, a)).To(Succeed())
+			Expect(fetchObject(ctx, r.Client, "", clusterRole.Name, clusterRole)).To(Succeed())
+			Expect(clusterRole.Rules).To(Equal(GetAggregateToEditPolicyRules()))
+		})
+
+		It("Test for reconcileRolloutsAggregateToViewClusterRole function", func() {
+			Expect(r.reconcileRolloutsAggregateToViewClusterRole(ctx, a)).To(Succeed())
+
+			By("Modify Rules of ClusterRole.")
+			clusterRole := &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "argo-rollouts-aggregate-to-view",
+				},
+			}
+			Expect(fetchObject(ctx, r.Client, "", clusterRole.Name, clusterRole)).To(Succeed())
+			clusterRole.Rules[0].Verbs = append(clusterRole.Rules[0].Verbs, "test")
+			Expect(r.Client.Update(ctx, clusterRole)).To(Succeed())
+
+			By("Reconciler should revert modifications.")
+			Expect(r.reconcileRolloutsAggregateToViewClusterRole(ctx, a)).To(Succeed())
+			Expect(fetchObject(ctx, r.Client, "", clusterRole.Name, clusterRole)).To(Succeed())
+			Expect(clusterRole.Rules).To(Equal(GetAggregateToViewPolicyRules()))
+		})
+
+		It("Test for reconcileRolloutsMetricsService function", func() {
+			Expect(r.reconcileRolloutsMetricsServiceAndMonitor(ctx, a)).To(Succeed())
+		})
+
+		It("Test for reconcileRolloutsSecrets function", func() {
+			Expect(r.reconcileRolloutsSecrets(ctx, a)).To(Succeed())
+		})
+
+		It("test for removeClusterScopedResourcesIfApplicable function", func() {
+
+			By("creating default cluster-scoped ClusterRole/ClusterRoleBinding. These should be deleted by the call to removeClusterScopedResourcesIfApplicable")
+			clusterRole := &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: DefaultArgoRolloutsResourceName,
+				},
+			}
+			Expect(r.Client.Create(ctx, clusterRole)).To(Succeed())
+
+			clusterRoleBinding := &rbacv1.ClusterRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: DefaultArgoRolloutsResourceName,
+				},
+			}
+			Expect(r.Client.Create(ctx, clusterRoleBinding)).To(Succeed())
+
+			By("creating default cluster-scoped ClusterRole/ClusterRoleBinding with a different name. These should not be deleted")
+
+			unrelatedRole := &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "unrelated-resource-should-not-be-deleted",
+				},
+			}
+			Expect(r.Client.Create(ctx, unrelatedRole)).To(Succeed())
+
+			unrelatedRoleBinding := &rbacv1.ClusterRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "unrelated-resource-should-not-be-deleted",
+				},
+			}
+			Expect(r.Client.Create(ctx, unrelatedRoleBinding)).To(Succeed())
+
+			By("calling removeClusterScopedResourcesIfApplicable, which should delete the cluster scoped resources")
+			Expect(r.removeClusterScopedResourcesIfApplicable(ctx)).To(Succeed())
+
+			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(clusterRole), clusterRole)).ToNot(Succeed(),
+				"ClusterRole should have been deleted")
+			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(clusterRoleBinding), clusterRoleBinding)).ToNot(Succeed(), "ClusterRoleBinding should have been deleted")
+
+			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(unrelatedRole), unrelatedRole)).To(Succeed(),
+				"Unrelated ClusterRole should not have been deleted")
+			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(unrelatedRoleBinding), unrelatedRoleBinding)).To(Succeed(), "Unrelated ClusterRoleBinding should not have been deleted")
+
+			Expect(r.removeClusterScopedResourcesIfApplicable(ctx)).To(Succeed(), "calling the function again should not return an error")
+
+		})
+	})
+
+	Context("Verify resource creation when RolloutManger contains a user-defined label/annotation", func() {
 		var (
 			ctx context.Context
 			a   v1alpha1.RolloutManager
@@ -268,7 +483,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 		})
 
 		It("Test for reconcileRolloutsMetricsService function", func() {
-			Expect(r.reconcileRolloutsMetricsService(ctx, a)).To(Succeed())
+			Expect(r.reconcileRolloutsMetricsServiceAndMonitor(ctx, a)).To(Succeed())
 			service := &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      DefaultArgoRolloutsMetricsServiceName,
@@ -527,7 +742,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 				}
 				Expect(r.Client.Create(ctx, svc)).To(Succeed())
 
-				err = r.reconcileRolloutsMetricsService(ctx, a)
+				err = r.reconcileRolloutsMetricsServiceAndMonitor(ctx, a)
 				Expect(err).ToNot(HaveOccurred())
 
 				Expect(fetchObject(ctx, r.Client, a.Namespace, svc.Name, svc)).To(Succeed())
