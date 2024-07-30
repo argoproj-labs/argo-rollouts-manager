@@ -445,11 +445,13 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 			})
 		})
 
-		When("A RolloutManager specifies controller resources", func() {
+		When("A RolloutManager specifies controller resources under .spec.controllerResources", func() {
 
 			It("should create the controller with the correct resources requests/limits", func() {
 
-				rolloutsManager := rolloutsmanagerv1alpha1.RolloutManager{
+				By("creating a RolloutManager containing resource requirements")
+
+				rmWithResources := rolloutsmanagerv1alpha1.RolloutManager{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "basic-rollouts-manager-with-resources",
 						Namespace: fixture.TestE2ENamespace,
@@ -469,16 +471,39 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 					},
 				}
 
-				Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
+				Expect(k8sClient.Create(ctx, &rmWithResources)).To(Succeed())
 
-				Eventually(rolloutsManager, "1m", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
+				Eventually(rmWithResources, "1m", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
 
 				deployment := appsv1.Deployment{
-					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rolloutManager.Namespace},
+					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rmWithResources.Namespace},
 				}
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&deployment), &deployment)).To(Succeed())
 
-				Expect(deployment.Spec.Template.Spec.Containers[0].Resources).To(Equal(*rolloutsManager.Spec.ControllerResources))
+				Expect(deployment.Spec.Template.Spec.Containers[0].Resources).To(Equal(*rmWithResources.Spec.ControllerResources))
+
+				By("updating RolloutManager to use a different CPU limit")
+
+				err := k8s.UpdateWithoutConflict(ctx, &rmWithResources, k8sClient, func(obj client.Object) {
+					rm, ok := obj.(*rolloutsmanagerv1alpha1.RolloutManager)
+					Expect(ok).To(BeTrue())
+
+					rm.Spec.ControllerResources.Limits[corev1.ResourceCPU] = resource.MustParse("555m")
+
+				})
+				Expect(err).ToNot(HaveOccurred())
+
+				Eventually(func() bool {
+					deployment := appsv1.Deployment{
+						ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rmWithResources.Namespace},
+					}
+					if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(&deployment), &deployment); err != nil {
+						return false
+					}
+					return deployment.Spec.Template.Spec.Containers[0].Resources.Limits[corev1.ResourceCPU] == resource.MustParse("555m")
+
+				}, "1m", "1s").Should(BeTrue(), "Deployment should switch to the new CPU limit on update of RolloutManager CR")
+
 			})
 		})
 	})
