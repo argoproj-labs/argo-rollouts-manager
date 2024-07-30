@@ -19,7 +19,7 @@ set -ex
 make install generate fmt vet
 
 if [ "$RUN_IN_BACKGROUND" == "true" ]; then
-  go run ./main.go 2>&1 | tee /tmp/e2e-operator-run.log &
+  go run ./cmd/main.go 2>&1 | tee /tmp/e2e-operator-run.log &
 else
-  go run ./main.go 2>&1 | tee /tmp/e2e-operator-run.log
+  go run ./cmd/main.go 2>&1 | tee /tmp/e2e-operator-run.log
 fi

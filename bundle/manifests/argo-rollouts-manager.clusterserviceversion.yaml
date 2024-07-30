@@ -21,9 +21,9 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2024-06-14T22:33:48Z"
-    operators.operatorframework.io/builder: operator-sdk-v1.28.0
-    operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+    createdAt: "2024-07-29T13:09:50Z"
+    operators.operatorframework.io/builder: operator-sdk-v1.35.0
+    operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   name: argo-rollouts-manager.v0.0.1
   namespace: placeholder
 spec:

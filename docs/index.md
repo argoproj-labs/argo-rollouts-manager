@@ -8,7 +8,7 @@ Not all planned features are completed. The API, spec, status and other user fac
 
 A Kubernetes operator for managing [Argo Rollouts](https://github.com/argoproj/argo-rollouts/). This operator provides an easy way to install, upgrade and manage the lifecycle of Argo Rollouts.
 
-This operator is built using `operator-sdk`, version - `v1.28.0`.
+This operator is built using ``, version - `v1.35.0`.
 
 ## What exactly the operator does ?
 

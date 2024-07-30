@@ -36,7 +36,7 @@ const (
 	argoprojlabsRepoOrg         = "argoproj-labs"
 	argoRolloutsManagerRepoName = "argo-rollouts-manager"
 
-	controllersDefaultGo = "controllers/default.go"
+	controllersDefaultGo = "internal/controller/default.go"
 )
 
 func main() {
