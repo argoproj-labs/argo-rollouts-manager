@@ -47,16 +47,6 @@ var _ = Describe("Deployment Test", func() {
 		fetchedDeployment := &appsv1.Deployment{}
 		Expect(fetchObject(ctx, r.Client, a.Namespace, DefaultArgoRolloutsResourceName, fetchedDeployment)).To(Succeed())
 
-		a.Spec.ControllerResources = &corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("100m"),
-				corev1.ResourceMemory: resource.MustParse("100Mi"),
-			},
-			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("500m"),
-				corev1.ResourceMemory: resource.MustParse("500Mi"),
-			},
-		}
 		expectedDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", DefaultArgoRolloutsResourceName, a)
 
 		By("verify that the fetched Deployment matches the desired one")
@@ -69,6 +59,7 @@ var _ = Describe("Deployment Test", func() {
 		Expect(fetchedDeployment.Spec.Template.Spec.Tolerations).To(Equal(expectedDeployment.Spec.Template.Spec.Tolerations))
 		Expect(fetchedDeployment.Spec.Template.Spec.SecurityContext).To(Equal(expectedDeployment.Spec.Template.Spec.SecurityContext))
 		Expect(fetchedDeployment.Spec.Template.Spec.Volumes).To(Equal(expectedDeployment.Spec.Template.Spec.Volumes))
+		Expect(fetchedDeployment.Spec.Template.Spec.Containers[0].Resources).To(Equal(expectedDeployment.Spec.Template.Spec.Containers[0].Resources))
 	})
 
 	When("Rollouts Deployment already exists, but then is modified away from default values", func() {
@@ -109,6 +100,91 @@ var _ = Describe("Deployment Test", func() {
 			Expect(fetchedDeployment.Spec.Template.Spec.Containers[0].Resources).To(Equal(expectedDeployment.Spec.Template.Spec.Containers[0].Resources))
 
 		})
+	})
+
+	When("RolloutManagerCR has custom controller resources defined", func() {
+
+		It("should create a Deployment that uses those controller resources", func() {
+
+			By("setting resource requirements on RolloutsManager CR")
+			a.Spec.ControllerResources = &corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("500m"),
+					corev1.ResourceMemory: resource.MustParse("500Mi"),
+				},
+			}
+			Expect(r.Client.Update(ctx, &a)).To(Succeed())
+
+			By("calling reconcileRolloutsDeployment to create the initial set of rollout resources")
+			Expect(r.reconcileRolloutsDeployment(ctx, a, *sa)).To(Succeed())
+
+			By("fetching the Deployment")
+			fetchedDeployment := &appsv1.Deployment{}
+			Expect(fetchObject(ctx, r.Client, a.Namespace, DefaultArgoRolloutsResourceName, fetchedDeployment)).To(Succeed())
+
+			By("verifying that the fetched Deployment matches the desired one")
+			Expect(fetchedDeployment.Spec.Template.Spec.Containers[0].Resources).To(Equal(*a.Spec.ControllerResources))
+		})
+
+		defaultContainerResources := defaultRolloutsContainerResources()
+
+		nonDefaultContainerResourcesValue := &corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("100m"),
+				corev1.ResourceMemory: resource.MustParse("100Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("500m"),
+				corev1.ResourceMemory: resource.MustParse("500Mi"),
+			},
+		}
+
+		otherNonDefault := corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1m"),
+				corev1.ResourceMemory: resource.MustParse("1Mi"),
+			},
+		}
+
+		DescribeTable("Deployment CR should always be updated to be consistent with RolloutsManager .spec.controllerResources field, in both default and non-default cases", func(initialDeployment *corev1.ResourceRequirements, crValue *corev1.ResourceRequirements, expectedDeployment *corev1.ResourceRequirements) {
+
+			By("calling reconcileRolloutsDeployment to create the initial set of rollout resources")
+			Expect(r.reconcileRolloutsDeployment(ctx, a, *sa)).To(Succeed())
+
+			By("updating the default Deployment to resource value defined in 'initialDeployment'")
+			fetchedDeployment := &appsv1.Deployment{}
+			Expect(fetchObject(ctx, r.Client, a.Namespace, DefaultArgoRolloutsResourceName, fetchedDeployment)).To(Succeed())
+
+			fetchedDeployment.Spec.Template.Spec.Containers[0].Resources = *initialDeployment
+			Expect(r.Update(ctx, fetchedDeployment)).To(Succeed())
+
+			if crValue != nil {
+				By("setting resource requirements on RolloutsManager CR to 'crValue'")
+				a.Spec.ControllerResources = crValue
+				Expect(r.Client.Update(ctx, &a)).To(Succeed())
+			}
+
+			By("calling reconcileRolloutsDeployment")
+			Expect(r.reconcileRolloutsDeployment(ctx, a, *sa)).To(Succeed())
+
+			By("fetching the Deployment")
+			fetchedDeployment = &appsv1.Deployment{}
+			Expect(fetchObject(ctx, r.Client, a.Namespace, DefaultArgoRolloutsResourceName, fetchedDeployment)).To(Succeed())
+
+			By("verifying that the fetched Deployment resource requirements matches the desired resource requirements")
+			Expect(fetchedDeployment.Spec.Template.Spec.Containers[0].Resources).To(Equal(*expectedDeployment))
+
+		},
+			Entry("default deployment, with a empty CR .spec.containerResources -> no change in deployment from default", &defaultContainerResources, nil, &defaultContainerResources),
+			Entry("default deployment, with CR non-default value in .spec.containerResources -> deployment should now have value from CR", &defaultContainerResources, nonDefaultContainerResourcesValue, nonDefaultContainerResourcesValue),
+			Entry("deployment with non-default container resources, empty value in CR .spec.containerResources -> Deployment should revert to default value from CR", nonDefaultContainerResourcesValue, nil, &defaultContainerResources),
+			Entry("deployment with a different non-default container resources, non-default value in CR .spec.containerResources -> Deployment should use CR value", &otherNonDefault, nonDefaultContainerResourcesValue, nonDefaultContainerResourcesValue),
+		)
+
 	})
 
 	When("Rollouts deployment already exists, but then RolloutManager is modified in a way that requires updating either .spec.selector of the existing Deployment", func() {
@@ -326,7 +402,7 @@ var _ = Describe("Deployment Test", func() {
 			Entry(".spec.template.spec.volumes", func(deployment *appsv1.Deployment) {
 				deployment.Spec.Template.Spec.Volumes = []corev1.Volume{{Name: "my-volume"}}
 			}),
-			Entry(".spec.template.spec.containes.resources", func(deployment *appsv1.Deployment) {
+			Entry(".spec.template.spec.containers.resources", func(deployment *appsv1.Deployment) {
 				deployment.Spec.Template.Spec.Containers[0].Resources = corev1.ResourceRequirements{
 					Requests: corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("100m"),

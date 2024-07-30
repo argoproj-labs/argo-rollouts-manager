@@ -239,6 +239,15 @@ func identifyDeploymentDifference(x appsv1.Deployment, y appsv1.Deployment) stri
 	return ""
 }
 
+// defaultRolloutsContainerResources return the default resource constaints set on containers, when the RolloutManager CR does not have resource constraints set.
+func defaultRolloutsContainerResources() corev1.ResourceRequirements {
+	return corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+		},
+	}
+}
+
 func rolloutsContainer(cr rolloutsmanagerv1alpha1.RolloutManager) corev1.Container {
 
 	// NOTE: When updating this function, ensure that normalizeDeployment is updated as well. See that function for details.
@@ -251,11 +260,8 @@ func rolloutsContainer(cr rolloutsmanagerv1alpha1.RolloutManager) corev1.Contain
 
 	containerResources := cr.Spec.ControllerResources
 	if containerResources == nil {
-		containerResources = &corev1.ResourceRequirements{
-			Limits: corev1.ResourceList{
-				corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
-			},
-		}
+		defaultContainerResources := defaultRolloutsContainerResources()
+		containerResources = &defaultContainerResources
 	}
 
 	return corev1.Container{
