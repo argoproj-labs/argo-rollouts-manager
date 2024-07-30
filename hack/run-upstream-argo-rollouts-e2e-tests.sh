@@ -47,7 +47,7 @@ if [ -z "$SKIP_RUN_STEP" ]; then
   set +e
 
   rm -f /tmp/e2e-operator-run.log || true
-  go run ./main.go 2>&1 | tee /tmp/e2e-operator-run.log &
+  go run ./cmd/main.go 2>&1 | tee /tmp/e2e-operator-run.log &
 
   set -e
 fi

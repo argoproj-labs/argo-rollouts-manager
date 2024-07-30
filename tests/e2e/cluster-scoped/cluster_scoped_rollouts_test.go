@@ -15,7 +15,7 @@ import (
 
 	rmv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 
-	controllers "github.com/argoproj-labs/argo-rollouts-manager/controllers"
+	controllers "github.com/argoproj-labs/argo-rollouts-manager/internal/controller"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
