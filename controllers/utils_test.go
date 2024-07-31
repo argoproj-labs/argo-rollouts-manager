@@ -94,10 +94,16 @@ var _ = Describe("updateStatusConditionOfRolloutManager tests", func() {
 			Expect(updateStatusConditionOfRolloutManager(ctx, rsr, &rolloutsManager, k8sClient, logger.FromContext(ctx))).To(Succeed())
 
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&rolloutsManager), &rolloutsManager)).To(Succeed())
-
 			Expect(rolloutsManager.Status.Conditions).To(HaveLen(1))
 			Expect(rolloutsManager.Status.Conditions[0].Message).To(Equal(newCondition.Message))
 			Expect(rolloutsManager.Status.Conditions[0].Reason).To(Equal(newCondition.Reason))
+
+			// Verify whether an error condition is set when len(reason) > 1.
+			if len(reason) > 1 {
+				Expect(newCondition.Reason).To(Equal(rolloutsmanagerv1alpha1.RolloutManagerReasonErrorOccurred))
+				Expect(newCondition.Message).To(Equal("An internal error occurred"))
+				Expect(newCondition.Status).To(Equal(metav1.ConditionTrue))
+			}
 		},
 			Entry("should set condition on status"),
 			Entry("should return error when len(reason) > 1", "my reason 1", "my reason 2"))
@@ -466,6 +472,238 @@ var _ = Describe("removeUserLabelsAndAnnotations tests", func() {
 				"app.kubernetes.io/component": DefaultArgoRolloutsResourceName},
 			map[string]string{},
 		),
+	)
+})
+
+var _ = Describe("insertOrUpdateConditionsInSlice tests", func() {
+	var (
+		existingConditions []metav1.Condition
+		newCondition       metav1.Condition
+	)
+
+	Context("when the condition does not exist", func() {
+		It("should add the new condition and return true", func() {
+			existingConditions = []metav1.Condition{}
+			newCondition = metav1.Condition{
+				Type:    rolloutsmanagerv1alpha1.RolloutManagerConditionType,
+				Status:  metav1.ConditionTrue,
+				Reason:  "test reason",
+				Message: "test message",
+			}
+			changed, conditions := insertOrUpdateConditionsInSlice(newCondition, existingConditions)
+			Expect(changed).To(BeTrue())
+			Expect(conditions).To(HaveLen(1))
+			Expect(conditions[0].Type).To(Equal(newCondition.Type))
+			Expect(conditions[0].Status).To(Equal(newCondition.Status))
+			Expect(conditions[0].Reason).To(Equal(newCondition.Reason))
+			Expect(conditions[0].Message).To(Equal(newCondition.Message))
+		})
+	})
+
+	Context("when the condition exists but is changed", func() {
+		It("should update the condition and return true", func() {
+			existingConditions = []metav1.Condition{
+				{
+					Type:    rolloutsmanagerv1alpha1.RolloutManagerConditionType,
+					Status:  metav1.ConditionTrue,
+					Reason:  "test reason",
+					Message: "test message",
+				},
+			}
+			newCondition = metav1.Condition{
+				Type:    rolloutsmanagerv1alpha1.RolloutManagerConditionType,
+				Status:  metav1.ConditionFalse,
+				Reason:  "Updated test reason",
+				Message: "Updated test message",
+			}
+			changed, conditions := insertOrUpdateConditionsInSlice(newCondition, existingConditions)
+			Expect(changed).To(BeTrue())
+			Expect(conditions).To(HaveLen(1))
+			Expect(conditions[0].Type).To(Equal(newCondition.Type))
+			Expect(conditions[0].Status).To(Equal(newCondition.Status))
+			Expect(conditions[0].Reason).To(Equal(newCondition.Reason))
+			Expect(conditions[0].Message).To(Equal(newCondition.Message))
+		})
+	})
+
+	Context("when there is another unrelated condition in the list", func() {
+		It("should not remove the unrelated condition and return true", func() {
+			newCondition := metav1.Condition{
+				Type:    rolloutsmanagerv1alpha1.RolloutManagerConditionType,
+				Status:  metav1.ConditionTrue,
+				Reason:  "test reason",
+				Message: "test message",
+			}
+			unrelatedCondition := metav1.Condition{
+				Type:    "UnrelatedCondition",
+				Status:  metav1.ConditionFalse,
+				Reason:  "some reason",
+				Message: "some message",
+			}
+			existingConditions := []metav1.Condition{
+				unrelatedCondition,
+			}
+
+			changed, conditions := insertOrUpdateConditionsInSlice(newCondition, existingConditions)
+			Expect(changed).To(BeTrue())
+			Expect(conditions).To(HaveLen(2))
+
+			By("Check that the unrelated condition is still present")
+			Expect(conditions).To(ContainElement(unrelatedCondition))
+
+			By("Check that the new condition was added")
+			Expect(conditions[1].Type).To(Equal(newCondition.Type))
+			Expect(conditions[1].Status).To(Equal(newCondition.Status))
+			Expect(conditions[1].Reason).To(Equal(newCondition.Reason))
+			Expect(conditions[1].Message).To(Equal(newCondition.Message))
+		})
+	})
+
+})
+
+var _ = Describe("isMergable tests", func() {
+	DescribeTable("checking for duplicate arguments", func(extraArgs, cmd []string, expectedErr bool) {
+		err := isMergable(extraArgs, cmd)
+		if expectedErr {
+			Expect(err).To(HaveOccurred())
+		} else {
+			Expect(err).NotTo(HaveOccurred())
+		}
+	},
+		Entry("no extraArgs", []string{}, []string{"--cmd1", "--cmd2"}, false),
+		Entry("extraArgs with no `--` args", []string{"arg1", "arg2"}, []string{"--cmd1", "--cmd2"}, false),
+		Entry("extraArgs with `--` args but no duplicates", []string{"--arg1", "--arg2"}, []string{"--cmd1", "--cmd2"}, false),
+		Entry("extraArgs with duplicate `--` args", []string{"--arg1", "--cmd1"}, []string{"--cmd1", "--cmd2"}, true),
+	)
+})
+
+var _ = Describe("combineImageTag tests", func() {
+	DescribeTable("checking for combined image and tag", func(img, tag, expected string) {
+		Expect(combineImageTag(img, tag)).To(Equal(expected))
+	},
+		Entry("verify when tag contains `:`", DefaultArgoRolloutsImage, DefaultArgoRolloutsImage+":"+DefaultArgoRolloutsVersion, DefaultArgoRolloutsImage+"@"+DefaultArgoRolloutsImage+":"+DefaultArgoRolloutsVersion),
+		Entry("verify when tag length is > 0", DefaultArgoRolloutsImage, DefaultArgoRolloutsVersion, DefaultArgoRolloutsImage+":"+DefaultArgoRolloutsVersion),
+		Entry("verify when no tag is passed", DefaultArgoRolloutsImage, "", DefaultArgoRolloutsImage),
+	)
+})
+
+var _ = Describe("setAdditionalRolloutsLabelsAndAnnotationsToObject tests", func() {
+	var (
+		obj *metav1.ObjectMeta
+		cr  rolloutsmanagerv1alpha1.RolloutManager
+	)
+
+	BeforeEach(func() {
+		obj = &metav1.ObjectMeta{}
+		cr = rolloutsmanagerv1alpha1.RolloutManager{}
+	})
+
+	Context("when AdditionalMetadata is nil", func() {
+		It("should not modify labels and annotations", func() {
+			setAdditionalRolloutsLabelsAndAnnotationsToObject(obj, cr)
+			Expect(obj.Labels).To(BeNil())
+			Expect(obj.Annotations).To(BeNil())
+		})
+	})
+
+	Context("when AdditionalMetadata is not nil", func() {
+		BeforeEach(func() {
+			cr.Spec.AdditionalMetadata = &rolloutsmanagerv1alpha1.ResourceMetadata{
+				Labels:      map[string]string{"key1": "value1"},
+				Annotations: map[string]string{"annotation1": "value1"},
+			}
+		})
+
+		Context("and obj.Labels and obj.Annotations are nil", func() {
+			It("should initialize and set labels and annotations", func() {
+				setAdditionalRolloutsLabelsAndAnnotationsToObject(obj, cr)
+				Expect(obj.Labels).To(HaveKeyWithValue("key1", "value1"))
+				Expect(obj.Annotations).To(HaveKeyWithValue("annotation1", "value1"))
+			})
+		})
+
+		Context("and obj.Labels and obj.Annotations are already set", func() {
+			BeforeEach(func() {
+				obj.Labels = map[string]string{"existingKey": "existingValue"}
+				obj.Annotations = map[string]string{"existingAnnotation": "existingValue"}
+			})
+
+			It("should merge labels and annotations", func() {
+				setAdditionalRolloutsLabelsAndAnnotationsToObject(obj, cr)
+				Expect(obj.Labels).To(HaveKeyWithValue("existingKey", "existingValue"))
+				Expect(obj.Labels).To(HaveKeyWithValue("key1", "value1"))
+				Expect(obj.Annotations).To(HaveKeyWithValue("existingAnnotation", "existingValue"))
+				Expect(obj.Annotations).To(HaveKeyWithValue("annotation1", "value1"))
+			})
+		})
+
+		Context("and obj.Labels and obj.Annotations are are already set with different values", func() {
+			BeforeEach(func() {
+				obj.Labels = map[string]string{"key1": "oldValue"}
+				obj.Annotations = map[string]string{"annotation1": "oldValue"}
+
+				cr.Spec.AdditionalMetadata = &rolloutsmanagerv1alpha1.ResourceMetadata{
+					Labels:      map[string]string{"key1": "newValue"},
+					Annotations: map[string]string{"annotation1": "newValue"},
+				}
+			})
+
+			It("should replace the existing values with the new values", func() {
+				setAdditionalRolloutsLabelsAndAnnotationsToObject(obj, cr)
+				Expect(obj.Labels).To(HaveKeyWithValue("key1", "newValue"))
+				Expect(obj.Annotations).To(HaveKeyWithValue("annotation1", "newValue"))
+			})
+		})
+
+	})
+})
+
+var _ = Describe("envMerge tests", func() {
+	DescribeTable("merges two slices of EnvVar entries",
+		func(existing, merge, expected []corev1.EnvVar, override bool) {
+			result := envMerge(existing, merge, override)
+			Expect(result).To(Equal(expected))
+		},
+		Entry("when both slices are empty",
+			[]corev1.EnvVar{},
+			[]corev1.EnvVar{},
+			[]corev1.EnvVar{},
+			false),
+		Entry("when existing is empty and merge has one element",
+			[]corev1.EnvVar{},
+			[]corev1.EnvVar{{Name: "test-name-1", Value: "test-value-1"}},
+			[]corev1.EnvVar{{Name: "test-name-1", Value: "test-value-1"}},
+			false),
+		Entry("when existing has one element and merge is empty",
+			[]corev1.EnvVar{{Name: "test-name-1", Value: "test-value-1"}},
+			[]corev1.EnvVar{},
+			[]corev1.EnvVar{{Name: "test-name-1", Value: "test-value-1"}},
+			false),
+		Entry("when merging with no override and no conflicts",
+			[]corev1.EnvVar{{Name: "test-name-1", Value: "test-value-1"}},
+			[]corev1.EnvVar{{Name: "test-name-2", Value: "test-value-2"}},
+			[]corev1.EnvVar{{Name: "test-name-1", Value: "test-value-1"}, {Name: "test-name-2", Value: "test-value-2"}},
+			false),
+		Entry("when merging with no override and with conflicts",
+			[]corev1.EnvVar{{Name: "test-name-1", Value: "test-value-1"}},
+			[]corev1.EnvVar{{Name: "test-name-1", Value: "test-value-2"}},
+			[]corev1.EnvVar{{Name: "test-name-1", Value: "test-value-1"}},
+			false),
+		Entry("when merging with override and with conflicts",
+			[]corev1.EnvVar{{Name: "test-name-1", Value: "test-value-1"}},
+			[]corev1.EnvVar{{Name: "test-name-1", Value: "test-value-2"}},
+			[]corev1.EnvVar{{Name: "test-name-1", Value: "test-value-2"}},
+			true),
+		Entry("when merging with multiple elements and override",
+			[]corev1.EnvVar{{Name: "test-name-1", Value: "test-value-1"}, {Name: "test-name-3", Value: "test-value-3"}},
+			[]corev1.EnvVar{{Name: "test-name-2", Value: "test-value-2"}, {Name: "test-name-3", Value: "new-value-3"}},
+			[]corev1.EnvVar{{Name: "test-name-1", Value: "test-value-1"}, {Name: "test-name-2", Value: "test-value-2"}, {Name: "test-name-3", Value: "new-value-3"}},
+			true),
+		Entry("when merging with multiple elements and no override",
+			[]corev1.EnvVar{{Name: "test-name-1", Value: "test-value-1"}, {Name: "test-name-3", Value: "test-value-3"}},
+			[]corev1.EnvVar{{Name: "test-name-2", Value: "test-value-2"}, {Name: "test-name-3", Value: "new-value-3"}},
+			[]corev1.EnvVar{{Name: "test-name-1", Value: "test-value-1"}, {Name: "test-name-2", Value: "test-value-2"}, {Name: "test-name-3", Value: "test-value-3"}},
+			false),
 	)
 })
 
