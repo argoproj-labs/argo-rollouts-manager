@@ -623,12 +623,11 @@ var _ = Describe("setAdditionalRolloutsLabelsAndAnnotationsToObject tests", func
 		})
 
 		Context("and obj.Labels and obj.Annotations are already set", func() {
-			BeforeEach(func() {
-				obj.Labels = map[string]string{"existingKey": "existingValue"}
-				obj.Annotations = map[string]string{"existingAnnotation": "existingValue"}
-			})
 
 			It("should merge labels and annotations", func() {
+				obj.Labels = map[string]string{"existingKey": "existingValue"}
+				obj.Annotations = map[string]string{"existingAnnotation": "existingValue"}
+
 				setAdditionalRolloutsLabelsAndAnnotationsToObject(obj, cr)
 				Expect(obj.Labels).To(HaveKeyWithValue("existingKey", "existingValue"))
 				Expect(obj.Labels).To(HaveKeyWithValue("key1", "value1"))
@@ -638,7 +637,8 @@ var _ = Describe("setAdditionalRolloutsLabelsAndAnnotationsToObject tests", func
 		})
 
 		Context("and obj.Labels and obj.Annotations are are already set with different values", func() {
-			BeforeEach(func() {
+
+			It("should replace the existing values with the new values", func() {
 				obj.Labels = map[string]string{"key1": "oldValue"}
 				obj.Annotations = map[string]string{"annotation1": "oldValue"}
 
@@ -646,9 +646,7 @@ var _ = Describe("setAdditionalRolloutsLabelsAndAnnotationsToObject tests", func
 					Labels:      map[string]string{"key1": "newValue"},
 					Annotations: map[string]string{"annotation1": "newValue"},
 				}
-			})
 
-			It("should replace the existing values with the new values", func() {
 				setAdditionalRolloutsLabelsAndAnnotationsToObject(obj, cr)
 				Expect(obj.Labels).To(HaveKeyWithValue("key1", "newValue"))
 				Expect(obj.Annotations).To(HaveKeyWithValue("annotation1", "newValue"))
