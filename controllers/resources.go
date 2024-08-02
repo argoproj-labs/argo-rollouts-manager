@@ -697,7 +697,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsSecrets(ctx context.Context,
 
 	}
 
-	// If SkipNotificationSecretDeployment is true, and the secret exists, delete it
+	// If SkipNotificationSecretDeployment is true, and the secret exists (and is owned by us), delete it
 	if cr.Spec.SkipNotificationSecretDeployment {
 
 		// If the controller created/owns the Secret, delete it

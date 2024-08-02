@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -506,77 +507,53 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 			})
 		})
 
-		When("A RolloutManager is created with the SkipNotificationSecretDeployment option to true", func() {
-			It("should create the controller without the notification secret", func() {
+		DescribeTable("RolloutManager is initially created with a given SkipNotificationSecretDeployment (true/false), then it swaps", func(initialSkipNotificationValue bool) {
 
-				rolloutsManager := rolloutsmanagerv1alpha1.RolloutManager{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "basic-rollouts-manager-with-skip-notification-secret",
-						Namespace: fixture.TestE2ENamespace,
-					},
-					Spec: rolloutsmanagerv1alpha1.RolloutManagerSpec{
-						NamespaceScoped:                  namespaceScopedParam,
-						SkipNotificationSecretDeployment: true,
-					},
-				}
+			By(fmt.Sprintf("creating RolloutManager with SkipNotificationSecretDeployment set to '%v'", initialSkipNotificationValue))
 
-				Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
+			rolloutsManager := rolloutsmanagerv1alpha1.RolloutManager{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "basic-rollouts-manager-with-skip-notification-secret",
+					Namespace: fixture.TestE2ENamespace,
+				},
+				Spec: rolloutsmanagerv1alpha1.RolloutManagerSpec{
+					NamespaceScoped:                  namespaceScopedParam,
+					SkipNotificationSecretDeployment: initialSkipNotificationValue,
+				},
+			}
 
-				Eventually(rolloutsManager, "1m", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
+			Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
 
-				secret := corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultRolloutsNotificationSecretName, Namespace: rolloutManager.Namespace},
-				}
+			Eventually(rolloutsManager, "1m", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
+
+			secret := corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultRolloutsNotificationSecretName, Namespace: rolloutManager.Namespace},
+			}
+			if rolloutsManager.Spec.SkipNotificationSecretDeployment {
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&secret), &secret)).ToNot(Succeed())
-
-				By("Setting the SkipNotificationSecretDeployment to false")
-				err := k8s.UpdateWithoutConflict(ctx, &rolloutsManager, k8sClient, func(obj client.Object) {
-					goObj, ok := obj.(*rolloutsmanagerv1alpha1.RolloutManager)
-					Expect(ok).To(BeTrue())
-					goObj.Spec.SkipNotificationSecretDeployment = false
-				})
-
-				Expect(err).ToNot(HaveOccurred())
-				Eventually(&secret, "10s", "1s").Should(k8s.ExistByName(k8sClient))
-
-			})
-		})
-
-		When("A RolloutManager is created with the SkipNotificationSecretDeployment option to false", func() {
-			It("should create the controller with the notification secret", func() {
-
-				rolloutsManager := rolloutsmanagerv1alpha1.RolloutManager{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "basic-rollouts-manager-without-skip-notification-secret",
-						Namespace: fixture.TestE2ENamespace,
-					},
-					Spec: rolloutsmanagerv1alpha1.RolloutManagerSpec{
-						NamespaceScoped:                  namespaceScopedParam,
-						SkipNotificationSecretDeployment: false,
-					},
-				}
-
-				Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
-
-				Eventually(rolloutsManager, "1m", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
-
-				secret := corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultRolloutsNotificationSecretName, Namespace: rolloutManager.Namespace},
-				}
+			} else {
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&secret), &secret)).To(Succeed())
+			}
 
-				By("Setting the SkipNotificationSecretDeployment to true")
-				err := k8s.UpdateWithoutConflict(ctx, &rolloutsManager, k8sClient, func(obj client.Object) {
-					goObj, ok := obj.(*rolloutsmanagerv1alpha1.RolloutManager)
-					Expect(ok).To(BeTrue())
-					goObj.Spec.SkipNotificationSecretDeployment = true
-				})
+			By(fmt.Sprintf("setting the SkipNotificationSecretDeployment to '%v'", !initialSkipNotificationValue))
+			err := k8s.UpdateWithoutConflict(ctx, &rolloutsManager, k8sClient, func(obj client.Object) {
+				rmObj, ok := obj.(*rolloutsmanagerv1alpha1.RolloutManager)
+				Expect(ok).To(BeTrue())
+				rmObj.Spec.SkipNotificationSecretDeployment = !initialSkipNotificationValue
+			})
+			Expect(err).ToNot(HaveOccurred())
 
-				Expect(err).ToNot(HaveOccurred())
+			if rolloutsManager.Spec.SkipNotificationSecretDeployment {
 				Eventually(&secret, "10s", "1s").ShouldNot(k8s.ExistByName(k8sClient))
 
-			})
-		})
+			} else {
+				Eventually(&secret, "10s", "1s").Should(k8s.ExistByName(k8sClient))
+			}
+
+		},
+			Entry("skipNotification is initially true, then set to false", true),
+			Entry("skipNotification is initially false, then set to true", false),
+		)
 
 		When("A RolloutManager is deleted but the notification secret is owned by another controller", func() {
 			It("should not delete the secret", func() {
