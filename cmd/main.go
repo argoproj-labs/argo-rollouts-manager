@@ -36,7 +36,7 @@ import (
 
 	rolloutsmanagerv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 
-	controllers "github.com/argoproj-labs/argo-rollouts-manager/internal/controller"
+	controllers "github.com/argoproj-labs/argo-rollouts-manager/controllers"
 	monitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	crdv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	//+kubebuilder:scaffold:imports

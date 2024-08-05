@@ -17,7 +17,7 @@ import (
 
 	rolloutsmanagerv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 
-	controllers "github.com/argoproj-labs/argo-rollouts-manager/internal/controller"
+	controllers "github.com/argoproj-labs/argo-rollouts-manager/controllers"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
