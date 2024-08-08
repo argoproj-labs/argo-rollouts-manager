@@ -3,9 +3,11 @@ package rollouts
 import (
 	"context"
 	"fmt"
+	"os"
 	"reflect"
 
 	"github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
@@ -418,6 +420,285 @@ var _ = Describe("Deployment Test", func() {
 
 	})
 
+})
+
+var _ = Describe("generateDesiredRolloutsDeployment tests", func() {
+	var (
+		cr v1alpha1.RolloutManager
+		sa corev1.ServiceAccount
+	)
+
+	BeforeEach(func() {
+		cr = v1alpha1.RolloutManager{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "test-namespace",
+			},
+			Spec: v1alpha1.RolloutManagerSpec{
+				AdditionalMetadata: &v1alpha1.ResourceMetadata{
+					Labels: map[string]string{
+						"label": "value",
+					},
+					Annotations: map[string]string{
+						"annotation": "value",
+					},
+				},
+				NodePlacement: &v1alpha1.RolloutsNodePlacementSpec{
+					NodeSelector: map[string]string{
+						"key1": "value1",
+					},
+					Tolerations: []corev1.Toleration{
+						{
+							Key:      "key1",
+							Operator: corev1.TolerationOpExists,
+						},
+					},
+				},
+			},
+		}
+
+		sa = corev1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      DefaultArgoRolloutsResourceName,
+				Namespace: cr.Namespace,
+			},
+		}
+	})
+
+	Context("when generating the desired deployment", func() {
+		It("should set the correct metadata on the deployment", func() {
+			deployment := generateDesiredRolloutsDeployment(cr, sa)
+			Expect(deployment.ObjectMeta.Name).To(Equal(DefaultArgoRolloutsResourceName))
+			Expect(deployment.ObjectMeta.Namespace).To(Equal(cr.Namespace))
+
+			// Verify whether labels and annotations are correctly set
+			Expect(deployment.Spec.Template.Labels["label"]).To(Equal("value"))
+			Expect(deployment.Spec.Template.Annotations["annotation"]).To(Equal("value"))
+		})
+
+		It("should set the NodeSelector and tolerations if NodePlacement is provided", func() {
+			deployment := generateDesiredRolloutsDeployment(cr, sa)
+			Expect(deployment.Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"kubernetes.io/os": "linux", "key1": "value1"}))
+			Expect(deployment.Spec.Template.Spec.Tolerations).To(ContainElement(corev1.Toleration{
+				Key:      "key1",
+				Operator: corev1.TolerationOpExists,
+			}))
+		})
+
+		It("should set the default node selector if NodePlacement is not provided", func() {
+			cr.Spec.NodePlacement = nil
+			deployment := generateDesiredRolloutsDeployment(cr, sa)
+			Expect(deployment.Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"kubernetes.io/os": "linux"}))
+			Expect(deployment.Spec.Template.Spec.Tolerations).To(BeNil())
+		})
+
+		It("should set the service account name", func() {
+			deployment := generateDesiredRolloutsDeployment(cr, sa)
+			Expect(deployment.Spec.Template.Spec.ServiceAccountName).To(Equal(sa.ObjectMeta.Name))
+		})
+
+		It("should add the correct volumes", func() {
+			deployment := generateDesiredRolloutsDeployment(cr, sa)
+			Expect(deployment.Spec.Template.Spec.Volumes).To(HaveLen(2))
+			Expect(deployment.Spec.Template.Spec.Volumes).To(ContainElement(corev1.Volume{
+				Name: "plugin-bin",
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{},
+				},
+			}))
+			Expect(deployment.Spec.Template.Spec.Volumes).To(ContainElement(corev1.Volume{
+				Name: "tmp",
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{},
+				},
+			}))
+		})
+	})
+})
+
+var _ = Describe("normalizeDeployment tests to verify that an error is returned", func() {
+	var (
+		a          v1alpha1.RolloutManager
+		deployment *appsv1.Deployment
+	)
+
+	BeforeEach(func() {
+		a = *makeTestRolloutManager()
+
+		// Set up a valid deployment object
+		deployment = deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", DefaultArgoRolloutsResourceName, a)
+	})
+
+	DescribeTable("should return an error when",
+		func(modifyDeployment func(), expectedError string) {
+			modifyDeployment()
+			_, err := normalizeDeployment(*deployment, a)
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError(expectedError))
+		},
+
+		Entry("spec.selector is nil", func() {
+			deployment.Spec.Selector = nil
+		}, "missing .spec.selector"),
+
+		Entry("spec.template.spec.securityContext is nil", func() {
+			deployment.Spec.Template.Spec.SecurityContext = nil
+		}, "missing .spec.template.spec.securityContext"),
+
+		Entry("spec.template.spec.volumes is nil", func() {
+			deployment.Spec.Template.Spec.Volumes = nil
+		}, "missing .spec.template.spec.volumes"),
+
+		Entry("spec.template.spec.volumes has incorrect length", func() {
+			deployment.Spec.Template.Spec.Volumes = []corev1.Volume{
+				{Name: "volume1"},
+			}
+		}, "missing .spec.template.spec.volumes"),
+
+		Entry("spec.template.spec.containers has incorrect length", func() {
+			deployment.Spec.Template.Spec.Containers = []corev1.Container{
+				{Name: "test-1"},
+				{Name: "test-2"},
+			}
+		}, "incorrect number of .spec.template.spec.containers"),
+
+		Entry("liveness probe is nil", func() {
+			deployment.Spec.Template.Spec.Containers[0].LivenessProbe = nil
+		}, "incorrect liveness probe"),
+
+		Entry("liveness probe http get is nil", func() {
+			deployment.Spec.Template.Spec.Containers[0].LivenessProbe.ProbeHandler.HTTPGet = nil
+		}, "incorrect http get in liveness probe"),
+
+		Entry("readiness probe is nil", func() {
+			deployment.Spec.Template.Spec.Containers[0].ReadinessProbe = nil
+		}, "incorrect readiness probe"),
+
+		Entry("readiness probe http get is nil", func() {
+			deployment.Spec.Template.Spec.Containers[0].ReadinessProbe.ProbeHandler.HTTPGet = nil
+		}, "incorrect http get in readiness probe"),
+
+		Entry("input ports is nil", func() {
+			deployment.Spec.Template.Spec.Containers[0].Ports = nil
+		}, "incorrect input ports"),
+
+		Entry("input ports has incorrect length", func() {
+			deployment.Spec.Template.Spec.Containers[0].Ports = []corev1.ContainerPort{
+				{ContainerPort: 8080, Name: "http"},
+			}
+		}, "incorrect input ports"),
+
+		Entry("security context is nil", func() {
+			deployment.Spec.Template.Spec.Containers[0].SecurityContext = nil
+		}, "incorrect security context"),
+
+		Entry("security context capabilities is nil", func() {
+			deployment.Spec.Template.Spec.Containers[0].SecurityContext.Capabilities = nil
+		}, "incorrect security context"),
+
+		Entry("volume mounts is nil", func() {
+			deployment.Spec.Template.Spec.Containers[0].VolumeMounts = nil
+		}, "incorrect volume mounts"),
+
+		Entry("volume mounts has incorrect length", func() {
+			deployment.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{
+				{Name: "volume1", MountPath: "/mnt/volume1"},
+			}
+		}, "incorrect volume mounts"),
+	)
+})
+
+var _ = Describe("getRolloutsContainerImage tests", func() {
+	var (
+		a v1alpha1.RolloutManager
+	)
+
+	BeforeEach(func() {
+		a = *makeTestRolloutManager()
+		os.Unsetenv("ARGO_ROLLOUTS_IMAGE") // Ensure env variable is not set unless needed
+	})
+
+	When("the spec Image and Version are empty", func() {
+		It("returns the default image and tag combined", func() {
+			a.Spec.Image = ""
+			a.Spec.Version = ""
+			Expect(getRolloutsContainerImage(a)).To(Equal(DefaultArgoRolloutsImage + ":" + DefaultArgoRolloutsVersion))
+		})
+	})
+
+	When("the spec Image is set but Version is empty", func() {
+		It("returns the custom image with the default tag", func() {
+			a.Spec.Image = "custom-image"
+			Expect(getRolloutsContainerImage(a)).To(Equal("custom-image:" + DefaultArgoRolloutsVersion))
+		})
+	})
+
+	When("the spec Image is empty but Version is set", func() {
+		It("returns the default image with the custom tag", func() {
+			a.Spec.Version = "custom-tag"
+			Expect(getRolloutsContainerImage(a)).To(Equal(DefaultArgoRolloutsImage + ":custom-tag"))
+		})
+	})
+
+	When("both spec Image and Version are set", func() {
+		It("returns the custom image and custom tag combined", func() {
+			a.Spec.Image = "custom-image"
+			a.Spec.Version = "custom-tag"
+			Expect(getRolloutsContainerImage(a)).To(Equal("custom-image:custom-tag"))
+		})
+	})
+
+	When("the environment variable is set and spec is empty", func() {
+		It("returns the environment variable image", func() {
+			os.Setenv("ARGO_ROLLOUTS_IMAGE", "env-image")
+			Expect(getRolloutsContainerImage(a)).To(Equal("env-image"))
+		})
+	})
+
+	When("the environment variable is set but spec is not empty", func() {
+		It("returns the custom image and tag ignoring the environment variable", func() {
+			a.Spec.Image = "custom-image"
+			a.Spec.Version = "custom-tag"
+			os.Setenv("ARGO_ROLLOUTS_IMAGE", "env-image")
+			Expect(getRolloutsContainerImage(a)).To(Equal("custom-image:custom-tag"))
+		})
+	})
+})
+
+var _ = Describe("rolloutsContainer tests", func() {
+	It("should include HTTP_PROXY, HTTPS_PROXY, and NO_PROXY environment variables in the container", func() {
+		By("Set environment variables")
+		os.Setenv("HTTP_PROXY", "http://proxy.example.com:8080")
+		os.Setenv("HTTPS_PROXY", "https://proxy.example.com:8443")
+		os.Setenv("NO_PROXY", "localhost,127.0.0.1")
+
+		By("Create a RolloutManager CR")
+		cr := v1alpha1.RolloutManager{
+			Spec: v1alpha1.RolloutManagerSpec{
+				Env: []corev1.EnvVar{
+					{Name: "EXISTING_VAR", Value: "existing_value"},
+				},
+				ControllerResources: nil,
+			},
+		}
+
+		By("Call rolloutsContainer function")
+		container := rolloutsContainer(cr)
+
+		By("Verify the environment variables")
+		expectedEnvVars := map[string]string{
+			"EXISTING_VAR": "existing_value",
+			"HTTP_PROXY":   "http://proxy.example.com:8080",
+			"HTTPS_PROXY":  "https://proxy.example.com:8443",
+			"NO_PROXY":     "localhost,127.0.0.1",
+		}
+
+		for _, env := range container.Env {
+			if val, exists := expectedEnvVars[env.Name]; exists {
+				Expect(env.Value).To(Equal(val))
+				delete(expectedEnvVars, env.Name)
+			}
+		}
+	})
 })
 
 func deploymentCR(name string, namespace string, rolloutsSelectorLabel string, volumeNames []string, nodeSelector string, serviceAccount string, rolloutManager v1alpha1.RolloutManager) *appsv1.Deployment {
