@@ -202,6 +202,28 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 			}
 			Expect(r.Client.Create(ctx, clusterRoleBinding)).To(Succeed())
 
+			By("creating '*aggregate* clusterRoles")
+			clusterRoleAdmin := &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "argo-rollouts-aggregate-to-admin",
+				},
+			}
+			Expect(r.Client.Create(ctx, clusterRoleAdmin)).To(Succeed())
+
+			clusterRoleEdit := &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "argo-rollouts-aggregate-to-edit",
+				},
+			}
+			Expect(r.Client.Create(ctx, clusterRoleEdit)).To(Succeed())
+
+			clusterRoleView := &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "argo-rollouts-aggregate-to-view",
+				},
+			}
+			Expect(r.Client.Create(ctx, clusterRoleView)).To(Succeed())
+
 			By("creating default cluster-scoped ClusterRole/ClusterRoleBinding with a different name. These should not be deleted")
 
 			unrelatedRole := &rbacv1.ClusterRole{
@@ -228,6 +250,13 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(unrelatedRole), unrelatedRole)).To(Succeed(),
 				"Unrelated ClusterRole should not have been deleted")
 			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(unrelatedRoleBinding), unrelatedRoleBinding)).To(Succeed(), "Unrelated ClusterRoleBinding should not have been deleted")
+
+			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(clusterRoleAdmin), clusterRoleAdmin)).ToNot(Succeed(),
+				"ClusterRole should have been deleted")
+			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(clusterRoleEdit), clusterRoleEdit)).ToNot(Succeed(),
+				"ClusterRole should have been deleted")
+			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(clusterRoleView), clusterRoleView)).ToNot(Succeed(),
+				"ClusterRole should have been deleted")
 
 			Expect(r.removeClusterScopedResourcesIfApplicable(ctx)).To(Succeed(), "calling the function again should not return an error")
 

@@ -18,6 +18,7 @@ import (
 	controllers "github.com/argoproj-labs/argo-rollouts-manager/controllers"
 
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -323,6 +324,54 @@ var _ = Describe("Cluster-scoped RolloutManager tests", func() {
 
 			By("2nd RM: Verify that Status.Condition is having success condition.")
 			Eventually(rolloutsManagerCl2, "1m", "1s").Should(rmFixture.HaveSuccessCondition())
+		})
+
+		It("Verify that deleting the RolloutManager should delete the '*aggregate*' ", func() {
+			rolloutsManagerCl, err := utils.CreateRolloutManager(ctx, k8sClient, "test-rollouts-manager-1", fixture.TestE2ENamespace, false)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("Verify that RolloutManager is successfully created.")
+			Eventually(rolloutsManagerCl, "1m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseAvailable))
+
+			By("Verify clusterRole '*aggregate*' is created")
+			clusterRoleAdmin := &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "argo-rollouts-aggregate-to-admin",
+				},
+			}
+
+			clusterRoleEdit := &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "argo-rollouts-aggregate-to-edit",
+				},
+			}
+
+			clusterRoleView := &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "argo-rollouts-aggregate-to-view",
+				},
+			}
+
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterRoleAdmin), clusterRoleView)).To(Succeed())
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterRoleEdit), clusterRoleView)).To(Succeed())
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterRoleView), clusterRoleView)).To(Succeed())
+
+			By("Delete RolloutManager")
+			Expect(k8sClient.Delete(ctx, &rolloutsManagerCl)).To(Succeed())
+
+			By("Verify clusterRole '*aggregate*' is deleted")
+			Eventually(func() error {
+				return k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterRoleAdmin), clusterRoleView)
+			}, "1m", "1s").ShouldNot(Succeed())
+
+			Eventually(func() error {
+				return k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterRoleView), clusterRoleView)
+			}, "1m", "1s").ShouldNot(Succeed())
+
+			Eventually(func() error {
+				return k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterRoleEdit), clusterRoleView)
+			}, "1m", "1s").ShouldNot(Succeed())
+
 		})
 	})
 })
