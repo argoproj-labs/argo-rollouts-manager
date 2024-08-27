@@ -129,14 +129,13 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rolloutManager.Namespace},
 				}, "30s", "1s").ShouldNot(k8s.ExistByName(k8sClient))
 
-				// Make sure the cluster roles have not been deleted
-				By("NOT deleting the three cluster roles")
+				By("deleting three aggregate cluster roles")
 				clusterRoleSuffixes := []string{"aggregate-to-admin", "aggregate-to-edit", "aggregate-to-view"}
 				for _, suffix := range clusterRoleSuffixes {
 					clusterRoleName := "argo-rollouts-" + suffix
 					Consistently(&rbacv1.ClusterRole{
 						ObjectMeta: metav1.ObjectMeta{Name: clusterRoleName},
-					}, "5s", "1s").Should(k8s.ExistByName(k8sClient))
+					}, "5s", "1s").ShouldNot(k8s.ExistByName(k8sClient))
 				}
 			})
 		})
