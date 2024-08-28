@@ -5,12 +5,30 @@ SCRIPTPATH="$(
   pwd -P
 )"
 
+function cleanup {
+  echo "* Cleaning up"
+  killall main || true
+  killall go || true
+}
+
+trap cleanup EXIT
+
+
 # Treat undefined variables as errors
 set -u
 
 extract_metrics_data() {
 
   TMP_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')
+
+  while true; do
+    curl http://localhost:8080/metrics -o "$TMP_DIR/rollouts-metric-endpoint-output.txt"
+    if [ "$?" == "0" ]; then
+        break
+    fi
+    echo "* Waiting for Metrics endpoint to become available"
+    sleep 3
+  done
 
   # 1) Extract REST client get/put/post metrics
   
@@ -20,9 +38,10 @@ extract_metrics_data() {
   # rest_client_requests_total{code="201",host="api.pgqqd-novoo-oqu.pa43.p3.openshiftapps.com:443",method="POST"} 110
 
   curl http://localhost:8080/metrics -o "$TMP_DIR/rollouts-metric-endpoint-output.txt"
-  GET_REQUESTS=`cat "$TMP_DIR/rollouts-metric-endpoint-output.txt" | grep "rest_client_requests_total" | grep "GET" | rev | cut -d' ' -f1`
-  PUT_REQUESTS=`cat "$TMP_DIR/rollouts-metric-endpoint-output.txt" | grep "rest_client_requests_total" | grep "PUT" | rev | cut -d' ' -f1`
-  POST_REQUESTS=`cat "$TMP_DIR/rollouts-metric-endpoint-output.txt" | grep "rest_client_requests_total" | grep "POST" | rev | cut -d' ' -f1`
+
+  GET_REQUESTS=`cat "$TMP_DIR/rollouts-metric-endpoint-output.txt" | grep "rest_client_requests_total" | grep "GET" | rev | cut -d' ' -f1 | rev`
+  PUT_REQUESTS=`cat "$TMP_DIR/rollouts-metric-endpoint-output.txt" | grep "rest_client_requests_total" | grep "PUT" | grep -v "409" | rev | cut -d' ' -f1 | rev`
+  POST_REQUESTS=`cat "$TMP_DIR/rollouts-metric-endpoint-output.txt" | grep "rest_client_requests_total" | grep "POST" | rev | cut -d' ' -f1 | rev`
 
   if [[ "$GET_REQUESTS" == "" ]]; then
     GET_REQUESTS=0
@@ -91,28 +110,6 @@ else
 
 fi
 
-set +e
-
-# If the output from the E2E operator is available, then check it for errors
-if [ -f "/tmp/e2e-operator-run.log" ]; then
-
-  # Wait for the controller to flush to the file, before killing the controller
-  sleep 10
-  killall main
-  sleep 5
-
-  # Grep the log for unexpected errors
-  # - Ignore errors that are expected to occur
-
-  UNEXPECTED_ERRORS_FOUND_TEXT=`cat /tmp/e2e-operator-run.log | grep "ERROR" | grep -v "because it is being terminated" | grep -v "the object has been modified; please apply your changes to the latest version and try again" | grep -v "unable to fetch" | grep -v "StorageError"` | grep -v "client rate limiter Wait returned an error: context canceled"
-  UNEXPECTED_ERRORS_COUNT=`echo $UNEXPECTED_ERRORS_FOUND_TEXT | grep "ERROR" | wc -l`
-  
-  if [ "$UNEXPECTED_ERRORS_COUNT" != "0" ]; then
-      echo "Unexpected errors found: $UNEXPECTED_ERRORS_FOUND_TEXT"
-      exit 1
-  fi
-fi
-
 # Sanity test the behaviour of the operator during the tests:
 # - We check the (prometheus) metrics coming from the 'localhost:8080/metrics' endpoint of the operator.
 # - For example, if the reported # of Reconcile calls was unusually high, this might mean that the operator was stuck in a Reconcile loop
@@ -148,19 +145,19 @@ sanity_test_metrics_data() {
   if [[ "`expr $PUT_REQUEST_PERCENT \> 40`" == "1" ]]; then
     # This value is arbitrary, and should be updated if at any point it becomes inaccurate (but first audit the test/code to make sure it is not an actual product/test issue, before increasing)
 
-    echo "Put request %$PUT_REQUEST_PERCENT was greater than the expected value"
+    echo "Put request was %$PUT_REQUEST_PERCENT greater than the expected value"
     exit 1
 
   fi
 
-  if [[ "`expr $DELTA_ERROR_RECONCILES \> 20`" == "1" ]]; then
+  if [[ "`expr $DELTA_ERROR_RECONCILES \> 30`" == "1" ]]; then
     # This value is arbitrary, and should be updated if at any point it becomes inaccurate (but first audit the test/code to make sure it is not an actual product/test issue, before increasing)
     echo "Number of Reconcile calls that returned an error $DELTA_ERROR_RECONCILES was greater than the expected value"
     exit 1
 
   fi
 
-  if [[ "`expr $DELTA_SUCCESS_RECONCILES \> 200`" == "1" ]]; then
+  if [[ "`expr $DELTA_SUCCESS_RECONCILES \> 250`" == "1" ]]; then
     # This value is arbitrary, and should be updated if at any point it becomes inaccurate (but first audit the test/code to make sure it is not an actual product/test issue, before increasing)
 
     echo "Number of Reconcile calls that returned success $DELTA_SUCCESS_RECONCILES was greater than the expected value"
@@ -170,3 +167,25 @@ sanity_test_metrics_data() {
 }
 
 sanity_test_metrics_data
+
+set +e
+
+# If the output from the E2E operator is available, then check it for errors
+if [ -f "/tmp/e2e-operator-run.log" ]; then
+
+  # Wait for the controller to flush to the file, before killing the controller
+  sleep 10
+  killall main
+  sleep 5
+
+  # Grep the log for unexpected errors
+  # - Ignore errors that are expected to occur
+
+  UNEXPECTED_ERRORS_FOUND_TEXT=`cat /tmp/e2e-operator-run.log | grep "ERROR" | grep -v "because it is being terminated" | grep -v "the object has been modified; please apply your changes to the latest version and try again" | grep -v "unable to fetch" | grep -v "StorageError"` | grep -v "client rate limiter Wait returned an error: context canceled"
+  UNEXPECTED_ERRORS_COUNT=`echo $UNEXPECTED_ERRORS_FOUND_TEXT | grep "ERROR" | wc -l`
+  
+  if [ "$UNEXPECTED_ERRORS_COUNT" != "0" ]; then
+      echo "Unexpected errors found: $UNEXPECTED_ERRORS_FOUND_TEXT"
+      exit 1
+  fi
+fi

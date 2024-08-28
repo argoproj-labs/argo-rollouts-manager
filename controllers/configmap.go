@@ -146,12 +146,12 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr ro
 		actualConfigMap.Data[TrafficRouterPluginConfigMapKey] = string(desiredTrafficRouterPluginString)
 		actualConfigMap.Data[MetricPluginConfigMapKey] = string(desiredMetricPluginString)
 
+		log.Info("Updating Rollouts ConfigMap due to detected difference")
+
 		// Update the ConfigMap in the cluster
 		if err := r.Client.Update(ctx, actualConfigMap); err != nil {
 			return fmt.Errorf("failed to update ConfigMap: %v", err)
 		}
-		log.Info("ConfigMap updated successfully")
-
 		// Restarting rollouts pod only if configMap is updated
 		if err := r.restartRolloutsPod(ctx, cr.Namespace); err != nil {
 			return err
@@ -183,8 +183,8 @@ func (r *RolloutManagerReconciler) restartRolloutsPod(ctx context.Context, names
 
 	for i := range podList.Items {
 		pod := podList.Items[i]
-		log.Info("Deleting Rollouts Pod", "podName", pod.Name)
 		if pod.ObjectMeta.DeletionTimestamp == nil {
+			log.Info("Deleting Rollouts Pod", "podName", pod.Name)
 			if err := r.Client.Delete(ctx, &pod); err != nil {
 				if errors.IsNotFound(err) {
 					log.Info(fmt.Sprintf("Pod %s already deleted", pod.Name))
