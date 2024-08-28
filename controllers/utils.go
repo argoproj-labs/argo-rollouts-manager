@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -84,6 +85,30 @@ func appendStringMap(src map[string]string, add map[string]string) map[string]st
 		res[key] = val
 	}
 	return res
+}
+
+// In go, reflect.DeepEqual(a, b), on maps a and b, will return false even when len(a) == 0 and len(b) == 0. This is due to a nil map being considered different from an empty map.
+// This function handles this case better: if maps both have a length of 0, we consider them always equal.
+func areStringMapsEqual(one map[string]string, two map[string]string) bool {
+
+	isOneEmpty := false
+
+	isTwoEmpty := false
+
+	if len(one) == 0 {
+		isOneEmpty = true
+	}
+
+	if len(two) == 0 {
+		isTwoEmpty = true
+	}
+
+	if isOneEmpty && isTwoEmpty {
+		return true
+	}
+
+	return reflect.DeepEqual(one, two)
+
 }
 
 // combineStringMaps will combine multiple maps: maps defined earlier in the 'maps' slice may have their values overriden by maps defined later in the 'maps' slice.
@@ -447,6 +472,11 @@ func removeUserLabelsAndAnnotations(obj *metav1.ObjectMeta, cr rolloutsmanagerv1
 	setRolloutsLabelsAndAnnotationsToObject(&defaultLabelsAndAnnotations, cr)
 
 	for objectLabelKey := range obj.Labels {
+
+		// We add this label to the aggregated cluster roles we generate, so we should not process it as a user label.
+		if strings.Contains(objectLabelKey, "rbac.authorization.k8s.io/") && strings.Contains(objectLabelKey, "aggregate") {
+			continue
+		}
 
 		existsInDefault := false
 

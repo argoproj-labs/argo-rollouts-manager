@@ -452,7 +452,6 @@ var _ = Describe("removeUserLabelsAndAnnotations tests", func() {
 			}
 
 			Expect(k8sClient.Create(ctx, &cr)).To(Succeed())
-			setRolloutsLabelsAndAnnotations(&obj)
 
 			removeUserLabelsAndAnnotations(&obj, cr)
 
@@ -460,34 +459,29 @@ var _ = Describe("removeUserLabelsAndAnnotations tests", func() {
 			Expect(obj.Annotations).To(Equal(expectedAnnotations))
 		},
 		Entry("when no user-defined labels or annotations exist",
-			map[string]string{}, map[string]string{},
-			map[string]string{"app.kubernetes.io/name": DefaultArgoRolloutsResourceName,
-				"app.kubernetes.io/part-of":   DefaultArgoRolloutsResourceName,
-				"app.kubernetes.io/component": DefaultArgoRolloutsResourceName},
+			map[string]string{},
+			map[string]string{},
+			map[string]string{},
 			map[string]string{},
 		),
 		Entry("when user-defined labels and annotations are present",
-			map[string]string{"user-label": "value"}, map[string]string{"user-annotation": "value"},
-			map[string]string{"app.kubernetes.io/name": DefaultArgoRolloutsResourceName,
-				"app.kubernetes.io/part-of":   DefaultArgoRolloutsResourceName,
-				"app.kubernetes.io/component": DefaultArgoRolloutsResourceName},
+			map[string]string{"user-label": "value"},
+			map[string]string{"user-annotation": "value"},
+			map[string]string{},
 			map[string]string{},
 		),
 		Entry("when user-defined labels are present and annotations are empty",
-			map[string]string{"user-label": "value"}, map[string]string{},
-			map[string]string{"app.kubernetes.io/name": DefaultArgoRolloutsResourceName,
-				"app.kubernetes.io/part-of":   DefaultArgoRolloutsResourceName,
-				"app.kubernetes.io/component": DefaultArgoRolloutsResourceName},
+			map[string]string{"user-label": "value"},
+			map[string]string{},
+			map[string]string{},
 			map[string]string{},
 		),
 		Entry("when user-defined labels are empty and annotations are present",
-			map[string]string{}, map[string]string{"user-annotation": "value"},
-			map[string]string{"app.kubernetes.io/name": DefaultArgoRolloutsResourceName,
-				"app.kubernetes.io/part-of":   DefaultArgoRolloutsResourceName,
-				"app.kubernetes.io/component": DefaultArgoRolloutsResourceName},
+			map[string]string{},
+			map[string]string{"user-annotation": "value"},
+			map[string]string{},
 			map[string]string{},
 		),
-
 		Entry("when both user and non-user-defined labels are present, and annotations are empty",
 			map[string]string{"user-label": "value",
 				"app.kubernetes.io/name":      DefaultArgoRolloutsResourceName,
@@ -497,6 +491,20 @@ var _ = Describe("removeUserLabelsAndAnnotations tests", func() {
 			map[string]string{"app.kubernetes.io/name": DefaultArgoRolloutsResourceName,
 				"app.kubernetes.io/part-of":   DefaultArgoRolloutsResourceName,
 				"app.kubernetes.io/component": DefaultArgoRolloutsResourceName},
+			map[string]string{},
+		),
+		Entry("rbac aggregate-to- labels should not be removed, as we add these to ClusterRoles",
+			map[string]string{
+				"rbac.authorization.k8s.io/aggregate-to-admin": "true",
+				"app.kubernetes.io/name":                       DefaultArgoRolloutsResourceName,
+				"app.kubernetes.io/part-of":                    DefaultArgoRolloutsResourceName,
+				"app.kubernetes.io/component":                  DefaultArgoRolloutsResourceName},
+			map[string]string{},
+			map[string]string{
+				"rbac.authorization.k8s.io/aggregate-to-admin": "true",
+				"app.kubernetes.io/name":                       DefaultArgoRolloutsResourceName,
+				"app.kubernetes.io/part-of":                    DefaultArgoRolloutsResourceName,
+				"app.kubernetes.io/component":                  DefaultArgoRolloutsResourceName},
 			map[string]string{},
 		),
 	)
@@ -681,6 +689,23 @@ var _ = Describe("setAdditionalRolloutsLabelsAndAnnotationsToObject tests", func
 		})
 
 	})
+})
+
+var _ = Describe("areStringMapsEqual tests", func() {
+	DescribeTable("areStringMapsEqual should match reflect.DeepEqual(), except when comparing nil with empty map", func(one map[string]string, two map[string]string, expectedRes bool) {
+
+		res := areStringMapsEqual(one, two)
+		Expect(res).To(Equal(expectedRes))
+	},
+		Entry("both nil", nil, nil, true),
+		Entry("one nil, one empty", map[string]string{}, nil, true),
+		Entry("one empty, one nil", nil, map[string]string{}, true),
+		Entry("both empty", map[string]string{}, map[string]string{}, true),
+		Entry("one empty, one has value", map[string]string{}, map[string]string{"key": "value"}, false),
+		Entry("one has value, one nil", map[string]string{"key": "value"}, nil, false),
+		Entry("equal values", map[string]string{"key": "value"}, map[string]string{"key": "value"}, true),
+	)
+
 })
 
 var _ = Describe("envMerge tests", func() {

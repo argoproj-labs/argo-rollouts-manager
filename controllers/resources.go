@@ -46,7 +46,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsServiceAccount(ctx context.C
 	normalizedLiveServiceAccount := liveServiceAccount.DeepCopy()
 	removeUserLabelsAndAnnotations(&normalizedLiveServiceAccount.ObjectMeta, cr)
 
-	if !reflect.DeepEqual(normalizedLiveServiceAccount.Labels, expectedServiceAccount.Labels) || !reflect.DeepEqual(normalizedLiveServiceAccount.Annotations, expectedServiceAccount.Annotations) {
+	if !areStringMapsEqual(normalizedLiveServiceAccount.Labels, expectedServiceAccount.Labels) || !areStringMapsEqual(normalizedLiveServiceAccount.Annotations, expectedServiceAccount.Annotations) {
 		updateNeeded = true
 		log.Info(fmt.Sprintf("Labels/Annotations of ServiceAccount %s do not match the expected state, hence updating it", liveServiceAccount.Name))
 
@@ -111,7 +111,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRole(ctx context.Context, cr
 
 	removeUserLabelsAndAnnotations(&normalizedLiveRole.ObjectMeta, cr)
 
-	if !reflect.DeepEqual(normalizedLiveRole.Labels, expectedRole.Labels) || !reflect.DeepEqual(normalizedLiveRole.Annotations, expectedRole.Annotations) {
+	if !areStringMapsEqual(normalizedLiveRole.Labels, expectedRole.Labels) || !areStringMapsEqual(normalizedLiveRole.Annotations, expectedRole.Annotations) {
 		updateNeeded = true
 		log.Info(fmt.Sprintf("Labels/Annotations of Role %s do not match the expected state, hence updating it", liveRole.Name))
 
@@ -165,7 +165,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsClusterRole(ctx context.Cont
 	normalizedLiveClusterRole := liveClusterRole.DeepCopy()
 	removeUserLabelsAndAnnotations(&normalizedLiveClusterRole.ObjectMeta, cr)
 
-	if !reflect.DeepEqual(normalizedLiveClusterRole.Labels, expectedClusterRole.Labels) || !reflect.DeepEqual(normalizedLiveClusterRole.Annotations, expectedClusterRole.Annotations) {
+	if !areStringMapsEqual(normalizedLiveClusterRole.Labels, expectedClusterRole.Labels) || !areStringMapsEqual(normalizedLiveClusterRole.Annotations, expectedClusterRole.Annotations) {
 		updateNeeded = true
 		log.Info(fmt.Sprintf("Labels/Annotations of Role %s do not match the expected state, hence updating it", liveClusterRole.Name))
 
@@ -248,7 +248,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRoleBinding(ctx context.Cont
 
 	normalizedLiveRoleBinding := liveRoleBinding.DeepCopy()
 	removeUserLabelsAndAnnotations(&normalizedLiveRoleBinding.ObjectMeta, cr)
-	if !reflect.DeepEqual(normalizedLiveRoleBinding.Labels, expectedRoleBinding.Labels) || !reflect.DeepEqual(normalizedLiveRoleBinding.Annotations, expectedRoleBinding.Annotations) {
+	if !areStringMapsEqual(normalizedLiveRoleBinding.Labels, expectedRoleBinding.Labels) || !areStringMapsEqual(normalizedLiveRoleBinding.Annotations, expectedRoleBinding.Annotations) {
 		updateNeeded = true
 		log.Info(fmt.Sprintf("Labels/Annotations of RoleBinding %s do not match the expected state, hence updating it", liveRoleBinding.Name))
 
@@ -327,7 +327,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsClusterRoleBinding(ctx conte
 
 	normalizedLiveClusterRoleBinding := liveClusterRoleBinding.DeepCopy()
 	removeUserLabelsAndAnnotations(&normalizedLiveClusterRoleBinding.ObjectMeta, cr)
-	if !reflect.DeepEqual(normalizedLiveClusterRoleBinding.Labels, expectedClusterRoleBinding.Labels) || !reflect.DeepEqual(normalizedLiveClusterRoleBinding.Annotations, expectedClusterRoleBinding.Annotations) {
+	if !areStringMapsEqual(normalizedLiveClusterRoleBinding.Labels, expectedClusterRoleBinding.Labels) || !areStringMapsEqual(normalizedLiveClusterRoleBinding.Annotations, expectedClusterRoleBinding.Annotations) {
 		updateNeeded = true
 		log.Info(fmt.Sprintf("Labels/Annotations of ClusterRoleBinding %s do not match the expected state, hence updating it", liveClusterRoleBinding.Name))
 
@@ -460,7 +460,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToAdminClusterRole(
 
 	normalizedLiveClusterRole := liveClusterRole.DeepCopy()
 	removeUserLabelsAndAnnotations(&normalizedLiveClusterRole.ObjectMeta, cr)
-	if !reflect.DeepEqual(normalizedLiveClusterRole.Labels, expectedClusterRole.Labels) || !reflect.DeepEqual(normalizedLiveClusterRole.Annotations, expectedClusterRole.Annotations) {
+	if !areStringMapsEqual(normalizedLiveClusterRole.Labels, expectedClusterRole.Labels) || !areStringMapsEqual(normalizedLiveClusterRole.Annotations, expectedClusterRole.Annotations) {
 		updateNeeded = true
 		log.Info(fmt.Sprintf("Labels/Annotations of aggregated ClusterRole %s do not match the expected state, hence updating it", liveClusterRole.Name))
 
@@ -512,7 +512,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToEditClusterRole(c
 
 	normalizedLiveClusterRole := liveClusterRole.DeepCopy()
 	removeUserLabelsAndAnnotations(&normalizedLiveClusterRole.ObjectMeta, cr)
-	if !reflect.DeepEqual(normalizedLiveClusterRole.Labels, expectedClusterRole.Labels) || !reflect.DeepEqual(normalizedLiveClusterRole.Annotations, expectedClusterRole.Annotations) {
+	if !areStringMapsEqual(normalizedLiveClusterRole.Labels, expectedClusterRole.Labels) || !areStringMapsEqual(normalizedLiveClusterRole.Annotations, expectedClusterRole.Annotations) {
 		updateNeeded = true
 		log.Info(fmt.Sprintf("Labels/Annotations of aggregated ClusterRole %s do not match the expected state, hence updating it", liveClusterRole.Name))
 
@@ -564,7 +564,8 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToViewClusterRole(c
 
 	normalizedLiveClusterRole := liveClusterRole.DeepCopy()
 	removeUserLabelsAndAnnotations(&normalizedLiveClusterRole.ObjectMeta, cr)
-	if !reflect.DeepEqual(normalizedLiveClusterRole.Labels, expectedClusterRole.Labels) || !reflect.DeepEqual(normalizedLiveClusterRole.Annotations, expectedClusterRole.Annotations) {
+	if !areStringMapsEqual(normalizedLiveClusterRole.Labels, expectedClusterRole.Labels) || !areStringMapsEqual(normalizedLiveClusterRole.Annotations, expectedClusterRole.Annotations) {
+
 		updateNeeded = true
 		log.Info(fmt.Sprintf("Labels/Annotations of aggregated ClusterRole %s do not match the expected state, hence updating it", liveClusterRole.Name))
 
@@ -702,7 +703,8 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.C
 
 	normalizedLiveService := liveService.DeepCopy()
 	removeUserLabelsAndAnnotations(&normalizedLiveService.ObjectMeta, cr)
-	if !reflect.DeepEqual(normalizedLiveService.Labels, expectedSvc.Labels) || !reflect.DeepEqual(normalizedLiveService.Annotations, expectedSvc.Annotations) {
+	if !areStringMapsEqual(normalizedLiveService.Labels, expectedSvc.Labels) || !areStringMapsEqual(normalizedLiveService.Annotations, expectedSvc.Annotations) {
+
 		updateNeeded = true
 		log.Info(fmt.Sprintf("Labels/Annotations of metrics Service %s do not match the expected state, hence updating it", liveService.Name))
 
@@ -778,7 +780,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsSecrets(ctx context.Context,
 	normalizedLiveSecret := liveSecret.DeepCopy()
 	removeUserLabelsAndAnnotations(&normalizedLiveSecret.ObjectMeta, cr)
 
-	if !reflect.DeepEqual(normalizedLiveSecret.Labels, expectedSecret.Labels) || !reflect.DeepEqual(normalizedLiveSecret.Annotations, expectedSecret.Annotations) {
+	if !areStringMapsEqual(normalizedLiveSecret.Labels, expectedSecret.Labels) || !areStringMapsEqual(normalizedLiveSecret.Annotations, expectedSecret.Annotations) {
 		updateNeeded = true
 		log.Info(fmt.Sprintf("Labels/Annotations of Secret %s do not match the expected state, hence updating it", liveSecret.Name))
 
