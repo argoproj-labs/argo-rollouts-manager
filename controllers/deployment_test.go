@@ -617,6 +617,11 @@ var _ = Describe("getRolloutsContainerImage tests", func() {
 		os.Unsetenv("ARGO_ROLLOUTS_IMAGE") // Ensure env variable is not set unless needed
 	})
 
+	AfterEach(func() {
+		a = *makeTestRolloutManager()
+		os.Unsetenv("ARGO_ROLLOUTS_IMAGE") // Ensure env variable is not set unless needed
+	})
+
 	When("the spec Image and Version are empty", func() {
 		It("returns the default image and tag combined", func() {
 			a.Spec.Image = ""
@@ -667,9 +672,22 @@ var _ = Describe("getRolloutsContainerImage tests", func() {
 var _ = Describe("rolloutsContainer tests", func() {
 	It("should include HTTP_PROXY, HTTPS_PROXY, and NO_PROXY environment variables in the container", func() {
 		By("Set environment variables")
-		os.Setenv("HTTP_PROXY", "http://proxy.example.com:8080")
-		os.Setenv("HTTPS_PROXY", "https://proxy.example.com:8443")
-		os.Setenv("NO_PROXY", "localhost,127.0.0.1")
+
+		prevHttpProxyVal := os.Getenv("HTTP_PROXY")
+		prevHttpsProxyVal := os.Getenv("HTTPS_PROXY")
+		prevNoProxyVal := os.Getenv("NO_PROXY")
+
+		Expect(os.Setenv("HTTP_PROXY", "http://proxy.example.com:8080")).To(Succeed())
+		Expect(os.Setenv("HTTPS_PROXY", "https://proxy.example.com:8443")).To(Succeed())
+		Expect(os.Setenv("NO_PROXY", "localhost,127.0.0.1")).To(Succeed())
+
+		// Return values to default
+		defer func() {
+			defer GinkgoRecover()
+			Expect(os.Setenv("HTTP_PROXY", prevHttpProxyVal)).To(Succeed())
+			Expect(os.Setenv("HTTPS_PROXY", prevHttpsProxyVal)).To(Succeed())
+			Expect(os.Setenv("NO_PROXY", prevNoProxyVal)).To(Succeed())
+		}()
 
 		By("Create a RolloutManager CR")
 		cr := v1alpha1.RolloutManager{
