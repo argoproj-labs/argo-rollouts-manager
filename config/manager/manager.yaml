@@ -1,4 +1,4 @@
-apiVersion: v1
+eapiVersion: v1
 kind: Namespace
 metadata:
   labels:
@@ -94,7 +94,7 @@ spec:
         resources:
           limits:
             cpu: 500m
-            memory: 128Mi
+            memory: 512Mi
           requests:
             cpu: 10m
             memory: 64Mi
