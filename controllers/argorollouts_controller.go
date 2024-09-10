@@ -67,9 +67,9 @@ const (
 //+kubebuilder:rbac:groups="",resources=configmaps;endpoints;events;pods;namespaces;secrets;serviceaccounts;services;services/finalizers,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=podtemplates;deployments;replicasets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=deployments/finalizers,verbs=update
-//+kubebuilder:rbac:groups="",resources=deployments,verbs=get;list;watch
+//+kubebuilder:rbac:groups="",resources=deployments,verbs=get;list;watch;update;patch
 //+kubebuilder:rbac:groups="",resources=pods/eviction,verbs=create
-//+kubebuilder:rbac:groups="",resources=podtemplates,verbs=get;list;watch
+//+kubebuilder:rbac:groups="",resources=podtemplates,verbs=get;list;watch;update;patch
 //+kubebuilder:rbac:groups="appmesh.k8s.aws",resources=virtualnodes;virtualrouters,verbs=get;list;watch;update;patch
 //+kubebuilder:rbac:groups="appmesh.k8s.aws",resources=virtualservices,verbs=get;list;watch
 //+kubebuilder:rbac:groups="argoproj.io",resources=analysisruns;analysisruns/finalizers;experiments;experiments/finalizers,verbs=create;get;list;watch;update;patch;delete;deletecollection
@@ -85,6 +85,7 @@ const (
 //+kubebuilder:rbac:groups="networking.k8s.io",resources=ingresses,verbs=create;watch;get;update;patch;list
 //+kubebuilder:rbac:groups="split.smi-spec.io",resources=trafficsplits,verbs=create;watch;get;update;patch
 //+kubebuilder:rbac:groups="traefik.containo.us",resources=traefikservices,verbs=watch;get;update
+//+kubebuilder:rbac:groups=traefik.io,resources=traefikservices,verbs=get;update;watch
 //+kubebuilder:rbac:groups="x.getambassador.io",resources=ambassadormappings;mappings,verbs=create;watch;get;update;list;delete
 //+kubebuilder:rbac:groups="apisix.apache.org",resources=apisixroutes,verbs=watch;get;update
 //+kubebuilder:rbac:groups="route.openshift.io",resources=routes,verbs=create;watch;get;update;patch;list
