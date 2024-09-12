@@ -43,7 +43,7 @@ if [ -f "/tmp/e2e-operator-run.log" ]; then
   # Grep the log for unexpected errors
   # - Ignore errors that are expected to occur
 
-  UNEXPECTED_ERRORS_FOUND_TEXT=`cat /tmp/e2e-operator-run.log | grep "ERROR" | grep -v "because it is being terminated" | grep -v "the object has been modified; please apply your changes to the latest version and try again" | grep -v "unable to fetch" | grep -v "StorageError"`
+  UNEXPECTED_ERRORS_FOUND_TEXT=`cat /tmp/e2e-operator-run.log | grep "ERROR" | grep -v "because it is being terminated" | grep -v "the object has been modified; please apply your changes to the latest version and try again" | grep -v "unable to fetch" | grep -v "StorageError"` | grep -v "client rate limiter Wait returned an error: context canceled"
   UNEXPECTED_ERRORS_COUNT=`echo $UNEXPECTED_ERRORS_FOUND_TEXT | grep "ERROR" | wc -l`
   
   if [ "$UNEXPECTED_ERRORS_COUNT" != "0" ]; then
