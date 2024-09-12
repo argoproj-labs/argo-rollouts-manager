@@ -215,7 +215,7 @@ func validateRolloutsScope(cr rolloutsmanagerv1alpha1.RolloutManager, namespaceS
 			return &reconcileStatusResult{
 				rolloutController: &phaseFailure,
 				phase:             &phaseFailure,
-			}, fmt.Errorf(UnsupportedRolloutManagerClusterScoped)
+			}, errors.New(UnsupportedRolloutManagerClusterScoped)
 
 		}
 
@@ -232,7 +232,7 @@ func validateRolloutsScope(cr rolloutsmanagerv1alpha1.RolloutManager, namespaceS
 			return &reconcileStatusResult{
 				rolloutController: &phaseFailure,
 				phase:             &phaseFailure,
-			}, fmt.Errorf(UnsupportedRolloutManagerNamespaceScoped)
+			}, errors.New(UnsupportedRolloutManagerNamespaceScoped)
 		}
 
 		// allow only cluster-scoped RolloutManager
@@ -273,7 +273,7 @@ func checkForExistingRolloutManager(ctx context.Context, k8sClient client.Client
 			return &reconcileStatusResult{
 				rolloutController: &phaseFailure,
 				phase:             &phaseFailure,
-			}, fmt.Errorf(UnsupportedRolloutManagerConfiguration)
+			}, errors.New(UnsupportedRolloutManagerConfiguration)
 
 		}
 	}

@@ -42,9 +42,8 @@ spec:
         app: test-argo-app
     spec:
       containers:
-        # based on docker.io/kostiscodefresh/gitops-canary-app:v1.0
-        # mirrored to jgwest-redhat
-      - image: quay.io/jgwest-redhat/gitops-canary-app@sha256:4fdd3483fa119b413aa9e3c4459bfa2be399c0741ab7565d2a716e362fc1aa41
+      - image: nginxinc/nginx-unprivileged@sha256:0569e319d06556564ad40882ed35231461d06bec788b5aec00b83b6e9f3ced1a
+        # nginx v1.27, from https://hub.docker.com/layers/nginxinc/nginx-unprivileged/1.27/images/sha256-37404ae33c744fe1c1e1f752225f986ff32c0327240ab6e960573c0f6cb577c3?context=explore
         name: webserver-simple
         ports:
         - containerPort: 8080
