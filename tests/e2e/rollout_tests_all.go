@@ -107,6 +107,15 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 					Eventually(&rbacv1.ClusterRoleBinding{
 						ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsResourceName},
 					}, "10s", "1s").ShouldNot(k8s.ExistByName(k8sClient))
+
+					By("deleting three aggregate cluster roles")
+					clusterRoleSuffixes := []string{"aggregate-to-admin", "aggregate-to-edit", "aggregate-to-view"}
+					for _, suffix := range clusterRoleSuffixes {
+						clusterRoleName := "argo-rollouts-" + suffix
+						Eventually(&rbacv1.ClusterRole{
+							ObjectMeta: metav1.ObjectMeta{Name: clusterRoleName},
+						}, "30s", "1s").ShouldNot(k8s.ExistByName(k8sClient))
+					}
 				}
 
 				By("deleting the deployment")
@@ -129,14 +138,6 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rolloutManager.Namespace},
 				}, "30s", "1s").ShouldNot(k8s.ExistByName(k8sClient))
 
-				By("deleting three aggregate cluster roles")
-				clusterRoleSuffixes := []string{"aggregate-to-admin", "aggregate-to-edit", "aggregate-to-view"}
-				for _, suffix := range clusterRoleSuffixes {
-					clusterRoleName := "argo-rollouts-" + suffix
-					Consistently(&rbacv1.ClusterRole{
-						ObjectMeta: metav1.ObjectMeta{Name: clusterRoleName},
-					}, "5s", "1s").ShouldNot(k8s.ExistByName(k8sClient))
-				}
 			})
 		})
 
