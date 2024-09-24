@@ -352,25 +352,17 @@ var _ = Describe("Cluster-scoped RolloutManager tests", func() {
 				},
 			}
 
-			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterRoleAdmin), clusterRoleView)).To(Succeed())
-			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterRoleEdit), clusterRoleView)).To(Succeed())
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterRoleAdmin), clusterRoleAdmin)).To(Succeed())
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterRoleEdit), clusterRoleEdit)).To(Succeed())
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterRoleView), clusterRoleView)).To(Succeed())
 
 			By("Delete RolloutManager")
 			Expect(k8sClient.Delete(ctx, &rolloutsManagerCl)).To(Succeed())
 
 			By("Verify clusterRole '*aggregate*' is deleted")
-			Eventually(func() error {
-				return k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterRoleAdmin), clusterRoleView)
-			}, "1m", "1s").ShouldNot(Succeed())
-
-			Eventually(func() error {
-				return k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterRoleView), clusterRoleView)
-			}, "1m", "1s").ShouldNot(Succeed())
-
-			Eventually(func() error {
-				return k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterRoleEdit), clusterRoleView)
-			}, "1m", "1s").ShouldNot(Succeed())
+			Eventually(clusterRoleAdmin, "1m", "1s").ShouldNot((k8s.ExistByName(k8sClient)))
+			Eventually(clusterRoleView, "1m", "1s").ShouldNot((k8s.ExistByName(k8sClient)))
+			Eventually(clusterRoleEdit, "1m", "1s").ShouldNot((k8s.ExistByName(k8sClient)))
 
 		})
 	})
