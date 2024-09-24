@@ -326,7 +326,7 @@ var _ = Describe("Cluster-scoped RolloutManager tests", func() {
 			Eventually(rolloutsManagerCl2, "1m", "1s").Should(rmFixture.HaveSuccessCondition())
 		})
 
-		It("Verify that deleting the RolloutManager should delete the '*aggregate*' ", func() {
+		It("Verify that deleting the RolloutManager should delete the '*aggregate*' ClusterRoles", func() {
 			rolloutsManagerCl, err := utils.CreateRolloutManager(ctx, k8sClient, "test-rollouts-manager-1", fixture.TestE2ENamespace, false)
 			Expect(err).ToNot(HaveOccurred())
 
