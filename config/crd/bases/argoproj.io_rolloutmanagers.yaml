@@ -286,6 +286,37 @@ spec:
                       type: object
                     type: array
                 type: object
+              plugins:
+                properties:
+                  metric:
+                    items:
+                      properties:
+                        location:
+                          type: string
+                        name:
+                          type: string
+                        sha256:
+                          type: string
+                      required:
+                      - location
+                      - name
+                      type: object
+                    type: array
+                  trafficManagement:
+                    items:
+                      properties:
+                        location:
+                          type: string
+                        name:
+                          type: string
+                        sha256:
+                          type: string
+                      required:
+                      - location
+                      - name
+                      type: object
+                    type: array
+                type: object
               skipNotificationSecretDeployment:
                 description: SkipNotificationSecretDeployment lets you specify if
                   the argo notification secret should be deployed
