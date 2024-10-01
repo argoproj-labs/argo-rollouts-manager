@@ -64,8 +64,10 @@ type Plugin struct {
 }
 
 type Plugins struct {
+	// TrafficManagement holds a list of traffic management plugins used to control traffic routing during rollouts.
 	TrafficManagement []Plugin `json:"trafficManagement,omitempty"`
-	Metric            []Plugin `json:"metric,omitempty"`
+	// Metric holds a list of metric plugins used to gather and report metrics during rollouts.
+	Metric []Plugin `json:"metric,omitempty"`
 }
 
 // ArgoRolloutsNodePlacementSpec is used to specify NodeSelector and Tolerations for Rollouts workloads

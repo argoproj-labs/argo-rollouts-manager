@@ -6,6 +6,10 @@ import (
 	"github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -15,6 +19,7 @@ var _ = Describe("ConfigMap Test", func() {
 	var a v1alpha1.RolloutManager
 	var r *RolloutManagerReconciler
 	var sa *corev1.ServiceAccount
+	var existingDeployment *v1.Deployment
 	const trafficrouterPluginLocation = "https://custom-traffic-plugin-location"
 	const metricPluginLocation = "https://custom-metric-plugin-location"
 
@@ -33,7 +38,7 @@ var _ = Describe("ConfigMap Test", func() {
 		}
 		Expect(r.Client.Create(ctx, sa)).To(Succeed())
 
-		existingDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin-test", "tmp-test"}, "linux-test", sa.Name, a)
+		existingDeployment = deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin-test", "tmp-test"}, "linux-test", sa.Name, a)
 		Expect(r.Client.Create(ctx, existingDeployment)).To(Succeed())
 
 	})
@@ -67,83 +72,10 @@ var _ = Describe("ConfigMap Test", func() {
 
 	})
 
-	// Commented out because we are overwriting user-defined plugin values in the ConfigMap
-	// with the plugins defined in the CR. This will be removed once the PR has been reviewed.
-
-	/*It("verifies that the config map reconciler will not overwrite a custom plugin that is added to the ConfigMap by the user", func() {
-
-	    // By("creating a ConfigMap containing default Openshift")
-	    expectedConfigMap := &corev1.ConfigMap{
-	        ObjectMeta: metav1.ObjectMeta{
-	            Name:      DefaultRolloutsConfigMapName,
-	            Namespace: a.Namespace,
-	            Labels: map[string]string{
-	                "app.kubernetes.io/name": DefaultRolloutsConfigMapName,
-	            },
-	        },
-	    }
-
-	    By("calling reconcileConfigMap, which will add the default plugin to the ConfigMap")
-	    Expect(r.reconcileConfigMap(ctx, a)).To(Succeed())
-
-	    By("fetching the ConfigMap")
-	    fetchedConfigMap := &corev1.ConfigMap{}
-	    Expect(fetchObject(ctx, r.Client, a.Namespace, expectedConfigMap.Name, fetchedConfigMap)).To(Succeed())
-	    Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(OpenShiftRolloutPluginName))
-	    Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).ToNot(ContainSubstring("test/plugin"))
-
-	    By("adding a new trafficRouter plugin to test the update plugin logic")
-	    trafficRouterPlugins := []pluginItem{
-	        {
-	            Name:     "test/plugin",
-	            Location: "https://test-path",
-	        },
-	    }
-
-	    newConfigMap := fetchedConfigMap.DeepCopy()
-	    {
-	        pluginString, err := yaml.Marshal(trafficRouterPlugins)
-	        Expect(err).ToNot(HaveOccurred())
-
-	        newConfigMap.Data = map[string]string{
-	            TrafficRouterPluginConfigMapKey: string(pluginString),
-	        }
-	    }
-
-	    By("updating the ConfigMap to contain only a user provided plugin")
-	    Expect(r.Client.Update(ctx, newConfigMap)).To(Succeed())
-
-	    By("calling reconcileConfigMap")
-	    Expect(r.reconcileConfigMap(ctx, a)).To(Succeed())
-
-	    By("verifying that when ConfigMap is reconciled, it contains both plugins")
-
-	    Expect(fetchObject(ctx, r.Client, a.Namespace, expectedConfigMap.Name, fetchedConfigMap)).To(Succeed())
-	    Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring("test/plugin"))
-	    Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(OpenShiftRolloutPluginName))
-	    Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(r.OpenShiftRoutePluginLocation))
-
-	    By("calling reconcileConfigMap again, to verify nothing changes when reconcile is called again")
-	    Expect(r.reconcileConfigMap(ctx, a)).To(Succeed())
-
-	    Expect(fetchObject(ctx, r.Client, a.Namespace, expectedConfigMap.Name, fetchedConfigMap)).To(Succeed())
-	    Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring("test/plugin"))
-	    Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(OpenShiftRolloutPluginName))
-	    Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(r.OpenShiftRoutePluginLocation))
-
-	    // overriding this value with new test url to verify whether it updated the existing configMap with the new url
-	    r.OpenShiftRoutePluginLocation = "test-updated-url"
-
-	    By("calling reconcileConfigMap")
-	    Expect(r.reconcileConfigMap(ctx, a)).To(Succeed())
-
-	    Expect(fetchObject(ctx, r.Client, a.Namespace, expectedConfigMap.Name, fetchedConfigMap)).To(Succeed())
-	    Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring("test/plugin"))
-	    Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(OpenShiftRolloutPluginName))
-	    Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring("test-updated-url"))
-	}) */
-
 	It("verifies traffic and metric plugin creation/modification and ensures OpenShiftRolloutPlugin existence", func() {
+		By("Add a pod that matches the deployment's selector")
+		addTestPodToFakeClient(r, a.Namespace, existingDeployment)
+
 		expectedConfigMap := &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: DefaultRolloutsConfigMapName,
@@ -157,6 +89,8 @@ var _ = Describe("ConfigMap Test", func() {
 		a.Spec.Plugins.Metric = []v1alpha1.Plugin{
 			{Name: "custom-metric-plugin", Location: metricPluginLocation, SHA256: "sha256-test"},
 		}
+
+		Expect(r.Client.Update(ctx, &a)).To(Succeed())
 
 		By("Call reconcileConfigMap")
 		Expect(r.reconcileConfigMap(ctx, a)).To(Succeed())
@@ -187,6 +121,8 @@ var _ = Describe("ConfigMap Test", func() {
 			{Name: "custom-metric-plugin", Location: updatedPluginLocation, SHA256: "sha256-test"},
 		}
 
+		Expect(r.Client.Update(ctx, &a)).To(Succeed())
+
 		By("Call reconcileConfigMap again after update")
 		Expect(r.reconcileConfigMap(ctx, a)).To(Succeed())
 
@@ -215,7 +151,59 @@ var _ = Describe("ConfigMap Test", func() {
 			},
 		}
 
-		By("Call reconcileConfigMap again after update")
+		Expect(r.Client.Update(ctx, &a)).To(Succeed())
+
+		By("Calling reconcileConfigMap again after the attempt to update OpenShiftRolloutPlugin")
 		Expect(r.reconcileConfigMap(ctx, a)).ToNot(Succeed(), "the plugin %s cannot be modified or added through the RolloutManager CR", OpenShiftRolloutPluginName)
+
+		By("Remove plugins from RolloutManager spec should remove plugins from ConfigMap")
+		a.Spec.Plugins.TrafficManagement = nil
+		a.Spec.Plugins.Metric = nil
+
+		Expect(r.Client.Update(ctx, &a)).To(Succeed())
+
+		By("Call reconcileConfigMap after plugins are removed")
+		Expect(r.reconcileConfigMap(ctx, a)).To(Succeed())
+
+		By("Fetched ConfigMap after removing plugins")
+		Expect(fetchObject(ctx, r.Client, a.Namespace, expectedConfigMap.Name, fetchedConfigMap)).To(Succeed())
+
+		By("Verify that the fetched ConfigMap contains OpenShiftRolloutPlugin after removing plugins from CR")
+		Expect(fetchedConfigMap.Name).To(Equal(expectedConfigMap.Name))
+		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(OpenShiftRolloutPluginName))
+		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(r.OpenShiftRoutePluginLocation))
+
+		By("Verify that the ConfigMap no longer contains removed plugins")
+		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).NotTo(ContainSubstring("custom-traffic-plugin"))
+		Expect(fetchedConfigMap.Data[MetricPluginConfigMapKey]).NotTo(ContainSubstring("custom-metric-plugin"))
+
+		By("Verify that the pod has been deleted after the above update.")
+		rolloutsPodList := &corev1.PodList{}
+		err := r.Client.List(ctx, rolloutsPodList, client.InNamespace(a.Namespace), client.MatchingLabels(existingDeployment.Spec.Selector.MatchLabels))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(len(rolloutsPodList.Items)).To(BeNumerically("==", 0))
 	})
 })
+
+func addTestPodToFakeClient(r *RolloutManagerReconciler, namespace string, deployment *appsv1.Deployment) {
+	// Create a test pod with labels that match the deployment's selector
+	testPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-rollouts-pod",
+			Namespace: namespace,
+			Labels:    deployment.Spec.Selector.MatchLabels,
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  DefaultArgoRolloutsResourceName,
+					Image: "argoproj/argo-rollouts:latest",
+				},
+			},
+		},
+	}
+
+	// Add the pod to the fake client
+	err := r.Client.Create(context.TODO(), testPod)
+	Expect(err).ToNot(HaveOccurred())
+}
