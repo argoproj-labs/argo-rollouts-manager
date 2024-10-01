@@ -13,6 +13,7 @@ jobs:
   test-e2e:
     name: Run end-to-end tests from upstream Argo Rollouts repo
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     strategy:
       matrix:
         k3s-version: [ v1.28.2 ]
