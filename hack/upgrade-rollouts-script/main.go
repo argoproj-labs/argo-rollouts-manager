@@ -115,8 +115,10 @@ func main() {
 
 		bodyText += `
 Before merging this PR, ensure you check the Argo Rollouts change logs and release notes: 
-- ensure there are no changes to the Argo Rollouts install YAML that we need to respond to with changes in the operator
-- ensure there are no backwards incompatible API/behaviour changes in the change logs`
+- Ensure there are no changes to the Argo Rollouts install YAML that we need to respond to with changes in the operator
+    - You can do this by downloading the 'install.yaml' from both the previous version (for example, v1.7.1) and new version (for example, v1.7.2), and then comparing them using a tool like [Meld](https://gitlab.gnome.org/GNOME/meld) or diff.
+	- If there are changes to resources like Deployments and Roles in the install.yaml between the two versions, this will likely require a corresponding code change within the operator. e.g. a new permission added to a Role would require a change to the Role creation code in the operator.
+- Ensure there are no backwards incompatible API/behaviour changes in the change logs`
 
 		// 4) Create PR if it doesn't exist
 		if stdout, stderr, err := runCommandWithWorkDir(pathToGitHubRepo, "gh", "pr", "create",
