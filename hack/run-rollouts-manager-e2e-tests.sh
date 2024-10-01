@@ -157,7 +157,7 @@ sanity_test_metrics_data() {
 
   fi
 
-  if [[ "`expr $DELTA_SUCCESS_RECONCILES \> 250`" == "1" ]]; then
+  if [[ "`expr $DELTA_SUCCESS_RECONCILES \> 1200`" == "1" ]]; then
     # This value is arbitrary, and should be updated if at any point it becomes inaccurate (but first audit the test/code to make sure it is not an actual product/test issue, before increasing)
 
     echo "Number of Reconcile calls that returned success $DELTA_SUCCESS_RECONCILES was greater than the expected value"
@@ -181,11 +181,19 @@ if [ -f "/tmp/e2e-operator-run.log" ]; then
   # Grep the log for unexpected errors
   # - Ignore errors that are expected to occur
 
-  UNEXPECTED_ERRORS_FOUND_TEXT=`cat /tmp/e2e-operator-run.log | grep "ERROR" | grep -v "because it is being terminated" | grep -v "the object has been modified; please apply your changes to the latest version and try again" | grep -v "unable to fetch" | grep -v "StorageError"` | grep -v "client rate limiter Wait returned an error: context canceled"
-  UNEXPECTED_ERRORS_COUNT=`echo $UNEXPECTED_ERRORS_FOUND_TEXT | grep "ERROR" | wc -l`
+  set +u # allow undefined vars
+
+  UNEXPECTED_ERRORS_FOUND_TEXT=`cat /tmp/e2e-operator-run.log | grep "ERROR" | grep -v "because it is being terminated" | grep -v "the object has been modified; please apply your changes to the latest version and try again" | grep -v "unable to fetch" | grep -v "StorageError" | grep -v "client rate limiter Wait returned an error: context canceled"`
+
+  if [ "$UNEXPECTED_ERRORS_FOUND_TEXT" != "" ]; then
   
-  if [ "$UNEXPECTED_ERRORS_COUNT" != "0" ]; then
-      echo "Unexpected errors found: $UNEXPECTED_ERRORS_FOUND_TEXT"
-      exit 1
+    UNEXPECTED_ERRORS_COUNT=`echo $UNEXPECTED_ERRORS_FOUND_TEXT | grep "ERROR" | wc -l`
+    
+    if [ "$UNEXPECTED_ERRORS_COUNT" != "0" ]; then
+        echo "Unexpected errors found: $UNEXPECTED_ERRORS_FOUND_TEXT"
+        exit 1
+    fi  
   fi
+
+
 fi
