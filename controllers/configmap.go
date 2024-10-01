@@ -2,6 +2,7 @@ package rollouts
 
 import (
 	"context"
+	"sort"
 
 	"fmt"
 	"reflect"
@@ -12,6 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -62,10 +64,17 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr ro
 		}
 	}
 
-	// Convert traffic plugins map to slice
+	// Sort trafficRouterPluginsMap keys for deterministic ordering
+	trafficRouterPluginKeys := make([]string, 0, len(trafficRouterPluginsMap))
+	for key := range trafficRouterPluginsMap {
+		trafficRouterPluginKeys = append(trafficRouterPluginKeys, key)
+	}
+	sort.Strings(trafficRouterPluginKeys)
+
+	// Convert trafficRouterPluginsMap to sorted slice
 	trafficRouterPlugins := make([]pluginItem, 0, len(trafficRouterPluginsMap))
-	for _, plugin := range trafficRouterPluginsMap {
-		trafficRouterPlugins = append(trafficRouterPlugins, plugin)
+	for _, key := range trafficRouterPluginKeys {
+		trafficRouterPlugins = append(trafficRouterPlugins, trafficRouterPluginsMap[key])
 	}
 
 	// Append metric plugins specified in RolloutManager CR
@@ -81,10 +90,17 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr ro
 		}
 	}
 
-	// Convert metric plugins map to slice
+	// Sort metricPluginsMap keys for deterministic ordering
+	metricPluginKeys := make([]string, 0, len(metricPluginsMap))
+	for key := range metricPluginsMap {
+		metricPluginKeys = append(metricPluginKeys, key)
+	}
+	sort.Strings(metricPluginKeys)
+
+	// Convert metricPluginsMap to sorted slice
 	metricPlugins := make([]pluginItem, 0, len(metricPluginsMap))
-	for _, plugin := range metricPluginsMap {
-		metricPlugins = append(metricPlugins, plugin)
+	for _, key := range metricPluginKeys {
+		metricPlugins = append(metricPlugins, metricPluginsMap[key])
 	}
 
 	desiredTrafficRouterPluginString, err := yaml.Marshal(trafficRouterPlugins)
@@ -149,6 +165,10 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr ro
 func (r *RolloutManagerReconciler) restartRolloutsPod(ctx context.Context, namespace string) error {
 	deployment := &appsv1.Deployment{}
 	if err := r.Client.Get(ctx, types.NamespacedName{Name: DefaultArgoRolloutsResourceName, Namespace: namespace}, deployment); err != nil {
+		if errors.IsNotFound(err) {
+			// If Deployment isn't found, return nil as there is no child pod to restart
+			return nil
+		}
 		return fmt.Errorf("failed to get deployment: %w", err)
 	}
 
@@ -164,14 +184,16 @@ func (r *RolloutManagerReconciler) restartRolloutsPod(ctx context.Context, names
 	for i := range podList.Items {
 		pod := podList.Items[i]
 		log.Info("Deleting Rollouts Pod", "podName", pod.Name)
-		if err := r.Client.Delete(ctx, &pod); err != nil {
-			if errors.IsNotFound(err) {
-				log.Info(fmt.Sprintf("Pod %s already deleted", pod.Name))
-				continue
+		if pod.ObjectMeta.DeletionTimestamp == nil {
+			if err := r.Client.Delete(ctx, &pod); err != nil {
+				if errors.IsNotFound(err) {
+					log.Info(fmt.Sprintf("Pod %s already deleted", pod.Name))
+					continue
+				}
+				return fmt.Errorf("failed to delete Rollouts Pod %s: %w", pod.Name, err)
 			}
-			return fmt.Errorf("failed to delete Rollouts Pod %s: %w", pod.Name, err)
+			log.Info("Rollouts Pod deleted successfully", "podName", pod.Name)
 		}
-		log.Info("Rollouts Pod deleted successfully", "podName", pod.Name)
 	}
 
 	return nil

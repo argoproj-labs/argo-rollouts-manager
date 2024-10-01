@@ -133,3 +133,23 @@ spec:
   skipNotificationSecretDeployment: true
 ```
 
+
+### RolloutManager example with metric and trafficManagement Plugins
+
+``` yaml
+apiVersion: argoproj.io/v1alpha1
+kind: RolloutManager
+metadata:
+  name: argo-rollout
+  labels:
+    example: with-plugins
+spec:
+  plugins:
+    trafficManagement:
+      - name: argoproj-labs/gatewayAPI
+        location: https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/v0.4.0/gatewayapi-plugin-linux-amd64  
+    metric:
+      - name: "argoproj-labs/sample-prometheus"
+        location: https://github.com/argoproj-labs/sample-rollouts-metric-plugin/releases/download/v0.0.3/metric-plugin-linux-amd64
+        sha256: a597a017a9a1394a31b3cbc33e08a071c88f0bd8
+```
