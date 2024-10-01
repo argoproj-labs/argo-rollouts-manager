@@ -2,6 +2,7 @@ package rollouts
 
 import (
 	"context"
+	"os"
 
 	rolloutsmanagerv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 	monitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
@@ -360,9 +361,19 @@ var _ = Describe("validateRolloutsScope tests", func() {
 
 	When("NAMESPACE_SCOPED_ARGO_ROLLOUTS environment variable is set to False.", func() {
 
+		BeforeEach(func() {
+			By("Set Env variable.")
+			os.Setenv(ClusterScopedArgoRolloutsNamespaces, rolloutsManager.Namespace)
+		})
+
+		AfterEach(func() {
+			By("Unset Env variable.")
+			os.Unsetenv(ClusterScopedArgoRolloutsNamespaces)
+		})
+
 		namespaceScopedArgoRolloutsController := false
 
-		It("should not return error, if cluster-scoped RolloutManager is created.", func() {
+		It("should not return error, if cluster-scoped RolloutManager is created in a namespace specified in env variable.", func() {
 
 			By("Create cluster-scoped RolloutManager.")
 			Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
@@ -371,6 +382,22 @@ var _ = Describe("validateRolloutsScope tests", func() {
 			rr, err := validateRolloutsScope(rolloutsManager, namespaceScopedArgoRolloutsController)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(rr).To(BeNil())
+		})
+
+		It("should return error, if cluster-scoped RolloutManager is created in a namespace which is not specified in env variable.", func() {
+
+			By("Unset Env variable.")
+			os.Unsetenv(ClusterScopedArgoRolloutsNamespaces)
+
+			By("Create cluster-scoped RolloutManager.")
+			Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
+
+			By("Verify there is no error returned.")
+			rr, err := validateRolloutsScope(rolloutsManager, namespaceScopedArgoRolloutsController)
+			Expect(err).To(HaveOccurred())
+			Expect(invalidRolloutNamespace(err)).To(BeTrue())
+			Expect(*rr.phase).To(Equal(rolloutsmanagerv1alpha1.PhaseFailure))
+			Expect(*rr.rolloutController).To(Equal(rolloutsmanagerv1alpha1.PhaseFailure))
 		})
 
 		It("should return error, if namespace-scoped RolloutManager is created.", func() {

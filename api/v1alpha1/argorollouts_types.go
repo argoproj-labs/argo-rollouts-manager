@@ -99,6 +99,7 @@ const (
 	RolloutManagerReasonErrorOccurred                       = "ErrorOccurred"
 	RolloutManagerReasonMultipleClusterScopedRolloutManager = "MultipleClusterScopedRolloutManager"
 	RolloutManagerReasonInvalidScoped                       = "InvalidRolloutManagerScope"
+	RolloutManagerReasonInvalidNamespace                    = "InvalidRolloutManagerNamespace"
 )
 
 type ResourceMetadata struct {
