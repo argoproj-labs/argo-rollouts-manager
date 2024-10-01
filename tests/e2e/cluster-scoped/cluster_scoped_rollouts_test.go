@@ -282,6 +282,31 @@ var _ = Describe("Cluster-scoped RolloutManager tests", func() {
 			utils.ValidateArgoRolloutsResources(ctx, k8sClient, nsName2, testServiceNodePort_31002, testServiceNodePort_32002)
 		})
 
+		/*
+			In this test a cluster-scoped RolloutManager is created in one namespace, but namespace is not specified in CLUSTER_SCOPED_ARGO_ROLLOUTS_NAMESPACES env variable, hence operator should not allow to create Rollouts instance.
+		*/
+		It("Namespace is not specified in CLUSTER_SCOPED_ARGO_ROLLOUTS_NAMESPACES, then cluster-scoped RolloutManager should not be allowed.", func() {
+
+			nsName := "test-ns"
+			By("Create namespace.")
+			Expect(utils.CreateNamespace(ctx, k8sClient, nsName)).To(Succeed())
+
+			rolloutsManager, err := utils.CreateRolloutManager(ctx, k8sClient, "test-rollouts-manager-1", nsName, false)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("Verify that RolloutManager is successfully created.")
+			Eventually(rolloutsManager, "1m", "5s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseFailure))
+
+			By("Verify that Status.Condition is now having error message.")
+			Eventually(rolloutsManager, "1m", "1s").Should(rmFixture.HaveCondition(
+				metav1.Condition{
+					Type:    rmv1alpha1.RolloutManagerConditionType,
+					Status:  metav1.ConditionFalse,
+					Reason:  rmv1alpha1.RolloutManagerReasonInvalidNamespace,
+					Message: controllers.UnsupportedRolloutManagerClusterScopedNamespace,
+				}))
+		})
+
 		It("After creating 2 cluster-scoped RolloutManager in a namespace, delete 1st RolloutManager and verify it removes the Failed status of 2nd RolloutManager", func() {
 			By("1st RM: Create cluster-scoped RolloutManager in a namespace.")
 			rolloutsManagerCl, err := utils.CreateRolloutManager(ctx, k8sClient, "test-rollouts-manager-1", fixture.TestE2ENamespace, false)

@@ -17,9 +17,10 @@ import (
 )
 
 const (
-	UnsupportedRolloutManagerConfiguration   = "when there exists a cluster-scoped RolloutManager on the cluster, there may not exist another: only a single cluster-scoped RolloutManager is supported"
-	UnsupportedRolloutManagerClusterScoped   = "when Subscription has environment variable NAMESPACE_SCOPED_ARGO_ROLLOUTS set to True, there may not exist any cluster-scoped RolloutManagers: in this case, only namespace-scoped RolloutManager resources are supported"
-	UnsupportedRolloutManagerNamespaceScoped = "when Subscription has environment variable NAMESPACE_SCOPED_ARGO_ROLLOUTS set to False, there may not exist any namespace-scoped RolloutManagers: only a single cluster-scoped RolloutManager is supported"
+	UnsupportedRolloutManagerConfiguration          = "when there exists a cluster-scoped RolloutManager on the cluster, there may not exist another: only a single cluster-scoped RolloutManager is supported"
+	UnsupportedRolloutManagerClusterScoped          = "when Subscription has environment variable NAMESPACE_SCOPED_ARGO_ROLLOUTS set to True, there may not exist any cluster-scoped RolloutManagers: in this case, only namespace-scoped RolloutManager resources are supported"
+	UnsupportedRolloutManagerNamespaceScoped        = "when Subscription has environment variable NAMESPACE_SCOPED_ARGO_ROLLOUTS set to False, there may not exist any namespace-scoped RolloutManagers: only a single cluster-scoped RolloutManager is supported"
+	UnsupportedRolloutManagerClusterScopedNamespace = "Namespace is not specified in CLUSTER_SCOPED_ARGO_ROLLOUTS_NAMESPACES environment variable of Subscription resource. If you wish to install a cluster-scoped Argo Rollouts instance outside the default namespace, ensure it is defined in CLUSTER_SCOPED_ARGO_ROLLOUTS_NAMESPACES"
 )
 
 // pluginItem is a clone of PluginItem from "github.com/argoproj/argo-rollouts/utils/plugin/types"
@@ -235,9 +236,42 @@ func validateRolloutsScope(cr rolloutsmanagerv1alpha1.RolloutManager, namespaceS
 			}, fmt.Errorf(UnsupportedRolloutManagerNamespaceScoped)
 		}
 
-		// allow only cluster-scoped RolloutManager
+		// if cluster-scoped RolloutManager being reconciled, is not specified in CLUSTER_SCOPED_ARGO_ROLLOUTS_NAMESPACES environment variable of Subscription resource,
+		// then don't allow it.
+		if !allowedClusterScopedNamespace(cr) {
+
+			phaseFailure := rolloutsmanagerv1alpha1.PhaseFailure
+
+			return &reconcileStatusResult{
+				rolloutController: &phaseFailure,
+				phase:             &phaseFailure,
+			}, errors.New(UnsupportedRolloutManagerClusterScopedNamespace)
+		}
+
+		// allow cluster-scoped Rollouts for namespaces specified in CLUSTER_SCOPED_ARGO_ROLLOUTS_NAMESPACES environment variable of Subscription resource
 		return nil, nil
 	}
+}
+
+// allowedClusterScopedNamespace will check that current namespace is allowed to host cluster-scoped Argo Rollouts.
+func allowedClusterScopedNamespace(cr rolloutsmanagerv1alpha1.RolloutManager) bool {
+	clusterConfigNamespaces := splitList(os.Getenv(ClusterScopedArgoRolloutsNamespaces))
+	if len(clusterConfigNamespaces) > 0 {
+		for _, n := range clusterConfigNamespaces {
+			if n == cr.Namespace {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func splitList(s string) []string {
+	elems := strings.Split(s, ",")
+	for i := range elems {
+		elems[i] = strings.TrimSpace(elems[i])
+	}
+	return elems
 }
 
 // checkForExistingRolloutManager will return error if more than one cluster-scoped RolloutManagers are created.
@@ -288,6 +322,10 @@ func multipleRolloutManagersExist(err error) bool {
 func invalidRolloutScope(err error) bool {
 	return err.Error() == UnsupportedRolloutManagerClusterScoped ||
 		err.Error() == UnsupportedRolloutManagerNamespaceScoped
+}
+
+func invalidRolloutNamespace(err error) bool {
+	return err.Error() == UnsupportedRolloutManagerClusterScopedNamespace
 }
 
 // updateStatusConditionOfRolloutManager calls Set Condition of RolloutManager status

@@ -29,3 +29,49 @@ kubectl get all
 
 If you would like to understand the siginificance of each rollout controller resource created by the operator, please go through the official rollouts controller [docs](https://argo-rollouts.readthedocs.io/en/stable/).
 
+
+
+
+## Namespace Scoped Rollouts Instance
+
+A namespace-scoped Rollouts instance can manage Rollouts resources of same namespace it is deployed into. To deploy a namespace-scoped Rollouts instance set `spec.namespaceScoped` field to `true`.
+
+```yml
+apiVersion: argoproj.io/v1alpha1
+kind: RolloutManager
+metadata:
+  name: argo-rollout
+spec:
+  namespaceScoped: true
+```
+
+
+## Cluster Scoped Rollouts Instance
+
+A cluster-scoped Rollouts instance can manage Rollouts resources from other namespaces as well. To install a cluster-scoped Rollouts instance first you need to add `NAMESPACE_SCOPED_ARGO_ROLLOUTS` and `CLUSTER_SCOPED_ARGO_ROLLOUTS_NAMESPACES` environment variables in subscription resource. If `NAMESPACE_SCOPED_ARGO_ROLLOUTS` is set to `false` then only you are allowed to create a cluster-scoped instance and then you need to provide list of namespaces that are allowed host a cluster-scoped Rollouts instance via `CLUSTER_SCOPED_ARGO_ROLLOUTS_NAMESPACES` environment variable.  
+
+```yml
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: argo-operator
+spec:
+  config:
+   env: 
+    - name: NAMESPACE_SCOPED_ARGO_ROLLOUTS
+      value: 'false'   
+    - name: CLUSTER_SCOPED_ARGO_ROLLOUTS_NAMESPACES
+      value: <list of namespaces of cluster-scoped Argo CD instances>
+  (...)
+```
+
+Now set `spec.namespaceScoped` field to `false` to create a Rollouts instance.
+
+```yml
+apiVersion: argoproj.io/v1alpha1
+kind: RolloutManager
+metadata:
+  name: argo-rollout
+spec:
+  namespaceScoped: false
+```

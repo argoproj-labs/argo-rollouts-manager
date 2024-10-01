@@ -47,6 +47,10 @@ if [ -z "$SKIP_RUN_STEP" ]; then
   set +e
 
   rm -f /tmp/e2e-operator-run.log || true
+  
+  # Set namespaces used for cluster-scoped e2e tests
+  export CLUSTER_SCOPED_ARGO_ROLLOUTS_NAMESPACES="argo-rollouts"
+  
   go run ./cmd/main.go 2>&1 | tee /tmp/e2e-operator-run.log &
 
   set -e
