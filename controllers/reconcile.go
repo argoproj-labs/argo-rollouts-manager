@@ -29,6 +29,12 @@ func (r *RolloutManagerReconciler) reconcileRolloutsManager(ctx context.Context,
 			rr.condition = createCondition(err.Error(), rolloutsmanagerv1alpha1.RolloutManagerReasonInvalidScoped)
 			return *rr, nil
 		}
+
+		if invalidRolloutNamespace(err) {
+			rr.condition = createCondition(err.Error(), rolloutsmanagerv1alpha1.RolloutManagerReasonInvalidNamespace)
+			return *rr, nil
+		}
+
 		log.Error(err, "failed to validate RolloutManager's scope.")
 		return wrapCondition(createCondition(err.Error())), err
 	}

@@ -3,6 +3,7 @@ package rollouts
 import (
 	"context"
 	"fmt"
+	"os"
 
 	rolloutsmanagerv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 	"github.com/argoproj-labs/argo-rollouts-manager/tests/e2e/fixture/k8s"
@@ -28,6 +29,14 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 	BeforeEach(func() {
 		ctx = context.Background()
 		rm = makeTestRolloutManager()
+
+		By("Set Env variable.")
+		os.Setenv(ClusterScopedArgoRolloutsNamespaces, rm.Namespace)
+	})
+
+	AfterEach(func() {
+		By("Unset Env variable.")
+		os.Unsetenv(ClusterScopedArgoRolloutsNamespaces)
 	})
 
 	When("NAMESPACE_SCOPED_ARGO_ROLLOUTS environment variable is set to False.", func() {
@@ -200,6 +209,9 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 			rm2 := makeTestRolloutManager()
 			rm2.Name = "test-rm"
 			rm2.Namespace = "test-ns"
+
+			By("Update Env variable.")
+			os.Setenv(ClusterScopedArgoRolloutsNamespaces, rm.Namespace+","+rm2.Namespace)
 
 			Expect(createNamespace(r, rm2.Namespace)).To(Succeed())
 			Expect(r.Client.Create(ctx, rm2)).ToNot(HaveOccurred())
