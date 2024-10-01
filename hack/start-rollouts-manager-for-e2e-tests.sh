@@ -18,6 +18,9 @@ set -ex
 
 make install generate fmt vet
 
+# Set namespaces used for cluster-scoped e2e tests
+export CLUSTER_SCOPED_ARGO_ROLLOUTS_NAMESPACES="argo-rollouts,test-rom-ns-1,rom-ns-1"
+
 if [ "$RUN_IN_BACKGROUND" == "true" ]; then
   go run ./cmd/main.go 2>&1 | tee /tmp/e2e-operator-run.log &
 else

@@ -3,6 +3,7 @@ package rollouts
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 	monitoringv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
@@ -809,6 +810,12 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 	})
 
 	Context("Resource Cleanup test", func() {
+
+		AfterEach(func() {
+			By("Unset Env variable.")
+			os.Unsetenv(ClusterScopedArgoRolloutsNamespaces)
+		})
+
 		a := makeTestRolloutManager()
 		tt := []struct {
 			name     string
@@ -875,6 +882,9 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 			When(test.name, func() {
 				It("Cleans up all resources created for RolloutManager", func() {
 
+					By("Set Env variable.")
+					os.Setenv(ClusterScopedArgoRolloutsNamespaces, a.Namespace)
+
 					ctx := context.Background()
 					req := reconcile.Request{
 						NamespacedName: types.NamespacedName{
@@ -919,6 +929,14 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 					Namespace: a.Namespace,
 				},
 			}
+
+			By("Set Env variable.")
+			os.Setenv(ClusterScopedArgoRolloutsNamespaces, a.Namespace)
+		})
+
+		AfterEach(func() {
+			By("Unset Env variable.")
+			os.Unsetenv(ClusterScopedArgoRolloutsNamespaces)
 		})
 
 		It("Verify whether RolloutManager creating ServiceMonitor", func() {
