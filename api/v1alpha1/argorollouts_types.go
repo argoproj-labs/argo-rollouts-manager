@@ -52,6 +52,22 @@ type RolloutManagerSpec struct {
 
 	// SkipNotificationSecretDeployment lets you specify if the argo notification secret should be deployed
 	SkipNotificationSecretDeployment bool `json:"skipNotificationSecretDeployment,omitempty"`
+
+	// Plugins specify the traffic and metric plugins in Argo Rollout
+	Plugins Plugins `json:"plugins,omitempty"`
+}
+
+type Plugin struct {
+	Name     string `json:"name"`
+	Location string `json:"location"`
+	SHA256   string `json:"sha256,omitempty"`
+}
+
+type Plugins struct {
+	// TrafficManagement holds a list of traffic management plugins used to control traffic routing during rollouts.
+	TrafficManagement []Plugin `json:"trafficManagement,omitempty"`
+	// Metric holds a list of metric plugins used to gather and report metrics during rollouts.
+	Metric []Plugin `json:"metric,omitempty"`
 }
 
 // ArgoRolloutsNodePlacementSpec is used to specify NodeSelector and Tolerations for Rollouts workloads

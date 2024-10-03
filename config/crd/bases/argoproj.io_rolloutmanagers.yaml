@@ -286,6 +286,43 @@ spec:
                       type: object
                     type: array
                 type: object
+              plugins:
+                description: Plugins specify the traffic and metric plugins in Argo
+                  Rollout
+                properties:
+                  metric:
+                    description: Metric holds a list of metric plugins used to gather
+                      and report metrics during rollouts.
+                    items:
+                      properties:
+                        location:
+                          type: string
+                        name:
+                          type: string
+                        sha256:
+                          type: string
+                      required:
+                      - location
+                      - name
+                      type: object
+                    type: array
+                  trafficManagement:
+                    description: TrafficManagement holds a list of traffic management
+                      plugins used to control traffic routing during rollouts.
+                    items:
+                      properties:
+                        location:
+                          type: string
+                        name:
+                          type: string
+                        sha256:
+                          type: string
+                      required:
+                      - location
+                      - name
+                      type: object
+                    type: array
+                type: object
               skipNotificationSecretDeployment:
                 description: SkipNotificationSecretDeployment lets you specify if
                   the argo notification secret should be deployed
