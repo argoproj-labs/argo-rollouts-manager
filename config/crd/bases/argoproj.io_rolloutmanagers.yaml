@@ -294,12 +294,23 @@ spec:
                     description: Metric holds a list of metric plugins used to gather
                       and report metrics during rollouts.
                     items:
+                      description: Plugin is used to integrate traffic management
+                        and metric plugins into the Argo Rollouts controller. For
+                        more information on these plugins, see the upstream Argo Rollouts
+                        documentation.
                       properties:
                         location:
+                          description: Location supports http(s):// urls and file://,
+                            though file:// requires the plugin be available on the
+                            filesystem
                           type: string
                         name:
+                          description: Name of the plugin, it must match the name
+                            required by the plugin so it can find its configuration
                           type: string
                         sha256:
+                          description: SHA256 is an optional sha256 checksum of the
+                            plugin executable
                           type: string
                       required:
                       - location
@@ -310,12 +321,23 @@ spec:
                     description: TrafficManagement holds a list of traffic management
                       plugins used to control traffic routing during rollouts.
                     items:
+                      description: Plugin is used to integrate traffic management
+                        and metric plugins into the Argo Rollouts controller. For
+                        more information on these plugins, see the upstream Argo Rollouts
+                        documentation.
                       properties:
                         location:
+                          description: Location supports http(s):// urls and file://,
+                            though file:// requires the plugin be available on the
+                            filesystem
                           type: string
                         name:
+                          description: Name of the plugin, it must match the name
+                            required by the plugin so it can find its configuration
                           type: string
                         sha256:
+                          description: SHA256 is an optional sha256 checksum of the
+                            plugin executable
                           type: string
                       required:
                       - location
