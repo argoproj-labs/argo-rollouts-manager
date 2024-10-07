@@ -57,10 +57,14 @@ type RolloutManagerSpec struct {
 	Plugins Plugins `json:"plugins,omitempty"`
 }
 
+// Plugin is used to integrate traffic management and metric plugins into the Argo Rollouts controller. For more information on these plugins, see the upstream Argo Rollouts documentation.
 type Plugin struct {
-	Name     string `json:"name"`
+	// Name of the plugin, it must match the name required by the plugin so it can find its configuration
+	Name string `json:"name"`
+	// Location supports http(s):// urls and file://, though file:// requires the plugin be available on the filesystem
 	Location string `json:"location"`
-	SHA256   string `json:"sha256,omitempty"`
+	// SHA256 is an optional sha256 checksum of the plugin executable
+	SHA256 string `json:"sha256,omitempty"`
 }
 
 type Plugins struct {
