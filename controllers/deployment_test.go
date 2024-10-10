@@ -49,7 +49,8 @@ var _ = Describe("Deployment Test", func() {
 		fetchedDeployment := &appsv1.Deployment{}
 		Expect(fetchObject(ctx, r.Client, a.Namespace, DefaultArgoRolloutsResourceName, fetchedDeployment)).To(Succeed())
 
-		expectedDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", DefaultArgoRolloutsResourceName, a)
+		expectedDeployment, err := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", DefaultArgoRolloutsResourceName, a)
+		Expect(err).ToNot(HaveOccurred())
 
 		By("verify that the fetched Deployment matches the desired one")
 		Expect(fetchedDeployment.Name).To(Equal(expectedDeployment.Name))
@@ -67,7 +68,8 @@ var _ = Describe("Deployment Test", func() {
 	When("Rollouts Deployment already exists, but then is modified away from default values", func() {
 		It("should update the Deployment back to default values, but preserve any added annotations/labels", func() {
 			By("create a new Deployment with custom values")
-			existingDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin-test", "tmp-test"}, "linux-test", sa.Name, a)
+			existingDeployment, err := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin-test", "tmp-test"}, "linux-test", sa.Name, a)
+			Expect(err).ToNot(HaveOccurred())
 
 			existingDeployment.Labels["new-label"] = "new-label-value"
 			existingDeployment.Annotations["new-annotation"] = "new-annotation-value"
@@ -81,7 +83,8 @@ var _ = Describe("Deployment Test", func() {
 			fetchedDeployment := &appsv1.Deployment{}
 			Expect(fetchObject(ctx, r.Client, a.Namespace, DefaultArgoRolloutsResourceName, fetchedDeployment)).To(Succeed())
 
-			expectedDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", sa.Name, a)
+			expectedDeployment, err := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", sa.Name, a)
+			Expect(err).ToNot(HaveOccurred())
 
 			By("verifing that the Deployment has been reconciled back to default values")
 			Expect(fetchedDeployment.Name).To(Equal(expectedDeployment.Name))
@@ -194,7 +197,8 @@ var _ = Describe("Deployment Test", func() {
 		It("should cause the existing Deployment to be deleted, and a new Deployment to be created with the updated .spec.selector", func() {
 
 			By("create a basic Rollout Deployment")
-			existingDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", DefaultArgoRolloutsResourceName, a)
+			existingDeployment, err := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", DefaultArgoRolloutsResourceName, a)
+			Expect(err).ToNot(HaveOccurred())
 
 			By("assigning a fake UID to the original deployment, so we can detected when it is deleted/recreated")
 			existingDeployment.ObjectMeta.UID = "original-deployment"
@@ -224,7 +228,8 @@ var _ = Describe("Deployment Test", func() {
 			Expect(fetchObject(ctx, r.Client, a.Namespace, DefaultArgoRolloutsResourceName, fetchedDeployment)).To(Succeed())
 			Expect(fetchedDeployment.ObjectMeta.UID).To(Equal(types.UID("")), "UID should be empty, because the original Deployment was deleted and recreated")
 
-			expectedDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", sa.Name, a)
+			expectedDeployment, err := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", sa.Name, a)
+			Expect(err).ToNot(HaveOccurred())
 
 			By("verifying that the Deployment has been reconciled back to default labels")
 			Expect(fetchedDeployment.Name).To(Equal(expectedDeployment.Name))
@@ -240,10 +245,12 @@ var _ = Describe("Deployment Test", func() {
 	When("the deployment has not changed", func() {
 		It("should not report any difference, both before and after normalization", func() {
 
-			expectedDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", DefaultArgoRolloutsResourceName, a)
+			expectedDeployment, err := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", DefaultArgoRolloutsResourceName, a)
+			Expect(err).ToNot(HaveOccurred())
 			Expect(identifyDeploymentDifference(*expectedDeployment, *expectedDeployment)).To(Equal(""), "comparing the object with itself should always report no differences")
 
-			expectedDeployment = deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", DefaultArgoRolloutsResourceName, a)
+			expectedDeployment, err = deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", DefaultArgoRolloutsResourceName, a)
+			Expect(err).ToNot(HaveOccurred())
 			expectedDeploymentNormalized, err := normalizeDeployment(*expectedDeployment, a)
 			Expect(err).To(Succeed())
 
@@ -258,7 +265,8 @@ var _ = Describe("Deployment Test", func() {
 
 		It("should ensure the user-defiend labels/annotations are be removed by called to normalizeDeployment, while preserving the values contributed by the operation", func() {
 
-			originalDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", DefaultArgoRolloutsResourceName, a)
+			originalDeployment, err := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", DefaultArgoRolloutsResourceName, a)
+			Expect(err).ToNot(HaveOccurred())
 
 			By("creating a new object with user added labels/annotations")
 			new := originalDeployment.DeepCopy()
@@ -308,9 +316,11 @@ var _ = Describe("Deployment Test", func() {
 		DescribeTable("controller should detect and revert the change", func(fxn func(deployment *appsv1.Deployment)) {
 
 			By("ensuring that deploymentCR properly detects the change")
-			defaultDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", DefaultArgoRolloutsResourceName, a)
+			defaultDeployment, err := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", DefaultArgoRolloutsResourceName, a)
+			Expect(err).ToNot(HaveOccurred())
 
-			defaultDeploymentModified := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", DefaultArgoRolloutsResourceName, a)
+			defaultDeploymentModified, err := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", DefaultArgoRolloutsResourceName, a)
+			Expect(err).ToNot(HaveOccurred())
 
 			Expect(identifyDeploymentDifference(*defaultDeployment, *defaultDeploymentModified)).To(BeEmpty(), "they should be the same before one is modified")
 
@@ -455,7 +465,8 @@ var _ = Describe("Deployment Test", func() {
 			fetchedDeployment := &appsv1.Deployment{}
 			Expect(fetchObject(ctx, r.Client, a.Namespace, DefaultArgoRolloutsResourceName, fetchedDeployment)).To(Succeed())
 
-			expectedDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", DefaultArgoRolloutsResourceName, a)
+			expectedDeployment, err := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", DefaultArgoRolloutsResourceName, a)
+			Expect(err).ToNot(HaveOccurred())
 
 			By("verify that the fetched Deployment matches the desired one")
 			Expect(fetchedDeployment.Name).To(Equal(expectedDeployment.Name))
@@ -528,7 +539,8 @@ var _ = Describe("generateDesiredRolloutsDeployment tests", func() {
 
 	Context("when generating the desired deployment", func() {
 		It("should set the correct metadata on the deployment", func() {
-			deployment := generateDesiredRolloutsDeployment(cr, sa)
+			deployment, err := generateDesiredRolloutsDeployment(cr, sa)
+			Expect(err).ToNot(HaveOccurred())
 			Expect(deployment.ObjectMeta.Name).To(Equal(DefaultArgoRolloutsResourceName))
 			Expect(deployment.ObjectMeta.Namespace).To(Equal(cr.Namespace))
 
@@ -538,7 +550,9 @@ var _ = Describe("generateDesiredRolloutsDeployment tests", func() {
 		})
 
 		It("should set the NodeSelector and tolerations if NodePlacement is provided", func() {
-			deployment := generateDesiredRolloutsDeployment(cr, sa)
+			deployment, err := generateDesiredRolloutsDeployment(cr, sa)
+			Expect(err).ToNot(HaveOccurred())
+
 			Expect(deployment.Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"kubernetes.io/os": "linux", "key1": "value1"}))
 			Expect(deployment.Spec.Template.Spec.Tolerations).To(ContainElement(corev1.Toleration{
 				Key:      "key1",
@@ -548,18 +562,21 @@ var _ = Describe("generateDesiredRolloutsDeployment tests", func() {
 
 		It("should set the default node selector if NodePlacement is not provided", func() {
 			cr.Spec.NodePlacement = nil
-			deployment := generateDesiredRolloutsDeployment(cr, sa)
+			deployment, err := generateDesiredRolloutsDeployment(cr, sa)
+			Expect(err).ToNot(HaveOccurred())
 			Expect(deployment.Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"kubernetes.io/os": "linux"}))
 			Expect(deployment.Spec.Template.Spec.Tolerations).To(BeNil())
 		})
 
 		It("should set the service account name", func() {
-			deployment := generateDesiredRolloutsDeployment(cr, sa)
+			deployment, err := generateDesiredRolloutsDeployment(cr, sa)
+			Expect(err).ToNot(HaveOccurred())
 			Expect(deployment.Spec.Template.Spec.ServiceAccountName).To(Equal(sa.ObjectMeta.Name))
 		})
 
 		It("should add the correct volumes", func() {
-			deployment := generateDesiredRolloutsDeployment(cr, sa)
+			deployment, err := generateDesiredRolloutsDeployment(cr, sa)
+			Expect(err).ToNot(HaveOccurred())
 			Expect(deployment.Spec.Template.Spec.Volumes).To(HaveLen(2))
 			Expect(deployment.Spec.Template.Spec.Volumes).To(ContainElement(corev1.Volume{
 				Name: "plugin-bin",
@@ -587,7 +604,9 @@ var _ = Describe("normalizeDeployment tests to verify that an error is returned"
 		a = *makeTestRolloutManager()
 
 		// Set up a valid deployment object
-		deployment = deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", DefaultArgoRolloutsResourceName, a)
+		var err error
+		deployment, err = deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", DefaultArgoRolloutsResourceName, a)
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	DescribeTable("should return an error when",
@@ -790,7 +809,8 @@ var _ = Describe("rolloutsContainer tests", func() {
 		}
 
 		By("Call rolloutsContainer function")
-		container := rolloutsContainer(cr)
+		container, err := rolloutsContainer(cr)
+		Expect(err).ToNot(HaveOccurred())
 
 		By("Verify the environment variables")
 		expectedEnvVars := map[string]string{
@@ -809,7 +829,7 @@ var _ = Describe("rolloutsContainer tests", func() {
 	})
 })
 
-func deploymentCR(name string, namespace string, rolloutsSelectorLabel string, volumeNames []string, nodeSelector string, serviceAccount string, rolloutManager v1alpha1.RolloutManager) *appsv1.Deployment {
+func deploymentCR(name string, namespace string, rolloutsSelectorLabel string, volumeNames []string, nodeSelector string, serviceAccount string, rolloutManager v1alpha1.RolloutManager) (*appsv1.Deployment, error) {
 	runAsNonRoot := true
 	deploymentCR := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -822,6 +842,12 @@ func deploymentCR(name string, namespace string, rolloutsSelectorLabel string, v
 	if rolloutManager.Spec.HA != nil && rolloutManager.Spec.HA.Enabled {
 		replicas = 2
 	}
+
+	rolloutsContainer, err := rolloutsContainer(rolloutManager)
+	if err != nil {
+		return nil, err
+	}
+
 	deploymentCR.Spec = appsv1.DeploymentSpec{
 		Replicas: &replicas,
 		Selector: &metav1.LabelSelector{
@@ -855,7 +881,7 @@ func deploymentCR(name string, namespace string, rolloutsSelectorLabel string, v
 					"kubernetes.io/os": nodeSelector,
 				},
 				Containers: []corev1.Container{
-					rolloutsContainer(rolloutManager),
+					rolloutsContainer,
 				},
 				ServiceAccountName: serviceAccount,
 				SecurityContext: &corev1.PodSecurityContext{
@@ -865,6 +891,6 @@ func deploymentCR(name string, namespace string, rolloutsSelectorLabel string, v
 		},
 	}
 
-	return deploymentCR
+	return deploymentCR, nil
 
 }

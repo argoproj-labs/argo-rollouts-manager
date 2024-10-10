@@ -20,7 +20,7 @@ const (
 	UnsupportedRolloutManagerConfiguration          = "when there exists a cluster-scoped RolloutManager on the cluster, there may not exist another: only a single cluster-scoped RolloutManager is supported"
 	UnsupportedRolloutManagerClusterScoped          = "when Subscription has environment variable NAMESPACE_SCOPED_ARGO_ROLLOUTS set to True, there may not exist any cluster-scoped RolloutManagers: in this case, only namespace-scoped RolloutManager resources are supported"
 	UnsupportedRolloutManagerNamespaceScoped        = "when Subscription has environment variable NAMESPACE_SCOPED_ARGO_ROLLOUTS set to False, there may not exist any namespace-scoped RolloutManagers: only a single cluster-scoped RolloutManager is supported"
-	UnsupportedRolloutManagerClusterScopedNamespace = "Namespace is not specified in CLUSTER_SCOPED_ARGO_ROLLOUTS_NAMESPACES environment variable of Subscription resource. If you wish to install a cluster-scoped Argo Rollouts instance outside the default namespace, ensure it is defined in CLUSTER_SCOPED_ARGO_ROLLOUTS_NAMESPACES"
+	UnsupportedRolloutManagerClusterScopedNamespace = "namespace is not specified in CLUSTER_SCOPED_ARGO_ROLLOUTS_NAMESPACES environment variable of Subscription resource. If you wish to install a cluster-scoped Argo Rollouts instance outside the default namespace, ensure it is defined in CLUSTER_SCOPED_ARGO_ROLLOUTS_NAMESPACES"
 )
 
 // pluginItem is a clone of PluginItem from "github.com/argoproj/argo-rollouts/utils/plugin/types"
