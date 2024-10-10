@@ -9,7 +9,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -19,7 +18,7 @@ var _ = Describe("ConfigMap Test", func() {
 	var a v1alpha1.RolloutManager
 	var r *RolloutManagerReconciler
 	var sa *corev1.ServiceAccount
-	var existingDeployment *v1.Deployment
+	var existingDeployment *appsv1.Deployment
 	const trafficrouterPluginLocation = "https://custom-traffic-plugin-location"
 	const metricPluginLocation = "https://custom-metric-plugin-location"
 
@@ -38,7 +37,11 @@ var _ = Describe("ConfigMap Test", func() {
 		}
 		Expect(r.Client.Create(ctx, sa)).To(Succeed())
 
-		existingDeployment = deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin-test", "tmp-test"}, "linux-test", sa.Name, a)
+		var err error
+
+		existingDeployment, err = deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin-test", "tmp-test"}, "linux-test", sa.Name, a)
+		Expect(err).ToNot(HaveOccurred())
+
 		Expect(r.Client.Create(ctx, existingDeployment)).To(Succeed())
 
 	})

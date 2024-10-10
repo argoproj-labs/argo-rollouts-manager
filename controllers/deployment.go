@@ -16,7 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func generateDesiredRolloutsDeployment(cr rolloutsmanagerv1alpha1.RolloutManager, sa corev1.ServiceAccount) appsv1.Deployment {
+func generateDesiredRolloutsDeployment(cr rolloutsmanagerv1alpha1.RolloutManager, sa corev1.ServiceAccount) (appsv1.Deployment, error) {
 
 	// NOTE: When updating this function, ensure that normalizeDeployment is updated as well. See that function for details.
 
@@ -111,8 +111,12 @@ func generateDesiredRolloutsDeployment(cr rolloutsmanagerv1alpha1.RolloutManager
 
 	desiredPodSpec.ServiceAccountName = sa.ObjectMeta.Name
 
+	rolloutsCont, err := rolloutsContainer(cr)
+	if err != nil {
+		return appsv1.Deployment{}, err
+	}
 	desiredPodSpec.Containers = []corev1.Container{
-		rolloutsContainer(cr),
+		rolloutsCont,
 	}
 
 	desiredPodSpec.Volumes = []corev1.Volume{
@@ -130,13 +134,16 @@ func generateDesiredRolloutsDeployment(cr rolloutsmanagerv1alpha1.RolloutManager
 		},
 	}
 
-	return desiredDeployment
+	return desiredDeployment, nil
 }
 
 // Reconcile the Rollouts controller deployment.
 func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager, sa corev1.ServiceAccount) error {
 
-	desiredDeployment := generateDesiredRolloutsDeployment(cr, sa)
+	desiredDeployment, err := generateDesiredRolloutsDeployment(cr, sa)
+	if err != nil {
+		return err
+	}
 
 	normalizedDesiredDeployment, err := normalizeDeployment(desiredDeployment, cr)
 	if err != nil {
@@ -292,7 +299,7 @@ func defaultRolloutsContainerResources() corev1.ResourceRequirements {
 	}
 }
 
-func rolloutsContainer(cr rolloutsmanagerv1alpha1.RolloutManager) corev1.Container {
+func rolloutsContainer(cr rolloutsmanagerv1alpha1.RolloutManager) (corev1.Container, error) {
 
 	// NOTE: When updating this function, ensure that normalizeDeployment is updated as well. See that function for details.
 
@@ -308,8 +315,13 @@ func rolloutsContainer(cr rolloutsmanagerv1alpha1.RolloutManager) corev1.Contain
 		containerResources = &defaultContainerResources
 	}
 
+	commandArgs, err := getRolloutsCommandArgs(cr)
+	if err != nil {
+		return corev1.Container{}, err
+	}
+
 	return corev1.Container{
-		Args:            getRolloutsCommandArgs(cr),
+		Args:            commandArgs,
 		Env:             rolloutsEnv,
 		Image:           getRolloutsContainerImage(cr),
 		ImagePullPolicy: corev1.PullAlways,
@@ -374,7 +386,7 @@ func rolloutsContainer(cr rolloutsmanagerv1alpha1.RolloutManager) corev1.Contain
 			},
 		},
 		Resources: *containerResources,
-	}
+	}, nil
 
 }
 
@@ -661,7 +673,7 @@ func getRolloutsContainerImage(cr rolloutsmanagerv1alpha1.RolloutManager) string
 }
 
 // getRolloutsCommand will return the command for the Rollouts controller component.
-func getRolloutsCommandArgs(cr rolloutsmanagerv1alpha1.RolloutManager) []string {
+func getRolloutsCommandArgs(cr rolloutsmanagerv1alpha1.RolloutManager) ([]string, error) {
 	args := make([]string, 0)
 
 	if cr.Spec.NamespaceScoped {
@@ -675,9 +687,9 @@ func getRolloutsCommandArgs(cr rolloutsmanagerv1alpha1.RolloutManager) []string 
 	extraArgs := cr.Spec.ExtraCommandArgs
 	err := isMergable(extraArgs, args)
 	if err != nil {
-		return args
+		return args, err
 	}
 
 	args = append(args, extraArgs...)
-	return args
+	return args, nil
 }
