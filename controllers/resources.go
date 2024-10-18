@@ -64,8 +64,16 @@ func (r *RolloutManagerReconciler) reconcileRolloutsServiceAccount(ctx context.C
 
 // Reconciles Rollouts Role.
 func (r *RolloutManagerReconciler) reconcileRolloutsRole(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager) (*rbacv1.Role, error) {
-	expectedPolicyRules := GetPolicyRules()
 
+	// Delete existing ClusterRole
+	liveClusterRole := &rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: DefaultArgoRolloutsResourceName}}
+	if err := fetchObject(ctx, r.Client, "", liveClusterRole.Name, liveClusterRole); err == nil {
+		if err := r.Client.Delete(ctx, liveClusterRole); err != nil {
+			return nil, fmt.Errorf("failed to delete existing ClusterRole %s: %w", liveClusterRole.Name, err)
+		}
+	}
+
+	expectedPolicyRules := GetPolicyRules()
 	expectedRole := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultArgoRolloutsResourceName,
@@ -121,8 +129,15 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRole(ctx context.Context, cr
 
 // Reconciles Rollouts ClusterRole.
 func (r *RolloutManagerReconciler) reconcileRolloutsClusterRole(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager) (*rbacv1.ClusterRole, error) {
-	expectedPolicyRules := GetPolicyRules()
 
+	// Delete existing Role
+	liveRole := &rbacv1.Role{ObjectMeta: metav1.ObjectMeta{Name: DefaultArgoRolloutsResourceName, Namespace: cr.Namespace}}
+	if err := fetchObject(ctx, r.Client, cr.Namespace, liveRole.Name, liveRole); err == nil {
+		if err := r.Client.Delete(ctx, liveRole); err != nil {
+			return nil, fmt.Errorf("failed to delete existing Role %s for Namespace %s: %w", liveRole.Name, liveRole.Namespace, err)
+		}
+	}
+	expectedPolicyRules := GetPolicyRules()
 	expectedClusterRole := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: DefaultArgoRolloutsResourceName,
@@ -134,7 +149,6 @@ func (r *RolloutManagerReconciler) reconcileRolloutsClusterRole(ctx context.Cont
 		if !apierrors.IsNotFound(err) {
 			return nil, fmt.Errorf("failed to Reconcile the ClusterRole for the ServiceAccount associated with %s: %w", liveClusterRole.Name, err)
 		}
-
 		log.Info(fmt.Sprintf("Creating ClusterRole %s", liveClusterRole.Name))
 		expectedClusterRole.Rules = expectedPolicyRules
 		return expectedClusterRole, r.Client.Create(ctx, expectedClusterRole)
@@ -168,6 +182,14 @@ func (r *RolloutManagerReconciler) reconcileRolloutsClusterRole(ctx context.Cont
 
 // Reconcile Rollouts RoleBinding.
 func (r *RolloutManagerReconciler) reconcileRolloutsRoleBinding(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager, role *rbacv1.Role, sa *corev1.ServiceAccount) error {
+
+	// Delete existing ClusterRoleBinding
+	liveClusterRoleBinding := &rbacv1.ClusterRoleBinding{ObjectMeta: metav1.ObjectMeta{Name: DefaultArgoRolloutsResourceName}}
+	if err := fetchObject(ctx, r.Client, "", liveClusterRoleBinding.Name, liveClusterRoleBinding); err == nil {
+		if err := r.Client.Delete(ctx, liveClusterRoleBinding); err != nil {
+			return fmt.Errorf("failed to delete existing ClusterRoleBinding %s: %w", liveClusterRoleBinding.Name, err)
+		}
+	}
 
 	if role == nil {
 		return fmt.Errorf("received Role is nil while reconciling RoleBinding")
@@ -246,6 +268,14 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRoleBinding(ctx context.Cont
 
 // Reconcile Rollouts ClusterRoleBinding.
 func (r *RolloutManagerReconciler) reconcileRolloutsClusterRoleBinding(ctx context.Context, clusterRole *rbacv1.ClusterRole, sa *corev1.ServiceAccount, cr rolloutsmanagerv1alpha1.RolloutManager) error {
+
+	// Delete existing RoleBinding
+	liveRoleBinding := &rbacv1.RoleBinding{ObjectMeta: metav1.ObjectMeta{Name: DefaultArgoRolloutsResourceName, Namespace: cr.Namespace}}
+	if err := fetchObject(ctx, r.Client, cr.Namespace, liveRoleBinding.Name, liveRoleBinding); err == nil {
+		if err := r.Client.Delete(ctx, liveRoleBinding); err != nil {
+			return fmt.Errorf("failed to delete existing RoleBinding %s for Namespace %s: %w", liveRoleBinding.Name, liveRoleBinding.Namespace, err)
+		}
+	}
 
 	if clusterRole == nil {
 		return fmt.Errorf("received ClusterRole is nil while reconciling ClusterRoleBinding")
