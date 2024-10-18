@@ -1141,7 +1141,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(clusterRole), clusterRole)).To(Succeed())
 
 			By("Verify existing Role is deleted")
-			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(role), role)).To(HaveOccurred())
+			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(role), role)).ToNot(Succeed())
 		})
 
 		It("Should delete existing ClusterRole when Role is reconciled", func() {
@@ -1161,7 +1161,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(role), role)).To(Succeed())
 
 			By("Verify existing ClusterRole is deleted")
-			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(clusterRole), clusterRole)).To(HaveOccurred())
+			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(clusterRole), clusterRole)).ToNot(Succeed())
 		})
 
 		It("Should delete existing RoleBinding when ClusterRoleBinding is reconciled", func() {
@@ -1187,7 +1187,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(clusterRoleBinding), clusterRoleBinding)).To(Succeed())
 
 			By("Verify RoleBinding is deleted")
-			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(roleBinding), roleBinding)).To(HaveOccurred())
+			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(roleBinding), roleBinding)).ToNot(Succeed())
 		})
 
 		It("Should delete existing ClusterRoleBinding when RoleBinding is reconciled", func() {
@@ -1213,7 +1213,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(roleBinding), roleBinding)).To(Succeed())
 
 			By("Verify ClusterRoleBinding is deleted")
-			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(clusterRole), clusterRole)).To(HaveOccurred())
+			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(clusterRole), clusterRole)).ToNot(Succeed())
 		})
 	})
 })
