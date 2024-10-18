@@ -418,6 +418,112 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 		})
 	})
 
+	Context("Verify correct RBAC permissions are assigned while switching between namespace and cluster scoped Rollouts", func() {
+		var (
+			ctx context.Context
+			a   v1alpha1.RolloutManager
+			r   *RolloutManagerReconciler
+		)
+
+		BeforeEach(func() {
+			ctx = context.Background()
+			a = *makeTestRolloutManager()
+			r = makeTestReconciler(&a)
+			err := createNamespace(r, a.Namespace)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("Should delete existing Role when ClusterRole is reconciled", func() {
+			By("Reconcile Role.")
+			role, err := r.reconcileRolloutsRole(ctx, a)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("Verify Role is created")
+			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(role), role)).To(Succeed())
+
+			By("Reconcile ClusterRole")
+			clusterRole, err := r.reconcileRolloutsClusterRole(ctx, a)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("Verify ClusterRole is created")
+			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(clusterRole), clusterRole)).To(Succeed())
+
+			By("Verify existing Role is deleted")
+			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(role), role)).To(HaveOccurred())
+		})
+
+		It("Should delete existing ClusterRole when Role is reconciled", func() {
+
+			By("Reconcile ClusterRole")
+			clusterRole, err := r.reconcileRolloutsClusterRole(ctx, a)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("Verify ClusterRole is created")
+			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(clusterRole), clusterRole)).To(Succeed())
+
+			By("Reconcile Role.")
+			role, err := r.reconcileRolloutsRole(ctx, a)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("Verify Role is created")
+			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(role), role)).To(Succeed())
+
+			By("Verify existing ClusterRole is deleted")
+			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(clusterRole), clusterRole)).To(HaveOccurred())
+		})
+
+		It("Should delete existing RoleBinding when ClusterRoleBinding is reconciled", func() {
+
+			By("Reconcile RoleBinding")
+			sa, err := r.reconcileRolloutsServiceAccount(ctx, a)
+			Expect(err).ToNot(HaveOccurred())
+			role, err := r.reconcileRolloutsRole(ctx, a)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(r.reconcileRolloutsRoleBinding(ctx, a, role, sa)).To(Succeed())
+
+			By("Verify RoleBinding is created")
+			roleBinding := &rbacv1.RoleBinding{ObjectMeta: metav1.ObjectMeta{Name: DefaultArgoRolloutsResourceName, Namespace: a.Namespace}}
+			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(roleBinding), roleBinding)).To(Succeed())
+
+			By("Reconcile ClusterRoleBinding")
+			clusterRole, err := r.reconcileRolloutsClusterRole(ctx, a)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(r.reconcileRolloutsClusterRoleBinding(ctx, clusterRole, sa, a)).To(Succeed())
+
+			By("Verify ClusterRoleBinding is created")
+			clusterRoleBinding := &rbacv1.ClusterRoleBinding{ObjectMeta: metav1.ObjectMeta{Name: DefaultArgoRolloutsResourceName}}
+			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(clusterRoleBinding), clusterRoleBinding)).To(Succeed())
+
+			By("Verify RoleBinding is deleted")
+			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(roleBinding), roleBinding)).To(HaveOccurred())
+		})
+
+		It("Should delete existing ClusterRoleBinding when RoleBinding is reconciled", func() {
+
+			By("Reconcile ClusterRoleBinding")
+			sa, err := r.reconcileRolloutsServiceAccount(ctx, a)
+			Expect(err).ToNot(HaveOccurred())
+			clusterRole, err := r.reconcileRolloutsClusterRole(ctx, a)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(r.reconcileRolloutsClusterRoleBinding(ctx, clusterRole, sa, a)).To(Succeed())
+
+			By("Verify ClusterRoleBinding is created")
+			clusterRoleBinding := &rbacv1.ClusterRoleBinding{ObjectMeta: metav1.ObjectMeta{Name: DefaultArgoRolloutsResourceName}}
+			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(clusterRoleBinding), clusterRoleBinding)).To(Succeed())
+
+			By("Reconcile RoleBinding")
+			role, err := r.reconcileRolloutsRole(ctx, a)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(r.reconcileRolloutsRoleBinding(ctx, a, role, sa)).To(Succeed())
+
+			By("Verify RoleBinding is created")
+			roleBinding := &rbacv1.RoleBinding{ObjectMeta: metav1.ObjectMeta{Name: DefaultArgoRolloutsResourceName, Namespace: a.Namespace}}
+			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(roleBinding), roleBinding)).To(Succeed())
+
+			By("Verify ClusterRoleBinding is deleted")
+			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(clusterRole), clusterRole)).To(HaveOccurred())
+		})
+	})
 })
 
 func serviceMonitor() *monitoringv1.ServiceMonitor {
