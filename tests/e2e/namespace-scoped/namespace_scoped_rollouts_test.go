@@ -17,9 +17,12 @@ import (
 
 	rmv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 
+	rolloutManagerFixture "github.com/argoproj-labs/argo-rollouts-manager/tests/e2e/fixture/rolloutmanager"
+
 	controllers "github.com/argoproj-labs/argo-rollouts-manager/controllers"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -342,6 +345,131 @@ var _ = Describe("Namespace-scoped RolloutManager tests", func() {
 
 			By("Create and validate rollouts.")
 			utils.ValidateArgoRolloutsResources(ctx, k8sClient, nsName, 31000, 32000)
+		})
+	})
+
+	Context("Backport of cluster/namespace-scoped RBAC tests to 0.0.3", func() {
+
+		namespaceScopedParam := true
+
+		var (
+			k8sClient      client.Client
+			ctx            context.Context
+			rolloutManager rmv1alpha1.RolloutManager
+		)
+
+		BeforeEach(func() {
+			Expect(fixture.EnsureCleanSlate()).To(Succeed())
+
+			var err error
+			k8sClient, _, err = fixture.GetE2ETestKubeClient()
+			Expect(err).ToNot(HaveOccurred())
+			ctx = context.Background()
+
+			rolloutManager = rmv1alpha1.RolloutManager{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "basic-rollouts-manager",
+					Namespace: fixture.TestE2ENamespace,
+				},
+				Spec: rmv1alpha1.RolloutManagerSpec{
+					NamespaceScoped: namespaceScopedParam,
+				},
+			}
+		})
+
+		When("a namespace-scoped RolloutManager is installed into a namespace that previously contained a cluster-scoped RolloutManager, or vice versa", func() {
+
+			It("should cleanup any cluster/role/rolebinding resources that are present in the namespace, that do not match the current .spec.namespaceScoped value of the RolloutManager CR", func() {
+
+				var fakeRole rbacv1.Role
+				var fakeRoleBinding rbacv1.RoleBinding
+
+				var fakeClusterRole rbacv1.ClusterRole
+				var fakeClusterRoleBinding rbacv1.ClusterRoleBinding
+
+				By("creating ClusterRole/Binding in the namespace-scoped case, and Role/Binding in the cluster-scoped case")
+
+				if namespaceScopedParam {
+
+					fakeClusterRole = rbacv1.ClusterRole{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      controllers.DefaultArgoRolloutsResourceName,
+							Namespace: rolloutManager.Namespace,
+						},
+					}
+					Expect(k8sClient.Create(ctx, &fakeClusterRole)).To(Succeed())
+
+					fakeClusterRoleBinding = rbacv1.ClusterRoleBinding{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      controllers.DefaultArgoRolloutsResourceName,
+							Namespace: rolloutManager.Namespace,
+						},
+						RoleRef: rbacv1.RoleRef{
+							APIGroup: rbacv1.GroupName,
+							Kind:     "ClusterRole",
+							Name:     fakeClusterRole.Name,
+						},
+						Subjects: []rbacv1.Subject{
+							{
+								Kind:      rbacv1.ServiceAccountKind,
+								Name:      controllers.DefaultArgoRolloutsResourceName,
+								Namespace: rolloutManager.Namespace,
+							},
+						},
+					}
+					Expect(k8sClient.Create(ctx, &fakeClusterRoleBinding)).To(Succeed())
+
+				} else {
+
+					fakeRole = rbacv1.Role{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      controllers.DefaultArgoRolloutsResourceName,
+							Namespace: rolloutManager.Namespace,
+						},
+					}
+					Expect(k8sClient.Create(ctx, &fakeRole)).To(Succeed())
+
+					fakeRoleBinding = rbacv1.RoleBinding{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      controllers.DefaultArgoRolloutsResourceName,
+							Namespace: rolloutManager.Namespace,
+						},
+						RoleRef: rbacv1.RoleRef{
+							APIGroup: rbacv1.GroupName,
+							Kind:     "Role",
+							Name:     fakeRole.Name,
+						},
+						Subjects: []rbacv1.Subject{
+							{
+								Kind:      rbacv1.ServiceAccountKind,
+								Name:      controllers.DefaultArgoRolloutsResourceName,
+								Namespace: rolloutManager.Namespace,
+							},
+						},
+					}
+					Expect(k8sClient.Create(ctx, &fakeRoleBinding)).To(Succeed())
+
+				}
+
+				By("creating RolloutManager and waiting for it to be available")
+				Expect(k8sClient.Create(ctx, &rolloutManager)).To(Succeed())
+				Eventually(rolloutManager, "1m", "1s").Should(rolloutManagerFixture.HavePhase(rmv1alpha1.PhaseAvailable))
+
+				if namespaceScopedParam {
+
+					By("verifying that in the namespace-scoped case, the cluster-scoped resources are deleted after reconciliation")
+					Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&fakeClusterRole), &fakeClusterRole)).ToNot(Succeed())
+					Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&fakeClusterRoleBinding), &fakeClusterRoleBinding)).ToNot(Succeed())
+
+				} else {
+
+					By("verifying that in the cluster-scoped case, the namespace-scoped resources are deleted after reconciliation")
+					Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&fakeRole), &fakeRole)).ToNot(Succeed())
+					Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&fakeRoleBinding), &fakeRoleBinding)).ToNot(Succeed())
+
+				}
+
+			})
 		})
 	})
 })
