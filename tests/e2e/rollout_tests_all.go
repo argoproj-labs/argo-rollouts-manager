@@ -794,7 +794,7 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 				},
 				Spec: rolloutsmanagerv1alpha1.RolloutManagerSpec{
 					NamespaceScoped: namespaceScopedParam,
-					HA: rolloutsmanagerv1alpha1.RolloutManagerHASpec{
+					HA: &rolloutsmanagerv1alpha1.RolloutManagerHASpec{
 						Enabled: true,
 					},
 				},
@@ -809,7 +809,9 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 				},
 			}
 
-			Eventually(&depl, "30s", "1s").Should(k8s.ExistByName(k8sClient))
+			// In this test we don't check whether RolloutManager has phase: Available, and we don't check if Deployment is ready.
+			// This is because our E2E tests run in a single node cluster, which prevents HA deployments from being fully scheduled.
+			Eventually(&depl, "60s", "1s").Should(k8s.ExistByName(k8sClient))
 
 			replicas := int32(2)
 			Expect(depl.Spec.Replicas).To(Equal(&replicas))

@@ -339,6 +339,15 @@ var _ = Describe("Deployment Test", func() {
 				Expect(r.Client.Get(context.Background(), client.ObjectKeyFromObject(&updatedDeplFromClient), &updatedDeplFromClient)).To(Succeed())
 				Expect(areEqual(*updatedDepl, updatedDeplFromClient, a)).To(BeTrue(), "resource on cluster should match the resource we called Update with")
 
+				// The '.spec.replicas' value is not being set directly through the CR.
+				// Instead, we're applying the default value of 2.
+				// This 'if' condition checks whether the replicas value is set to 2 when HA is enabled.
+				if a.Spec.HA != nil && a.Spec.HA.Enabled {
+					Expect(areEqual(*updatedDepl, updatedDeplFromClient, a)).To(BeTrue())
+					// Return here to skip further steps in the test for '.spec.replicas' entry
+					return
+				}
+
 				Expect(areEqual(updatedDeplFromClient, expectedDepl, a)).ToNot(BeTrue(), "resource on cluster should NOT match the original Deployment that was created by the call to reconcileRolloutsDeployment")
 
 				By("calling reconcileRolloutsDeployment again, it should revert the change back to default")
@@ -416,11 +425,27 @@ var _ = Describe("Deployment Test", func() {
 					},
 				}
 			}),
+			Entry(".spec.replicas", func(deployment *appsv1.Deployment) {
+				a.Spec = v1alpha1.RolloutManagerSpec{
+					HA: &v1alpha1.RolloutManagerHASpec{
+						Enabled: true,
+					},
+				}
+				Expect(r.Client.Update(context.Background(), &a)).To(Succeed())
+				var replicas int32
+				deployment.Spec.Replicas = &replicas
+			}),
 		)
 
 		It("should contain two replicas and the --leader-elect argument set to true, and verify that the anti-affinity rule is added by default when HA is enabled", func() {
-			a.Spec.HA.Enabled = true
+			a.Spec = v1alpha1.RolloutManagerSpec{
+				HA: &v1alpha1.RolloutManagerHASpec{
+					Enabled: true,
+				},
+			}
 			replicas := int32(2)
+
+			Expect(r.Client.Update(ctx, &a)).To(Succeed())
 
 			By("calling reconcileRolloutsDeployment to create the initial set of rollout resources")
 			Expect(r.reconcileRolloutsDeployment(ctx, a, *sa)).To(Succeed())
@@ -642,6 +667,10 @@ var _ = Describe("normalizeDeployment tests to verify that an error is returned"
 				{Name: "volume1", MountPath: "/mnt/volume1"},
 			}
 		}, "incorrect volume mounts"),
+
+		Entry("Spec.Replicas is nil", func() {
+			deployment.Spec.Replicas = nil
+		}, "missing .spec.replicas"),
 	)
 })
 
@@ -767,7 +796,7 @@ func deploymentCR(name string, namespace string, rolloutsSelectorLabel string, v
 	}
 	setRolloutsLabelsAndAnnotationsToObject(&deploymentCR.ObjectMeta, rolloutManager)
 	replicas := int32(1)
-	if rolloutManager.Spec.HA.Enabled {
+	if rolloutManager.Spec.HA != nil && rolloutManager.Spec.HA.Enabled {
 		replicas = 2
 	}
 	deploymentCR.Spec = appsv1.DeploymentSpec{

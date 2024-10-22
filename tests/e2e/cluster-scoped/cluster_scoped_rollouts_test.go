@@ -388,6 +388,7 @@ var _ = Describe("Cluster-scoped RolloutManager tests", func() {
 			Eventually(clusterRoleAdmin, "1m", "1s").ShouldNot((k8s.ExistByName(k8sClient)))
 			Eventually(clusterRoleView, "1m", "1s").ShouldNot((k8s.ExistByName(k8sClient)))
 			Eventually(clusterRoleEdit, "1m", "1s").ShouldNot((k8s.ExistByName(k8sClient)))
+
 		})
 	})
 })

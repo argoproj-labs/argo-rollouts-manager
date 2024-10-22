@@ -153,3 +153,16 @@ spec:
         location: https://github.com/argoproj-labs/sample-rollouts-metric-plugin/releases/download/v0.0.3/metric-plugin-linux-amd64
         sha256: a597a017a9a1394a31b3cbc33e08a071c88f0bd8
 ```
+### RolloutManager example with HA enabled
+
+``` yaml
+apiVersion: argoproj.io/v1alpha1
+kind: RolloutManager
+metadata:
+  name: argo-rollout
+  labels:
+    example: with-ha
+spec:
+  ha:
+    enabled: true
+```

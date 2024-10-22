@@ -57,7 +57,7 @@ type RolloutManagerSpec struct {
 	Plugins Plugins `json:"plugins,omitempty"`
 
 	// HA options for High Availability support for Rollouts.
-	HA RolloutManagerHASpec `json:"ha,omitempty"`
+	HA *RolloutManagerHASpec `json:"ha,omitempty"`
 }
 
 // Plugin is used to integrate traffic management and metric plugins into the Argo Rollouts controller. For more information on these plugins, see the upstream Argo Rollouts documentation.
@@ -77,6 +77,7 @@ type Plugins struct {
 	Metric []Plugin `json:"metric,omitempty"`
 }
 
+// RolloutManagerHASpec specifies HA options for High Availability support for Rollouts.
 type RolloutManagerHASpec struct {
 	// Enabled will toggle HA support globally for RolloutManager.
 	Enabled bool `json:"enabled"`

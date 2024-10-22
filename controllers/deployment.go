@@ -45,7 +45,7 @@ func generateDesiredRolloutsDeployment(cr rolloutsmanagerv1alpha1.RolloutManager
 
 	// Default number of replicas is 1, update it to 2 if HA is enabled
 	var replicas int32 = 1
-	if cr.Spec.HA.Enabled {
+	if cr.Spec.HA != nil && cr.Spec.HA.Enabled {
 		replicas = 2
 	}
 
@@ -70,7 +70,7 @@ func generateDesiredRolloutsDeployment(cr rolloutsmanagerv1alpha1.RolloutManager
 		},
 	}
 
-	if cr.Spec.HA.Enabled {
+	if cr.Spec.HA != nil && cr.Spec.HA.Enabled {
 		desiredDeployment.Spec.Template.Spec.Affinity = &corev1.Affinity{
 			PodAntiAffinity: &corev1.PodAntiAffinity{
 				PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
@@ -431,7 +431,7 @@ func normalizeDeployment(inputParam appsv1.Deployment, cr rolloutsmanagerv1alpha
 
 	// Default number of replicas is 1, update it to 2 if HA is enabled
 	var replicas int32 = 1
-	if cr.Spec.HA.Enabled {
+	if cr.Spec.HA != nil && cr.Spec.HA.Enabled {
 		replicas = 2
 	}
 
@@ -459,6 +459,10 @@ func normalizeDeployment(inputParam appsv1.Deployment, cr rolloutsmanagerv1alpha
 			Type: input.Spec.Strategy.Type,
 			// we ignore the default values set in RollingUpdate:
 		},
+	}
+
+	if input.Spec.Replicas == nil {
+		return appsv1.Deployment{}, fmt.Errorf("missing .spec.replicas")
 	}
 
 	if len(input.Spec.Template.Spec.Containers) != 1 {
@@ -509,7 +513,7 @@ func normalizeDeployment(inputParam appsv1.Deployment, cr rolloutsmanagerv1alpha
 		inputContainer.Env = make([]corev1.EnvVar, 0)
 	}
 
-	if cr.Spec.HA.Enabled {
+	if input.Spec.Template.Spec.Affinity != nil && input.Spec.Template.Spec.Affinity.PodAffinity != nil {
 		res.Spec.Template.Spec.Affinity = &corev1.Affinity{
 			PodAntiAffinity: &corev1.PodAntiAffinity{
 				PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
@@ -648,7 +652,7 @@ func getRolloutsCommandArgs(cr rolloutsmanagerv1alpha1.RolloutManager) []string 
 		args = append(args, "--namespaced")
 	}
 
-	if cr.Spec.HA.Enabled {
+	if cr.Spec.HA != nil && cr.Spec.HA.Enabled {
 		args = append(args, "--leader-elect", "true")
 	}
 
