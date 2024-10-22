@@ -43,7 +43,14 @@ func generateDesiredRolloutsDeployment(cr rolloutsmanagerv1alpha1.RolloutManager
 		}
 	}
 
+	// Default number of replicas is 1, update it to 2 if HA is enabled
+	var replicas int32 = 1
+	if cr.Spec.HA.Enabled {
+		replicas = 2
+	}
+
 	desiredDeployment.Spec = appsv1.DeploymentSpec{
+		Replicas: &replicas,
 		Selector: &metav1.LabelSelector{
 			MatchLabels: labels,
 		},
@@ -61,6 +68,32 @@ func generateDesiredRolloutsDeployment(cr rolloutsmanagerv1alpha1.RolloutManager
 		Strategy: appsv1.DeploymentStrategy{
 			Type: appsv1.RollingUpdateDeploymentStrategyType,
 		},
+	}
+
+	if cr.Spec.HA.Enabled {
+		desiredDeployment.Spec.Template.Spec.Affinity = &corev1.Affinity{
+			PodAntiAffinity: &corev1.PodAntiAffinity{
+				PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+					{
+						PodAffinityTerm: corev1.PodAffinityTerm{
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: labels,
+							},
+							TopologyKey: TopologyKubernetesZoneLabel,
+						},
+						Weight: int32(100),
+					},
+				},
+				RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: labels,
+						},
+						TopologyKey: KubernetesHostnameLabel,
+					},
+				},
+			},
+		}
 	}
 
 	if cr.Spec.NodePlacement != nil {
@@ -159,6 +192,9 @@ func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(ctx context.Conte
 		actualDeployment.Spec.Template.Spec.Containers = desiredDeployment.Spec.Template.Spec.Containers
 		actualDeployment.Spec.Template.Spec.ServiceAccountName = desiredDeployment.Spec.Template.Spec.ServiceAccountName
 
+		actualDeployment.Spec.Replicas = desiredDeployment.Spec.Replicas
+		actualDeployment.Spec.Template.Spec.Affinity = desiredDeployment.Spec.Template.Spec.Affinity
+
 		actualDeployment.Labels = combineStringMaps(actualDeployment.Labels, desiredDeployment.Labels)
 		actualDeployment.Annotations = combineStringMaps(actualDeployment.Annotations, desiredDeployment.Annotations)
 
@@ -234,6 +270,10 @@ func identifyDeploymentDifference(x appsv1.Deployment, y appsv1.Deployment) stri
 
 	if !reflect.DeepEqual(x.Spec.Template.Spec.Volumes, y.Spec.Template.Spec.Volumes) {
 		return "Spec.Template.Spec.Volumes"
+	}
+
+	if !reflect.DeepEqual(x.Spec.Replicas, y.Spec.Replicas) {
+		return "Spec.Replicas"
 	}
 
 	return ""
@@ -389,7 +429,14 @@ func normalizeDeployment(inputParam appsv1.Deployment, cr rolloutsmanagerv1alpha
 		return appsv1.Deployment{}, fmt.Errorf("missing .spec.template.spec.volumes")
 	}
 
+	// Default number of replicas is 1, update it to 2 if HA is enabled
+	var replicas int32 = 1
+	if cr.Spec.HA.Enabled {
+		replicas = 2
+	}
+
 	res.Spec = appsv1.DeploymentSpec{
+		Replicas: &replicas,
 		Selector: &metav1.LabelSelector{
 			MatchLabels: normalizeMap(input.Spec.Selector.MatchLabels),
 		},
@@ -460,6 +507,32 @@ func normalizeDeployment(inputParam appsv1.Deployment, cr rolloutsmanagerv1alpha
 
 	if len(inputContainer.Env) == 0 {
 		inputContainer.Env = make([]corev1.EnvVar, 0)
+	}
+
+	if cr.Spec.HA.Enabled {
+		res.Spec.Template.Spec.Affinity = &corev1.Affinity{
+			PodAntiAffinity: &corev1.PodAntiAffinity{
+				PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+					{
+						PodAffinityTerm: corev1.PodAffinityTerm{
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: normalizeMap(input.Spec.Selector.MatchLabels),
+							},
+							TopologyKey: TopologyKubernetesZoneLabel,
+						},
+						Weight: int32(100),
+					},
+				},
+				RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: normalizeMap(input.Spec.Selector.MatchLabels),
+						},
+						TopologyKey: KubernetesHostnameLabel,
+					},
+				},
+			},
+		}
 	}
 
 	res.Spec.Template.Spec.Containers = []corev1.Container{{
@@ -573,6 +646,10 @@ func getRolloutsCommandArgs(cr rolloutsmanagerv1alpha1.RolloutManager) []string 
 
 	if cr.Spec.NamespaceScoped {
 		args = append(args, "--namespaced")
+	}
+
+	if cr.Spec.HA.Enabled {
+		args = append(args, "--leader-elect", "true")
 	}
 
 	extraArgs := cr.Spec.ExtraCommandArgs

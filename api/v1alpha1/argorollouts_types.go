@@ -55,6 +55,9 @@ type RolloutManagerSpec struct {
 
 	// Plugins specify the traffic and metric plugins in Argo Rollout
 	Plugins Plugins `json:"plugins,omitempty"`
+
+	// HA options for High Availability support for Rollouts.
+	HA RolloutManagerHASpec `json:"ha,omitempty"`
 }
 
 // Plugin is used to integrate traffic management and metric plugins into the Argo Rollouts controller. For more information on these plugins, see the upstream Argo Rollouts documentation.
@@ -72,6 +75,11 @@ type Plugins struct {
 	TrafficManagement []Plugin `json:"trafficManagement,omitempty"`
 	// Metric holds a list of metric plugins used to gather and report metrics during rollouts.
 	Metric []Plugin `json:"metric,omitempty"`
+}
+
+type RolloutManagerHASpec struct {
+	// Enabled will toggle HA support globally for RolloutManager.
+	Enabled bool `json:"enabled"`
 }
 
 // ArgoRolloutsNodePlacementSpec is used to specify NodeSelector and Tolerations for Rollouts workloads
