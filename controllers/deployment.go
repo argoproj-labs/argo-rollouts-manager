@@ -276,6 +276,10 @@ func identifyDeploymentDifference(x appsv1.Deployment, y appsv1.Deployment) stri
 		return "Spec.Replicas"
 	}
 
+	if !reflect.DeepEqual(x.Spec.Template.Spec.Affinity, y.Spec.Template.Spec.Affinity) {
+		return "Spec.Template.Spec.Affinity"
+	}
+
 	return ""
 }
 
@@ -429,10 +433,10 @@ func normalizeDeployment(inputParam appsv1.Deployment, cr rolloutsmanagerv1alpha
 		return appsv1.Deployment{}, fmt.Errorf("missing .spec.template.spec.volumes")
 	}
 
-	// Default number of replicas is 1, update it to 2 if HA is enabled
+	// Default number of replicas is 1
 	var replicas int32 = 1
-	if cr.Spec.HA != nil && cr.Spec.HA.Enabled {
-		replicas = 2
+	if input.Spec.Replicas != nil {
+		replicas = *input.Spec.Replicas
 	}
 
 	res.Spec = appsv1.DeploymentSpec{
@@ -459,10 +463,6 @@ func normalizeDeployment(inputParam appsv1.Deployment, cr rolloutsmanagerv1alpha
 			Type: input.Spec.Strategy.Type,
 			// we ignore the default values set in RollingUpdate:
 		},
-	}
-
-	if input.Spec.Replicas == nil {
-		return appsv1.Deployment{}, fmt.Errorf("missing .spec.replicas")
 	}
 
 	if len(input.Spec.Template.Spec.Containers) != 1 {
@@ -513,18 +513,34 @@ func normalizeDeployment(inputParam appsv1.Deployment, cr rolloutsmanagerv1alpha
 		inputContainer.Env = make([]corev1.EnvVar, 0)
 	}
 
-	if input.Spec.Template.Spec.Affinity != nil && input.Spec.Template.Spec.Affinity.PodAffinity != nil {
-		res.Spec.Template.Spec.Affinity = &corev1.Affinity{
-			PodAntiAffinity: &corev1.PodAntiAffinity{
+	if input.Spec.Template.Spec.Affinity != nil {
+
+		res.Spec.Template.Spec.Affinity = &corev1.Affinity{}
+
+		// As of this writing, we don't touch pod affinity field at at all, so just copy it as is: any changes to this field should be reverted.
+		res.Spec.Template.Spec.Affinity.PodAffinity = input.Spec.Template.Spec.Affinity.PodAffinity
+
+		// We do touch anti affinity field, so check it then copy it into res
+		if input.Spec.Template.Spec.Affinity.PodAntiAffinity != nil {
+
+			if len(input.Spec.Template.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution) != 1 {
+				return appsv1.Deployment{}, fmt.Errorf("incorrect number of anti-affinity PreferredDuringSchedulingIgnoredDuringExecution")
+			}
+
+			if len(input.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 1 {
+				return appsv1.Deployment{}, fmt.Errorf("incorrect number of anti-affinity RequiredDuringSchedulingIgnoredDuringExecution")
+			}
+
+			res.Spec.Template.Spec.Affinity.PodAntiAffinity = &corev1.PodAntiAffinity{
 				PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
 					{
 						PodAffinityTerm: corev1.PodAffinityTerm{
 							LabelSelector: &metav1.LabelSelector{
 								MatchLabels: normalizeMap(input.Spec.Selector.MatchLabels),
 							},
-							TopologyKey: TopologyKubernetesZoneLabel,
+							TopologyKey: input.Spec.Template.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].PodAffinityTerm.TopologyKey,
 						},
-						Weight: int32(100),
+						Weight: input.Spec.Template.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Weight,
 					},
 				},
 				RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
@@ -532,10 +548,10 @@ func normalizeDeployment(inputParam appsv1.Deployment, cr rolloutsmanagerv1alpha
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: normalizeMap(input.Spec.Selector.MatchLabels),
 						},
-						TopologyKey: KubernetesHostnameLabel,
+						TopologyKey: input.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey,
 					},
 				},
-			},
+			}
 		}
 	}
 
