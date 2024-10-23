@@ -228,6 +228,15 @@ spec:
                 items:
                   type: string
                 type: array
+              ha:
+                description: HA options for High Availability support for Rollouts.
+                properties:
+                  enabled:
+                    description: Enabled will toggle HA support globally for RolloutManager.
+                    type: boolean
+                required:
+                - enabled
+                type: object
               image:
                 description: Image defines Argo Rollouts controller image (optional)
                 type: string

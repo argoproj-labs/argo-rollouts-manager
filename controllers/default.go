@@ -38,4 +38,8 @@ const (
 
 	// ClusterScopedArgoRolloutsNamespaces is an environment variable that can be used to configure namespaces that are allowed to host cluster-scoped Argo Rollouts
 	ClusterScopedArgoRolloutsNamespaces = "CLUSTER_SCOPED_ARGO_ROLLOUTS_NAMESPACES"
+
+	KubernetesHostnameLabel = "kubernetes.io/hostname"
+
+	TopologyKubernetesZoneLabel = "topology.kubernetes.io/zone"
 )

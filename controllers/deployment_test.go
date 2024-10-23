@@ -416,10 +416,72 @@ var _ = Describe("Deployment Test", func() {
 					},
 				}
 			}),
+			Entry(".spec.replicas", func(deployment *appsv1.Deployment) {
+				var replicas int32 = 2
+				deployment.Spec.Replicas = &replicas
+			}),
+			Entry(".spec.template.spec.affinity.podantiaffinity", func(deployment *appsv1.Deployment) {
+				deployment.Spec.Template.Spec.Affinity = &corev1.Affinity{
+					PodAntiAffinity: &corev1.PodAntiAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+							{TopologyKey: "TopologyKey"},
+						},
+						PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+							{PodAffinityTerm: corev1.PodAffinityTerm{TopologyKey: "ToplogyKey"}},
+						},
+					},
+				}
+			}),
 		)
-
 	})
 
+	When("HA is enabled via RolloutManager .spec.HA", func() {
+
+		It("should have a Deployment that contains two replicas and the --leader-elect argument, and it should have anti-affinity rule is added by default when HA is enabled", func() {
+
+			a.Spec = v1alpha1.RolloutManagerSpec{
+				HA: &v1alpha1.RolloutManagerHASpec{
+					Enabled: true,
+				},
+			}
+			replicas := int32(2)
+
+			Expect(r.Client.Update(ctx, &a)).To(Succeed())
+
+			By("calling reconcileRolloutsDeployment to create the initial set of rollout resources")
+			Expect(r.reconcileRolloutsDeployment(ctx, a, *sa)).To(Succeed())
+
+			By("fetch the Deployment")
+			fetchedDeployment := &appsv1.Deployment{}
+			Expect(fetchObject(ctx, r.Client, a.Namespace, DefaultArgoRolloutsResourceName, fetchedDeployment)).To(Succeed())
+
+			expectedDeployment := deploymentCR(DefaultArgoRolloutsResourceName, a.Namespace, DefaultArgoRolloutsResourceName, []string{"plugin-bin", "tmp"}, "linux", DefaultArgoRolloutsResourceName, a)
+
+			By("verify that the fetched Deployment matches the desired one")
+			Expect(fetchedDeployment.Name).To(Equal(expectedDeployment.Name))
+			Expect(fetchedDeployment.Labels).To(Equal(expectedDeployment.Labels))
+			Expect(fetchedDeployment.Spec.Replicas).To(Equal(&replicas))
+			Expect(fetchedDeployment.Spec.Template.Spec.Containers[0].Args).To(ContainElements("--leader-elect", "true"))
+
+			By("verifying that the anti-affinity rules are set correctly")
+			affinity := fetchedDeployment.Spec.Template.Spec.Affinity
+			Expect(affinity).NotTo(BeNil())
+			Expect(affinity.PodAntiAffinity).NotTo(BeNil())
+
+			By("Verify PreferredDuringSchedulingIgnoredDuringExecution")
+			preferred := affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution
+			Expect(preferred).To(HaveLen(1))
+			Expect(preferred[0].Weight).To(Equal(int32(100)))
+			Expect(preferred[0].PodAffinityTerm.TopologyKey).To(Equal(TopologyKubernetesZoneLabel))
+			Expect(preferred[0].PodAffinityTerm.LabelSelector.MatchLabels).To(Equal(normalizeMap(fetchedDeployment.Spec.Selector.MatchLabels)))
+
+			By("Verify RequiredDuringSchedulingIgnoredDuringExecution")
+			required := affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+			Expect(required).To(HaveLen(1))
+			Expect(required[0].TopologyKey).To(Equal(KubernetesHostnameLabel))
+			Expect(required[0].LabelSelector.MatchLabels).To(Equal(normalizeMap(fetchedDeployment.Spec.Selector.MatchLabels)))
+		})
+	})
 })
 
 var _ = Describe("generateDesiredRolloutsDeployment tests", func() {
@@ -604,6 +666,34 @@ var _ = Describe("normalizeDeployment tests to verify that an error is returned"
 				{Name: "volume1", MountPath: "/mnt/volume1"},
 			}
 		}, "incorrect volume mounts"),
+
+		Entry("input.Spec.Template.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution has incorrect length: if pod anti affinity is set, it should have only 1 PreferredDuringSchedulingIgnoredDuringExecution", func() {
+			deployment.Spec.Template.Spec.Affinity = &corev1.Affinity{
+				PodAntiAffinity: &corev1.PodAntiAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{{
+						PodAffinityTerm: corev1.PodAffinityTerm{TopologyKey: "PodAffinityTerm1"},
+					}, {
+						PodAffinityTerm: corev1.PodAffinityTerm{TopologyKey: "PodAffinityTerm2"},
+					}},
+				},
+			}
+		}, "incorrect number of anti-affinity PreferredDuringSchedulingIgnoredDuringExecution"),
+
+		Entry("input.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution has incorrect length: if pod anti affinity is set, it should have only 1 RequiredDuringSchedulingIgnoredDuringExecution", func() {
+			deployment.Spec.Template.Spec.Affinity = &corev1.Affinity{
+				PodAntiAffinity: &corev1.PodAntiAffinity{
+
+					PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{{
+						PodAffinityTerm: corev1.PodAffinityTerm{TopologyKey: "PodAffinityTerm1"}, // this is valid
+					}},
+
+					RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{ // too many
+						{TopologyKey: "TopologyKey1"},
+						{TopologyKey: "TopologyKey2"},
+					},
+				},
+			}
+		}, "incorrect number of anti-affinity RequiredDuringSchedulingIgnoredDuringExecution"),
 	)
 })
 
@@ -728,7 +818,12 @@ func deploymentCR(name string, namespace string, rolloutsSelectorLabel string, v
 		},
 	}
 	setRolloutsLabelsAndAnnotationsToObject(&deploymentCR.ObjectMeta, rolloutManager)
+	replicas := int32(1)
+	if rolloutManager.Spec.HA != nil && rolloutManager.Spec.HA.Enabled {
+		replicas = 2
+	}
 	deploymentCR.Spec = appsv1.DeploymentSpec{
+		Replicas: &replicas,
 		Selector: &metav1.LabelSelector{
 			MatchLabels: map[string]string{
 				DefaultRolloutsSelectorKey: rolloutsSelectorLabel,
