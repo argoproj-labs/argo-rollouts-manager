@@ -29,7 +29,7 @@ func ExistByName(k8sClient client.Client) matcher.GomegaMatcher {
 	}, BeTrue())
 }
 
-// DoesNotExistByName checks if the given resource does not exist, when retrieving it by name/namespace.
+// NotExistByName checks if the given resource does not exist, when retrieving it by name/namespace.
 // Does NOT check if the resource content matches.
 func NotExistByName(k8sClient client.Client) matcher.GomegaMatcher {
 
