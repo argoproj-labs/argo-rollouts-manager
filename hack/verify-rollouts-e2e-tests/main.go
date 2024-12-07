@@ -63,7 +63,7 @@ func main() {
 		return
 	}
 
-	// 3) Report unexpected failed tests, in alphabetical order
+	// 3a) Report unexpected failed tests, in alphabetical order
 	mapKeys := []string{}
 	for key := range testResults {
 		mapKeys = append(mapKeys, key)
@@ -75,6 +75,9 @@ func main() {
 		reportErrorAndExit(fmt.Errorf("no test results found"))
 		return
 	}
+
+	var testFailureOutput []string
+	var testSuccessOutput []string
 
 	atLeastOneTestPermFail := false
 
@@ -90,20 +93,36 @@ func main() {
 		for _, testRunLine := range testRuns {
 			if strings.Contains(testRunLine, "PASS") {
 				passFound = true
+				testSuccessOutput = append(testSuccessOutput, "Test passed - "+testName)
+				break
 			}
 		}
 
 		if !passFound {
-			fmt.Println("Unexpected test failure, test failed too many times - " + testName + ":")
-			for _, testRun := range testRuns {
-				fmt.Println(testRun)
-			}
 
-			fmt.Println()
+			testFailureOutput = append(testFailureOutput, "Unexpected test failure, test failed too many times - "+testName+":")
+
+			testFailureOutput = append(testFailureOutput, testRuns...)
+
+			testFailureOutput = append(testFailureOutput, "")
 			atLeastOneTestPermFail = true
 
 		}
 
+	}
+
+	fmt.Println()
+
+	// 3b) First print successes
+	for _, line := range testSuccessOutput {
+		fmt.Println(line)
+	}
+
+	fmt.Println()
+
+	// 3c) Then print failures
+	for _, line := range testFailureOutput {
+		fmt.Println(line)
 	}
 
 	// 4) Exit with error code 1 if there was at least one unexpected test failure.
