@@ -19,6 +19,8 @@ set -u
 
 extract_metrics_data() {
 
+  set +eu
+
   TMP_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')
 
   while true; do
@@ -112,6 +114,9 @@ fi
 
 # Before the test starts, extract initial metrics values from the /metrics endpoint of the operator
 extract_metrics_data
+
+set -eu
+
 INITIAL_GET_REQUESTS=$GET_REQUESTS
 INITIAL_PUT_REQUESTS=$PUT_REQUESTS
 INITIAL_POST_REQUESTS=$POST_REQUESTS
@@ -141,7 +146,7 @@ sanity_test_metrics_data() {
 
   extract_metrics_data
 
-  set -x
+  set -eux
 
   FINAL_GET_REQUESTS=$GET_REQUESTS
   FINAL_PUT_REQUESTS=$PUT_REQUESTS
