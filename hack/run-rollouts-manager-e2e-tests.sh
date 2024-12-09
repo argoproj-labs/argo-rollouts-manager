@@ -19,6 +19,8 @@ set -u
 
 extract_metrics_data() {
 
+  set +eu
+
   TMP_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')
 
   while true; do
@@ -39,20 +41,43 @@ extract_metrics_data() {
 
   curl http://localhost:8080/metrics -o "$TMP_DIR/rollouts-metric-endpoint-output.txt"
 
-  GET_REQUESTS=`cat "$TMP_DIR/rollouts-metric-endpoint-output.txt" | grep "rest_client_requests_total" | grep "GET" | rev | cut -d' ' -f1 | rev`
-  PUT_REQUESTS=`cat "$TMP_DIR/rollouts-metric-endpoint-output.txt" | grep "rest_client_requests_total" | grep "PUT" | grep -v "409" | rev | cut -d' ' -f1 | rev`
-  POST_REQUESTS=`cat "$TMP_DIR/rollouts-metric-endpoint-output.txt" | grep "rest_client_requests_total" | grep "POST" | rev | cut -d' ' -f1 | rev`
+  echo "* Metrics gathered raw output ---------------------------------------------------------------"
+  cat "$TMP_DIR/rollouts-metric-endpoint-output.txt"
+  echo "---------------------------------------------------------------------------------------------"
+
+  GET_REQUESTS=`cat "$TMP_DIR/rollouts-metric-endpoint-output.txt" | grep "rest_client_requests_total" | grep "GET" | grep "200" | rev | cut -d' ' -f1 | rev`
+  
+  PUT_REQUESTS_200=`cat "$TMP_DIR/rollouts-metric-endpoint-output.txt" | grep "rest_client_requests_total" | grep "PUT" | grep "200" | rev | cut -d' ' -f1 | rev`
+
+  # 409 Conflict error code
+  PUT_REQUESTS_409=`cat "$TMP_DIR/rollouts-metric-endpoint-output.txt" | grep "rest_client_requests_total" | grep "PUT" | grep "409" | rev | cut -d' ' -f1 | rev`
+
+  # 201 Created error code
+  POST_REQUESTS_201=`cat "$TMP_DIR/rollouts-metric-endpoint-output.txt" | grep "rest_client_requests_total" | grep "POST" | grep "201" | rev | cut -d' ' -f1 | rev`
+
+  # 409 Conflict error code
+  POST_REQUESTS_409=`cat "$TMP_DIR/rollouts-metric-endpoint-output.txt" | grep "rest_client_requests_total" | grep "POST" | grep "409" | rev | cut -d' ' -f1 | rev`
 
   if [[ "$GET_REQUESTS" == "" ]]; then
     GET_REQUESTS=0
   fi
-  if [[ "$POST_REQUESTS" == "" ]]; then
-    POST_REQUESTS=0
+
+  if [[ "$POST_REQUESTS_201" == "" ]]; then
+    POST_REQUESTS_201=0
   fi
-  if [[ "$PUT_REQUESTS" == "" ]]; then
-    PUT_REQUESTS=0
+  if [[ "$POST_REQUESTS_409" == "" ]]; then
+    POST_REQUESTS_409=0
   fi
 
+  if [[ "$PUT_REQUESTS_200" == "" ]]; then
+    PUT_REQUESTS_200=0
+  fi
+  if [[ "$PUT_REQUESTS_409" == "" ]]; then
+    PUT_REQUESTS_409=0
+  fi
+
+  PUT_REQUESTS=`expr $PUT_REQUESTS_200 + $PUT_REQUESTS_409`
+  POST_REQUESTS=`expr $POST_REQUESTS_201 + $POST_REQUESTS_409`
 
   # 2) Extract the # of RolloutManager reconciles
 
@@ -89,6 +114,9 @@ fi
 
 # Before the test starts, extract initial metrics values from the /metrics endpoint of the operator
 extract_metrics_data
+
+set -eu
+
 INITIAL_GET_REQUESTS=$GET_REQUESTS
 INITIAL_PUT_REQUESTS=$PUT_REQUESTS
 INITIAL_POST_REQUESTS=$POST_REQUESTS
@@ -118,7 +146,7 @@ sanity_test_metrics_data() {
 
   extract_metrics_data
 
-  set -x
+  set -eux
 
   FINAL_GET_REQUESTS=$GET_REQUESTS
   FINAL_PUT_REQUESTS=$PUT_REQUESTS
