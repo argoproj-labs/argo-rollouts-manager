@@ -12,6 +12,7 @@ jobs:
 
   test-e2e:
     name: Run end-to-end tests
+    timeout-minutes: 90
     runs-on: ubuntu-latest
     strategy:
       matrix:

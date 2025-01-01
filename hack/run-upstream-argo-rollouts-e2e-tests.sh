@@ -25,12 +25,7 @@ cd argo-rollouts
 git checkout $CURRENT_ROLLOUTS_VERSION
 go mod tidy
 
-# 2) Replace 'argoproj/rollouts-demo' image with 'quay.io/jgwest-redhat/rollouts-demo' in E2E tests
-# - The original 'argoproj/rollouts-demo' repository only has amd64 images, thus some of the E2E tests will not work on it.
-# - 'quay.io/jgwest-redhat/rollouts-demo' is based on the same code, but built for other archs
-find "$TMP_DIR/argo-rollouts/test/e2e" -type f | xargs sed -i.bak  's/argoproj\/rollouts-demo/quay.io\/jgwest-redhat\/rollouts-demo/g'
-
-# 3) Setup the Namespace
+# 2) Setup the Namespace
 
 kubectl delete ns argo-rollouts || true
 
@@ -40,7 +35,7 @@ kubectl create ns argo-rollouts
 kubectl config set-context --current --namespace=argo-rollouts
 
 
-# 4) Build, install, and start the argo-rollouts-manager controller
+# 3) Build, install, and start the argo-rollouts-manager controller
 cd $SCRIPT_DIR/..
 
 
@@ -61,7 +56,7 @@ if [ -z "$SKIP_RUN_STEP" ]; then
   set -e
 fi
 
-# 5) Install Argo Rollouts into the Namespace via RolloutManager CR
+# 4) Install Argo Rollouts into the Namespace via RolloutManager CR
 
 cd $TMP_DIR/argo-rollouts
 
@@ -98,7 +93,7 @@ oc adm policy add-scc-to-user anyuid -z argo-rollouts -n argo-rollouts || true
 oc adm policy add-scc-to-user anyuid -z default -n argo-rollouts || true
 
 
-# 6) Run the E2E tests
+# 5) Run the E2E tests
 rm -f /tmp/test-e2e.log
 
 set +e
@@ -107,7 +102,7 @@ make test-e2e | tee /tmp/test-e2e.log
 
 set +x
 
-# 7) Check and report the results for unexpected failures
+# 6) Check and report the results for unexpected failures
 
 echo "-----------------------------------------------------------------"
 echo
@@ -127,6 +122,7 @@ set -e
 "$SCRIPT_DIR/verify-rollouts-e2e-tests/verify-e2e-test-results.sh" /tmp/test-e2e.log
 
 echo "* SUCCESS: No unexpected errors occurred."
+
 
 
 
