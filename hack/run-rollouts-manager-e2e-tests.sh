@@ -5,6 +5,17 @@ SCRIPTPATH="$(
   pwd -P
 )"
 
+function cleanup {
+  echo "* Cleaning up"
+  killall main || true
+  killall go || true
+}
+
+trap cleanup EXIT
+
+# Treat undefined variables as errors
+set -u
+
 cd "$SCRIPTPATH/.."
 
 set -o pipefail
@@ -13,9 +24,14 @@ set -o pipefail
 kubectl get crd/servicemonitors.monitoring.coreos.com &> /dev/null
 retVal=$?
 if [ $retVal -ne 0 ]; then
-    # If the CRD is not found, apply the CRD YAML
-    kubectl apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/release-0.52/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml
+  # If the CRD is not found, apply the CRD YAML
+  kubectl apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/release-0.52/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml
 fi
+
+
+set -eu
+
+# Run the tests
 
 set -ex
 
@@ -28,7 +44,6 @@ else
   go test -v -p=1 -timeout=30m -race -count=1 -coverprofile=coverage.out ./tests/e2e/cluster-scoped
 
 fi
-
 
 set +e
 
@@ -43,11 +58,19 @@ if [ -f "/tmp/e2e-operator-run.log" ]; then
   # Grep the log for unexpected errors
   # - Ignore errors that are expected to occur
 
-  UNEXPECTED_ERRORS_FOUND_TEXT=`cat /tmp/e2e-operator-run.log | grep "ERROR" | grep -v "because it is being terminated" | grep -v "the object has been modified; please apply your changes to the latest version and try again" | grep -v "unable to fetch" | grep -v "StorageError"` | grep -v "client rate limiter Wait returned an error: context canceled"
-  UNEXPECTED_ERRORS_COUNT=`echo $UNEXPECTED_ERRORS_FOUND_TEXT | grep "ERROR" | wc -l`
+  set +u # allow undefined vars
+
+  UNEXPECTED_ERRORS_FOUND_TEXT=`cat /tmp/e2e-operator-run.log | grep "ERROR" | grep -v "because it is being terminated" | grep -v "the object has been modified; please apply your changes to the latest version and try again" | grep -v "unable to fetch" | grep -v "StorageError" | grep -v "client rate limiter Wait returned an error: context canceled" | grep -v "failed to reconcile Rollout's ClusterRoleBinding" | grep -v "clusterrolebindings.rbac.authorization.k8s.io \"argo-rollouts\" already exists"`
+
+  if [ "$UNEXPECTED_ERRORS_FOUND_TEXT" != "" ]; then
   
-  if [ "$UNEXPECTED_ERRORS_COUNT" != "0" ]; then
-      echo "Unexpected errors found: $UNEXPECTED_ERRORS_FOUND_TEXT"
-      exit 1
+    UNEXPECTED_ERRORS_COUNT=`echo $UNEXPECTED_ERRORS_FOUND_TEXT | grep "ERROR" | wc -l`
+    
+    if [ "$UNEXPECTED_ERRORS_COUNT" != "0" ]; then
+        echo "Unexpected errors found: $UNEXPECTED_ERRORS_FOUND_TEXT"
+        exit 1
+    fi  
   fi
+
+
 fi

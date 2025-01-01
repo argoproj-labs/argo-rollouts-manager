@@ -609,7 +609,9 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 						TrafficManagement: []rolloutsmanagerv1alpha1.Plugin{
 							{
 								Name:     "argoproj-labs/gatewayAPI",
-								Location: "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/v0.4.0/gateway-api-plugin-linux-amd64"},
+								Location: "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/v0.4.0/gatewayapi-plugin-linux-amd64",
+								SHA256:   "d00ce783dc0eb30ac2e203bdfdac5300a4b47695267a7fa57474e0a4a7376afe",
+							},
 						},
 						Metric: []rolloutsmanagerv1alpha1.Plugin{
 							{
@@ -646,6 +648,7 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 			By("Get existing Rollouts Pod(s) before update")
 			var oldPods corev1.PodList
 			Expect(k8sClient.List(ctx, &oldPods, client.InNamespace(rolloutsManager.Namespace), client.MatchingLabels{"app.kubernetes.io/name": "argo-rollouts"})).To(Succeed())
+			Expect(oldPods.Items).To(HaveLen(1))
 
 			Expect(k8sClient.Update(ctx, &rolloutsManager)).To(Succeed())
 			Eventually(rolloutsManager, "1m", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
@@ -661,14 +664,19 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 					strings.Contains(configMap.Data[controllers.MetricPluginConfigMapKey], rolloutsManager.Spec.Plugins.Metric[0].Location)
 			}, "1m", "1s").Should(BeTrue())
 
-			By("Remove traffic and metric plugins")
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&rolloutsManager), &rolloutsManager)).To(Succeed())
 
 			By("Remove plugins from RolloutManager CR")
-			rolloutsManager.Spec.Plugins.TrafficManagement = []rolloutsmanagerv1alpha1.Plugin{}
-			rolloutsManager.Spec.Plugins.Metric = []rolloutsmanagerv1alpha1.Plugin{}
-			Expect(k8sClient.Update(ctx, &rolloutsManager)).To(Succeed())
-			Eventually(rolloutsManager, "1m", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
+
+			Expect(k8s.UpdateWithoutConflict(ctx, &rolloutsManager, k8sClient, func(obj client.Object) {
+
+				rmo, ok := obj.(*rolloutsmanagerv1alpha1.RolloutManager)
+				Expect(ok).To(BeTrue())
+
+				rmo.Spec.Plugins.TrafficManagement = []rolloutsmanagerv1alpha1.Plugin{}
+				rmo.Spec.Plugins.Metric = []rolloutsmanagerv1alpha1.Plugin{}
+
+			})).To(Succeed())
 
 			By("Verify that traffic and metric plugins are removed from ConfigMap")
 			Eventually(func() bool {
@@ -679,13 +687,22 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 					!strings.Contains(configMap.Data[controllers.MetricPluginConfigMapKey], "prometheus")
 			}, "1m", "1s").Should(BeTrue())
 
-			By("Get existing Rollouts Pod(s) after update")
+			By("Verifying the old pod is deleted")
+			Eventually(&oldPods.Items[0], "60s", "1s").Should(k8s.NotExistByName(k8sClient))
+
 			var newPods corev1.PodList
-			Expect(k8sClient.List(ctx, &newPods, client.InNamespace(rolloutsManager.Namespace), client.MatchingLabels{"app.kubernetes.io/name": "argo-rollouts"})).To(Succeed())
 
 			By("Verify Rollouts Pod is restarted")
-			Expect(newPods.Items).To(HaveLen(1))                              // Ensure a new Pod is created
-			Expect(oldPods.Items).To(HaveLen(1))                              // Ensure there was an old Pod
+			Eventually(func() bool {
+
+				if err := k8sClient.List(ctx, &newPods, client.InNamespace(rolloutsManager.Namespace), client.MatchingLabels{"app.kubernetes.io/name": "argo-rollouts"}); err != nil {
+					return false
+				}
+
+				return len(newPods.Items) == 1
+
+			}, "60s", "1s").Should(BeTrue())
+
 			Expect(newPods.Items[0].Name).NotTo(Equal(oldPods.Items[0].Name)) // Ensure the Pod names are different
 		})
 
