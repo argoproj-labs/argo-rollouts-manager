@@ -182,7 +182,17 @@ func parseTestResultsFromFile(fileContents []string, testsExpectedToFailList []s
 				continue
 			}
 
-			testName = line[strings.Index(line, ".")+1 : roundBraceIndex-1]
+			dotIndex := strings.Index(line, ".")
+			if dotIndex == -1 {
+				continue
+			}
+
+			if dotIndex+1 >= roundBraceIndex-1 {
+				fmt.Println("Unexpected line format: [", line, "]")
+				continue
+			}
+
+			testName = line[dotIndex+1 : roundBraceIndex-1]
 			atLeastOnePassSeen = true
 
 		} else {
