@@ -609,7 +609,7 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 						TrafficManagement: []rolloutsmanagerv1alpha1.Plugin{
 							{
 								Name:     "argoproj-labs/gatewayAPI",
-								Location: "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/v0.4.0/gateway-api-plugin-linux-amd64"},
+								Location: "https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/v0.4.0/gatewayapi-plugin-linux-amd64"},
 						},
 						Metric: []rolloutsmanagerv1alpha1.Plugin{
 							{
