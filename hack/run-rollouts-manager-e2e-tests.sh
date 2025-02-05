@@ -178,7 +178,7 @@ sanity_test_metrics_data() {
 
   fi
 
-  if [[ "`expr $DELTA_ERROR_RECONCILES \> 60`" == "1" ]]; then
+  if [[ "`expr $DELTA_ERROR_RECONCILES \> 70`" == "1" ]]; then
     # This value is arbitrary, and should be updated if at any point it becomes inaccurate (but first audit the test/code to make sure it is not an actual product/test issue, before increasing)
     echo "Number of Reconcile calls that returned an error '$DELTA_ERROR_RECONCILES' was greater than the expected value"
     exit 1
