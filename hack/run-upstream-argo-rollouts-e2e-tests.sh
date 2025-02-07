@@ -38,6 +38,13 @@ find "$TMP_DIR/argo-rollouts/test/e2e" -type f | xargs sed -i.bak  's/nginx:1.19
 
 find "$TMP_DIR/argo-rollouts/test/e2e" -type f | xargs sed -i.bak  's/nginx:1.14.2/quay.io\/jgwest-redhat\/nginx@sha256:07ab71a2c8e4ecb19a5a5abcfb3a4f175946c001c8af288b1aa766d67b0d05d2/g'
 
+# 2c) replace the rollouts-pod-template-hash of 'TestCanaryDynamicStableScale', since we have updated the image above
+find "$TMP_DIR/argo-rollouts/test/e2e" -type f | xargs sed -i.bak  's/868d98995b/5496d694d6/g'
+
+# replace the TestCanaryScaleDownOnAbort and TestCanaryScaleDownOnAbortNoTrafficRouting, for same reason
+find "$TMP_DIR/argo-rollouts/test/e2e" -type f | xargs sed -i.bak  's/66597877b7/6fcb5674b5/g'
+
+
 find "$TMP_DIR/argo-rollouts/test/e2e" -type f -name "*.bak" -delete
 
 # 3) Setup the Namespace
