@@ -112,16 +112,24 @@ if [ $retVal -ne 0 ]; then
   kubectl apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/release-0.52/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml
 fi
 
-# Before the test starts, extract initial metrics values from the /metrics endpoint of the operator
-extract_metrics_data
+if [[ "$DISABLE_METRICS" == "" ]]; then
+
+  # Before the test starts, extract initial metrics values from the /metrics endpoint of the operator
+  extract_metrics_data
+
+fi
 
 set -eu
 
-INITIAL_GET_REQUESTS=$GET_REQUESTS
-INITIAL_PUT_REQUESTS=$PUT_REQUESTS
-INITIAL_POST_REQUESTS=$POST_REQUESTS
-INITIAL_ERROR_RECONCILES=$ERROR_RECONCILES
-INITIAL_SUCCESS_RECONCILES=$SUCCESS_RECONCILES
+if [[ "$DISABLE_METRICS" == "" ]]; then
+
+  INITIAL_GET_REQUESTS=$GET_REQUESTS
+  INITIAL_PUT_REQUESTS=$PUT_REQUESTS
+  INITIAL_POST_REQUESTS=$POST_REQUESTS
+  INITIAL_ERROR_RECONCILES=$ERROR_RECONCILES
+  INITIAL_SUCCESS_RECONCILES=$SUCCESS_RECONCILES
+
+fi
 
 
 # Run the tests
@@ -194,7 +202,9 @@ sanity_test_metrics_data() {
   fi
 }
 
-sanity_test_metrics_data
+if [[ "$DISABLE_METRICS" == "" ]]; then
+  sanity_test_metrics_data
+fi
 
 set +e
 
@@ -222,6 +232,4 @@ if [ -f "/tmp/e2e-operator-run.log" ]; then
         exit 1
     fi  
   fi
-
-
 fi
