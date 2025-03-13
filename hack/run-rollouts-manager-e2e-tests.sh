@@ -13,13 +13,9 @@ function cleanup {
 
 trap cleanup EXIT
 
-
-# Treat undefined variables as errors
-set -u
-
 extract_metrics_data() {
 
-  set +eu
+  set +e
 
   TMP_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')
 
@@ -99,7 +95,6 @@ extract_metrics_data() {
 
 }
 
-
 cd "$SCRIPTPATH/.."
 
 set -o pipefail
@@ -119,9 +114,11 @@ if [[ "$DISABLE_METRICS" == "" ]]; then
 
 fi
 
-set -eu
+set -e
 
 if [[ "$DISABLE_METRICS" == "" ]]; then
+
+  set -u
 
   INITIAL_GET_REQUESTS=$GET_REQUESTS
   INITIAL_PUT_REQUESTS=$PUT_REQUESTS
@@ -129,6 +126,7 @@ if [[ "$DISABLE_METRICS" == "" ]]; then
   INITIAL_ERROR_RECONCILES=$ERROR_RECONCILES
   INITIAL_SUCCESS_RECONCILES=$SUCCESS_RECONCILES
 
+  set +u
 fi
 
 
@@ -200,6 +198,8 @@ sanity_test_metrics_data() {
     exit 1
 
   fi
+
+  set +u
 }
 
 if [[ "$DISABLE_METRICS" == "" ]]; then
@@ -218,8 +218,6 @@ if [ -f "/tmp/e2e-operator-run.log" ]; then
 
   # Grep the log for unexpected errors
   # - Ignore errors that are expected to occur
-
-  set +u # allow undefined vars
 
   UNEXPECTED_ERRORS_FOUND_TEXT=`cat /tmp/e2e-operator-run.log | grep "ERROR" | grep -v "because it is being terminated" | grep -v "the object has been modified; please apply your changes to the latest version and try again" | grep -v "unable to fetch" | grep -v "StorageError" | grep -v "client rate limiter Wait returned an error: context canceled" | grep -v "failed to reconcile Rollout's ClusterRoleBinding" | grep -v "clusterrolebindings.rbac.authorization.k8s.io \"argo-rollouts\" already exists"`
 
