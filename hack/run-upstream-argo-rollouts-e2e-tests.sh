@@ -1,6 +1,6 @@
 #!/bin/bash
 
-CURRENT_ROLLOUTS_VERSION=v1.8.0
+CURRENT_ROLLOUTS_VERSION=v1.8.2
 
 function cleanup {
   echo "* Cleaning up"
@@ -127,6 +127,7 @@ set -e
 "$SCRIPT_DIR/verify-rollouts-e2e-tests/verify-e2e-test-results.sh" /tmp/test-e2e.log
 
 echo "* SUCCESS: No unexpected errors occurred."
+
 
 
 
