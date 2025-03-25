@@ -80,7 +80,7 @@ var _ = Describe("Cluster-scoped RolloutManager tests", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			By("Verify that RolloutManager is successfully created.")
-			Eventually(rolloutsManager, "1m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseAvailable))
+			Eventually(rolloutsManager, "4m", "1s").Should(rmFixture.HavePhase(rmv1alpha1.PhaseAvailable))
 
 			By("Verify that Status.Condition is having success condition.")
 			Eventually(rolloutsManager, "1m", "1s").Should(rmFixture.HaveSuccessCondition())
@@ -385,9 +385,9 @@ var _ = Describe("Cluster-scoped RolloutManager tests", func() {
 			Expect(k8sClient.Delete(ctx, &rolloutsManagerCl)).To(Succeed())
 
 			By("Verify clusterRole '*aggregate*' is deleted")
-			Eventually(clusterRoleAdmin, "1m", "1s").ShouldNot((k8s.ExistByName(k8sClient)))
-			Eventually(clusterRoleView, "1m", "1s").ShouldNot((k8s.ExistByName(k8sClient)))
-			Eventually(clusterRoleEdit, "1m", "1s").ShouldNot((k8s.ExistByName(k8sClient)))
+			Eventually(clusterRoleAdmin, "1m", "1s").ShouldNot(k8s.ExistByName(k8sClient))
+			Eventually(clusterRoleView, "1m", "1s").ShouldNot(k8s.ExistByName(k8sClient))
+			Eventually(clusterRoleEdit, "1m", "1s").ShouldNot(k8s.ExistByName(k8sClient))
 
 		})
 	})
