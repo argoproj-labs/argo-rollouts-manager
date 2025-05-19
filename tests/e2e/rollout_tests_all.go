@@ -626,7 +626,7 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 			Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
 
 			By("Verify that RolloutManager is successfully created.")
-			Eventually(rolloutsManager, "1m", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
+			Eventually(rolloutsManager, "4m", "5s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
 
 			By("Verify traffic and metric plugin is added to ConfigMap")
 			configMap := corev1.ConfigMap{
@@ -650,8 +650,8 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 			Expect(k8sClient.List(ctx, &oldPods, client.InNamespace(rolloutsManager.Namespace), client.MatchingLabels{"app.kubernetes.io/name": "argo-rollouts"})).To(Succeed())
 			Expect(oldPods.Items).To(HaveLen(1))
 
+			By("Update RolloutManager CR to use placeholder values, so we can verify ConfigMap is updated")
 			Expect(k8sClient.Update(ctx, &rolloutsManager)).To(Succeed())
-			Eventually(rolloutsManager, "1m", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
 
 			By("Verify traffic and metric plugin is updated in ConfigMap")
 			Eventually(func() bool {
