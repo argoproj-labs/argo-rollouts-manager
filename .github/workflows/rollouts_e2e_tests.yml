@@ -15,11 +15,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
+      fail-fast: false
       matrix:
-        k3s-version: [ v1.28.2 ]
-        # k3s-version: [ v1.28.2, v1.27.6, v1.26.9 ]
+        kubernetes:
+          - version: '1.28'
+            latest: false
     steps:
       - name: Install K3S
+        env:
+          INSTALL_K3S_CHANNEL: v${{ matrix.kubernetes.version }}      
         run: |
           set -x
           curl -sfL https://get.k3s.io | sh -
