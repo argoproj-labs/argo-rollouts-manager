@@ -60,7 +60,7 @@ if [ -f "/tmp/e2e-operator-run.log" ]; then
 
   set +u # allow undefined vars
 
-  UNEXPECTED_ERRORS_FOUND_TEXT=`cat /tmp/e2e-operator-run.log | grep "ERROR" | grep -v "because it is being terminated" | grep -v "the object has been modified; please apply your changes to the latest version and try again" | grep -v "unable to fetch" | grep -v "StorageError" | grep -v "client rate limiter Wait returned an error: context canceled" | grep -v "failed to reconcile Rollout's ClusterRoleBinding" | grep -v "clusterrolebindings.rbac.authorization.k8s.io \"argo-rollouts\" already exists"`
+  UNEXPECTED_ERRORS_FOUND_TEXT=`cat /tmp/e2e-operator-run.log | grep "ERROR" | grep -v "because it is being terminated" | grep -v "the object has been modified; please apply your changes to the latest version and try again" | grep -v "unable to fetch" | grep -v "StorageError" | grep -v "client rate limiter Wait returned an error: context canceled" | grep -v "failed to reconcile Rollout's ClusterRoleBinding" | grep -v "clusterrolebindings.rbac.authorization.k8s.io.*argo-rollouts.*already.*exists" | grep -v "servicemonitors.monitoring.coreos.com.*argo-rollouts.*already.*exists"`
 
   if [ "$UNEXPECTED_ERRORS_FOUND_TEXT" != "" ]; then
   
