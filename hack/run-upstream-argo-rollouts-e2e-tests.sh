@@ -25,10 +25,27 @@ cd argo-rollouts
 git checkout $CURRENT_ROLLOUTS_VERSION
 go mod tidy
 
-# 2) Replace 'argoproj/rollouts-demo' image with 'quay.io/jgwest-redhat/rollouts-demo' in upstream E2E tests
+# 2a) Replace 'argoproj/rollouts-demo' image with 'quay.io/jgwest-redhat/rollouts-demo' in upstream E2E tests
 # - The original 'argoproj/rollouts-demo' repository only has amd64 images, thus some of the E2E tests will not work on Power/Z.
 # - 'quay.io/jgwest-redhat/rollouts-demo' is based on the same code, but built for other archs
 find "$TMP_DIR/argo-rollouts/test/e2e" -type f | xargs sed -i.bak  's/argoproj\/rollouts-demo/quay.io\/jgwest-redhat\/rollouts-demo/g'
+
+# 2b) Replace nginx images used by E2E tests with images from quay.io (thus no rate limiting) 
+
+# quay.io/jgwest-redhat/nginx@sha256:07ab71a2c8e4ecb19a5a5abcfb3a4f175946c001c8af288b1aa766d67b0d05d2 is a copy of nginx:1.19-alpine
+
+find "$TMP_DIR/argo-rollouts/test/e2e" -type f | xargs sed -i.bak  's/nginx:1.19-alpine/quay.io\/jgwest-redhat\/nginx@sha256:07ab71a2c8e4ecb19a5a5abcfb3a4f175946c001c8af288b1aa766d67b0d05d2/g'
+
+find "$TMP_DIR/argo-rollouts/test/e2e" -type f | xargs sed -i.bak  's/nginx:1.14.2/quay.io\/jgwest-redhat\/nginx@sha256:07ab71a2c8e4ecb19a5a5abcfb3a4f175946c001c8af288b1aa766d67b0d05d2/g'
+
+# 2c) replace the rollouts-pod-template-hash of 'TestCanaryDynamicStableScale', since we have updated the image above
+find "$TMP_DIR/argo-rollouts/test/e2e" -type f | xargs sed -i.bak  's/868d98995b/5496d694d6/g'
+
+# replace the TestCanaryScaleDownOnAbort and TestCanaryScaleDownOnAbortNoTrafficRouting, for same reason
+find "$TMP_DIR/argo-rollouts/test/e2e" -type f | xargs sed -i.bak  's/66597877b7/6fcb5674b5/g'
+
+
+find "$TMP_DIR/argo-rollouts/test/e2e" -type f -name "*.bak" -delete
 
 # 3) Setup the Namespace
 
@@ -127,7 +144,4 @@ set -e
 "$SCRIPT_DIR/verify-rollouts-e2e-tests/verify-e2e-test-results.sh" /tmp/test-e2e.log
 
 echo "* SUCCESS: No unexpected errors occurred."
-
-
-
 
