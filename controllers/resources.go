@@ -736,6 +736,9 @@ func (r *RolloutManagerReconciler) reconcileRolloutsSecrets(ctx context.Context,
 	}
 
 	setRolloutsLabelsAndAnnotationsToObject(&expectedSecret.ObjectMeta, cr)
+	if r.ArgoRolloutsCustomLabel != nil {
+		setCustomLabels(&expectedSecret.ObjectMeta, r.ArgoRolloutsCustomLabel)
+	}
 
 	// If the Secret doesn't exist (or an unrelated error occurred)....
 	liveSecret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: expectedSecret.Name, Namespace: expectedSecret.Namespace}}
