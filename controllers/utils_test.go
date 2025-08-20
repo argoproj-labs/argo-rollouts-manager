@@ -792,8 +792,8 @@ func makeTestReconciler(obj ...client.Object) *RolloutManagerReconciler {
 	cl := fake.NewClientBuilder().WithScheme(s).WithStatusSubresource(obj...).WithObjects(obj...).Build()
 
 	return &RolloutManagerReconciler{
-		Client:                       cl,
-		Scheme:                       s,
+		Client: cl,
+		Scheme: s,
 		ArgoRolloutsCustomLabel: map[string]string{
 			"custom1": "value",
 		},
