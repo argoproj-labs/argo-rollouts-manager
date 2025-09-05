@@ -28,6 +28,7 @@ rules:
   - ""
   resources:
   - deployments
+  - podtemplates
   verbs:
   - get
   - list
@@ -38,14 +39,6 @@ rules:
   - pods/eviction
   verbs:
   - create
-- apiGroups:
-  - ""
-  resources:
-  - podtemplates
-  verbs:
-  - get
-  - list
-  - watch
 - apiGroups:
   - apiextensions.k8s.io
   resources:
@@ -106,34 +99,14 @@ rules:
   resources:
   - analysisruns
   - analysisruns/finalizers
+  - analysistemplates
+  - clusteranalysistemplates
   - experiments
   - experiments/finalizers
-  verbs:
-  - create
-  - delete
-  - deletecollection
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - argoproj.io
-  resources:
-  - analysistemplates
-  verbs:
-  - create
-  - delete
-  - deletecollection
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - argoproj.io
-  resources:
-  - clusteranalysistemplates
+  - rollouts
+  - rollouts/finalizers
+  - rollouts/scale
+  - rollouts/status
   verbs:
   - create
   - delete
@@ -169,22 +142,6 @@ rules:
   - get
   - patch
   - update
-- apiGroups:
-  - argoproj.io
-  resources:
-  - rollouts
-  - rollouts/finalizers
-  - rollouts/scale
-  - rollouts/status
-  verbs:
-  - create
-  - delete
-  - deletecollection
-  - get
-  - list
-  - patch
-  - update
-  - watch
 - apiGroups:
   - batch
   resources:
@@ -224,6 +181,7 @@ rules:
   - watch
 - apiGroups:
   - getambassador.io
+  - x.getambassador.io
   resources:
   - ambassadormappings
   - mappings
@@ -272,17 +230,6 @@ rules:
   resources:
   - clusterrolebindings
   - clusterroles
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
   - rolebindings
   - roles
   verbs:
@@ -320,17 +267,5 @@ rules:
   - traefikservices
   verbs:
   - get
-  - update
-  - watch
-- apiGroups:
-  - x.getambassador.io
-  resources:
-  - ambassadormappings
-  - mappings
-  verbs:
-  - create
-  - delete
-  - get
-  - list
   - update
   - watch
