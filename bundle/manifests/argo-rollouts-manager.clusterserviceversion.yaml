@@ -21,7 +21,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-06-11T23:05:34Z"
+    createdAt: "2025-10-28T19:47:47Z"
     operators.operatorframework.io/builder: operator-sdk-v1.35.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   name: argo-rollouts-manager.v0.0.1
@@ -83,6 +83,7 @@ spec:
           - ""
           resources:
           - deployments
+          - podtemplates
           verbs:
           - get
           - list
@@ -93,14 +94,6 @@ spec:
           - pods/eviction
           verbs:
           - create
-        - apiGroups:
-          - ""
-          resources:
-          - podtemplates
-          verbs:
-          - get
-          - list
-          - watch
         - apiGroups:
           - apiextensions.k8s.io
           resources:
@@ -161,34 +154,14 @@ spec:
           resources:
           - analysisruns
           - analysisruns/finalizers
+          - analysistemplates
+          - clusteranalysistemplates
           - experiments
           - experiments/finalizers
-          verbs:
-          - create
-          - delete
-          - deletecollection
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - argoproj.io
-          resources:
-          - analysistemplates
-          verbs:
-          - create
-          - delete
-          - deletecollection
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - argoproj.io
-          resources:
-          - clusteranalysistemplates
+          - rollouts
+          - rollouts/finalizers
+          - rollouts/scale
+          - rollouts/status
           verbs:
           - create
           - delete
@@ -224,22 +197,6 @@ spec:
           - get
           - patch
           - update
-        - apiGroups:
-          - argoproj.io
-          resources:
-          - rollouts
-          - rollouts/finalizers
-          - rollouts/scale
-          - rollouts/status
-          verbs:
-          - create
-          - delete
-          - deletecollection
-          - get
-          - list
-          - patch
-          - update
-          - watch
         - apiGroups:
           - batch
           resources:
@@ -279,6 +236,7 @@ spec:
           - watch
         - apiGroups:
           - getambassador.io
+          - x.getambassador.io
           resources:
           - ambassadormappings
           - mappings
@@ -327,17 +285,6 @@ spec:
           resources:
           - clusterrolebindings
           - clusterroles
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - rbac.authorization.k8s.io
-          resources:
           - rolebindings
           - roles
           verbs:
@@ -375,18 +322,6 @@ spec:
           - traefikservices
           verbs:
           - get
-          - update
-          - watch
-        - apiGroups:
-          - x.getambassador.io
-          resources:
-          - ambassadormappings
-          - mappings
-          verbs:
-          - create
-          - delete
-          - get
-          - list
           - update
           - watch
         - apiGroups:
