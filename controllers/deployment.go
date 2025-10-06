@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strings"
 
 	rolloutsmanagerv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -650,26 +651,37 @@ func boolPtr(val bool) *bool {
 
 // Returns the container image for rollouts controller.
 func getRolloutsContainerImage(cr rolloutsmanagerv1alpha1.RolloutManager) string {
-	defaultImg, defaultTag := false, false
+	img, tag := getRolloutsImageAndTag(ArgoRolloutsImageEnvName, cr.Spec.Image, cr.Spec.Version)
+	return resolveRolloutsImageFromEnv(
+		img,
+		tag,
+	)
+}
 
-	img := cr.Spec.Image
-	tag := cr.Spec.Version
+func resolveRolloutsImageFromEnv(image, tag string) string {
+	return combineImageTag(image, tag)
+}
 
-	// If spec is empty, use the defaults
-	if img == "" {
-		img = DefaultArgoRolloutsImage
-		defaultImg = true
+func getRolloutsImageAndTag(envVar, commonSpecImage, commonSpecVersion string) (string, string) {
+	img := DefaultArgoRolloutsImage
+	tag := DefaultArgoRolloutsVersion
+	if envVal := os.Getenv(envVar); envVal != "" {
+		if envImage, envVersion, found := strings.Cut(envVal, "@"); found {
+			img, tag = envImage, envVersion
+		} else if envImage, envVersion, found := strings.Cut(envVal, ":"); found {
+			img, tag = envImage, envVersion
+		} else {
+			img, tag = envVal, ""
+		}
 	}
-	if tag == "" {
-		tag = DefaultArgoRolloutsVersion
-		defaultTag = true
+	if commonSpecImage != "" {
+		img = commonSpecImage
 	}
 
-	// If an env var is specified then use that, but don't override the spec values (if they are present)
-	if e := os.Getenv(ArgoRolloutsImageEnvName); e != "" && (defaultTag && defaultImg) {
-		return e
+	if commonSpecVersion != "" {
+		tag = commonSpecVersion
 	}
-	return combineImageTag(img, tag)
+	return img, tag
 }
 
 // getRolloutsCommand will return the command for the Rollouts controller component.
