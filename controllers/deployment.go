@@ -678,7 +678,6 @@ func getRolloutsImageAndTag(envVar, commonSpecImage, commonSpecVersion string) (
 
 	// Parse environment variable image if it exists and we need to extract the base image name
 	if envVal != "" {
-		log.Info("Processing environment variable image", "envVal", envVal)
 		baseImageName, err := extractBaseImageName(envVal)
 		if err != nil {
 			log.Error(err, "Failed to parse environment variable image", "envVal", envVal)
@@ -688,8 +687,8 @@ func getRolloutsImageAndTag(envVar, commonSpecImage, commonSpecVersion string) (
 	}
 
 	// Apply spec overrides with container spec taking precedence over common spec
-	image = selectImage(commonSpecImage, image)
-	tag = selectVersion(commonSpecVersion, tag)
+	image = getPriorityValue(commonSpecImage, image)
+	tag = getPriorityValue(commonSpecVersion, tag)
 
 	return image, tag
 }
@@ -714,18 +713,10 @@ func extractBaseImageName(imageRef string) (string, error) {
 	return named.Name(), nil
 }
 
-// selectImage returns the highest priority image from container spec, common spec, or fallback
-func selectImage(commonSpecImage, fallback string) string {
-	if commonSpecImage != "" {
-		return commonSpecImage
-	}
-	return fallback
-}
-
-// selectVersion returns the highest priority version from container spec, common spec, or fallback
-func selectVersion(commonSpecVersion, fallback string) string {
-	if commonSpecVersion != "" {
-		return commonSpecVersion
+// getPriorityValue returns the highest priority value from container spec, fallback
+func getPriorityValue(commonLevelSpec, fallback string) string {
+	if commonLevelSpec != "" {
+		return commonLevelSpec
 	}
 	return fallback
 }
