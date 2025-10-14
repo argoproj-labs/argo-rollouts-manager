@@ -772,7 +772,7 @@ var _ = Describe("getRolloutsContainerImage tests", func() {
 		It("returns the custom image and tag ignoring the environment variable", func() {
 			a.Spec.Image = "custom-image"
 			a.Spec.Version = "custom-tag"
-			os.Setenv("ARGO_ROLLOUTS_IMAGE", "env-image")
+			os.Setenv("ARGO_ROLLOUTS_IMAGE", "quay.io/argoproj/argo-rollouts:latest")
 			Expect(getRolloutsContainerImage(a)).To(Equal("custom-image:custom-tag"))
 		})
 	})

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	rolloutsmanagerv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
+	"github.com/distribution/reference"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -663,25 +664,70 @@ func resolveRolloutsImageFromEnv(image, tag string) string {
 }
 
 func getRolloutsImageAndTag(envVar, commonSpecImage, commonSpecVersion string) (string, string) {
-	img := DefaultArgoRolloutsImage
+	// Start with defaults
+	image := DefaultArgoRolloutsImage
 	tag := DefaultArgoRolloutsVersion
-	if envVal := os.Getenv(envVar); envVal != "" {
-		if envImage, envVersion, found := strings.Cut(envVal, "@"); found {
-			img, tag = envImage, envVersion
-		} else if envImage, envVersion, found := strings.Cut(envVal, ":"); found {
-			img, tag = envImage, envVersion
-		} else {
-			img, tag = envVal, ""
-		}
-	}
-	if commonSpecImage != "" {
-		img = commonSpecImage
+
+	// Check if environment variable is set
+	envVal := os.Getenv(envVar)
+
+	// If no spec values are provided and env var is set, use env var as-is
+	if envVal != "" && commonSpecImage == "" && commonSpecVersion == "" {
+		return envVal, ""
 	}
 
-	if commonSpecVersion != "" {
-		tag = commonSpecVersion
+	// Parse environment variable image if it exists and we need to extract the base image name
+	if envVal != "" {
+		log.Info("Processing environment variable image", "envVal", envVal)
+		baseImageName, err := extractBaseImageName(envVal)
+		if err != nil {
+			log.Error(err, "Failed to parse environment variable image", "envVal", envVal)
+			return "", ""
+		}
+		image = baseImageName
 	}
-	return img, tag
+
+	// Apply spec overrides with container spec taking precedence over common spec
+	image = selectImage(commonSpecImage, image)
+	tag = selectVersion(commonSpecVersion, tag)
+
+	return image, tag
+}
+
+// extractBaseImageName extracts the base image name from a full image reference (removing tag/digest)
+func extractBaseImageName(imageRef string) (string, error) {
+	// Handle digest format (image@sha256:...)
+	if strings.Contains(imageRef, "@") {
+		parts := strings.SplitN(imageRef, "@", 2)
+		named, err := reference.ParseNamed(parts[0])
+		if err != nil {
+			return "", err
+		}
+		return named.Name(), nil
+	}
+
+	// Handle tag format (image:tag) or just image name
+	named, err := reference.ParseNamed(imageRef)
+	if err != nil {
+		return "", err
+	}
+	return named.Name(), nil
+}
+
+// selectImage returns the highest priority image from container spec, common spec, or fallback
+func selectImage(commonSpecImage, fallback string) string {
+	if commonSpecImage != "" {
+		return commonSpecImage
+	}
+	return fallback
+}
+
+// selectVersion returns the highest priority version from container spec, common spec, or fallback
+func selectVersion(commonSpecVersion, fallback string) string {
+	if commonSpecVersion != "" {
+		return commonSpecVersion
+	}
+	return fallback
 }
 
 // getRolloutsCommand will return the command for the Rollouts controller component.
