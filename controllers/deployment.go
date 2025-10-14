@@ -2,10 +2,12 @@ package rollouts
 
 import (
 	"context"
+	"crypto"
+	"crypto/sha256"
 	"fmt"
+	"hash"
 	"os"
 	"reflect"
-	"strings"
 
 	rolloutsmanagerv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 	"github.com/distribution/reference"
@@ -696,21 +698,16 @@ func getRolloutsImageAndTag(envVar, commonSpecImage, commonSpecVersion string) (
 // extractBaseImageName extracts the base image name from a full image reference (removing tag/digest)
 func extractBaseImageName(imageRef string) (string, error) {
 	// Handle digest format (image@sha256:...)
-	if strings.Contains(imageRef, "@") {
-		parts := strings.SplitN(imageRef, "@", 2)
-		named, err := reference.ParseNamed(parts[0])
-		if err != nil {
-			return "", err
-		}
-		return named.Name(), nil
-	}
-
-	// Handle tag format (image:tag) or just image name
-	named, err := reference.ParseNamed(imageRef)
+	crypto.RegisterHash(crypto.SHA256, func() hash.Hash { return sha256.New() })
+	ref, err := reference.Parse(imageRef)
 	if err != nil {
 		return "", err
 	}
-	return named.Name(), nil
+	var name string
+	if named, ok := ref.(reference.Named); ok {
+		name = named.Name()
+	}
+	return name, nil
 }
 
 // getPriorityValue returns the highest priority value from container spec, fallback
