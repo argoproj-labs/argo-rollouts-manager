@@ -2,10 +2,7 @@ package rollouts
 
 import (
 	"context"
-	"crypto"
-	"crypto/sha256"
 	"fmt"
-	"hash"
 	"os"
 	"reflect"
 
@@ -324,10 +321,15 @@ func rolloutsContainer(cr rolloutsmanagerv1alpha1.RolloutManager) (corev1.Contai
 		return corev1.Container{}, err
 	}
 
+	image, err := getRolloutsContainerImage(cr)
+	if err != nil {
+		return corev1.Container{}, err
+	}
+
 	return corev1.Container{
 		Args:            commandArgs,
 		Env:             rolloutsEnv,
-		Image:           getRolloutsContainerImage(cr),
+		Image:           image,
 		ImagePullPolicy: corev1.PullAlways,
 		LivenessProbe: &corev1.Probe{
 			FailureThreshold: 3,
@@ -653,52 +655,51 @@ func boolPtr(val bool) *bool {
 }
 
 // Returns the container image for rollouts controller.
-func getRolloutsContainerImage(cr rolloutsmanagerv1alpha1.RolloutManager) string {
-	img, tag := getRolloutsImageAndTag(ArgoRolloutsImageEnvName, cr.Spec.Image, cr.Spec.Version)
-	return resolveRolloutsImageFromEnv(
-		img,
-		tag,
-	)
-}
+func getRolloutsContainerImage(cr rolloutsmanagerv1alpha1.RolloutManager) (string, error) {
 
-func resolveRolloutsImageFromEnv(image, tag string) string {
-	return combineImageTag(image, tag)
-}
+	// Order of priority:
+	// 1) cr.spec.image/tag
+	// 2) env
+	// 3) default images
 
-func getRolloutsImageAndTag(envVar, commonSpecImage, commonSpecVersion string) (string, string) {
-	// Start with defaults
-	image := DefaultArgoRolloutsImage
-	tag := DefaultArgoRolloutsVersion
+	image := cr.Spec.Image
+	tag := cr.Spec.Version
 
 	// Check if environment variable is set
-	envVal := os.Getenv(envVar)
+	envVal := os.Getenv(ArgoRolloutsImageEnvName)
 
-	// If no spec values are provided and env var is set, use env var as-is
-	if envVal != "" && commonSpecImage == "" && commonSpecVersion == "" {
-		return envVal, ""
-	}
-
-	// Parse environment variable image if it exists and we need to extract the base image name
 	if envVal != "" {
-		baseImageName, err := extractBaseImageName(envVal)
-		if err != nil {
-			log.Error(err, "Failed to parse environment variable image", "envVal", envVal)
-			return "", ""
+
+		// If no spec values are provided and env var is set, use env var as-is
+		if image == "" && tag == "" {
+			return envVal, nil
 		}
-		image = baseImageName
+
+		// If no cr.Spec.Image, use value from env
+		if image == "" {
+			// Parse environment variable image if it exists and extract the base image name
+			baseImageName, err := extractBaseImageName(envVal)
+			if err != nil {
+				log.Error(err, "Failed to parse environment variable image", "envVal", envVal)
+				return "", err
+			}
+			image = baseImageName
+		}
+
 	}
 
-	// Apply spec overrides with container spec taking precedence over common spec
-	image = getPriorityValue(commonSpecImage, image)
-	tag = getPriorityValue(commonSpecVersion, tag)
+	if image == "" {
+		image = DefaultArgoRolloutsImage
+	}
+	if tag == "" {
+		tag = DefaultArgoRolloutsVersion
+	}
 
-	return image, tag
+	return combineImageTag(image, tag), nil
 }
 
 // extractBaseImageName extracts the base image name from a full image reference (removing tag/digest)
 func extractBaseImageName(imageRef string) (string, error) {
-	// Handle digest format (image@sha256:...)
-	crypto.RegisterHash(crypto.SHA256, func() hash.Hash { return sha256.New() })
 	ref, err := reference.Parse(imageRef)
 	if err != nil {
 		return "", err
@@ -706,16 +707,10 @@ func extractBaseImageName(imageRef string) (string, error) {
 	var name string
 	if named, ok := ref.(reference.Named); ok {
 		name = named.Name()
+	} else {
+		return "", fmt.Errorf("unable to extract base image name: %s", imageRef)
 	}
 	return name, nil
-}
-
-// getPriorityValue returns the highest priority value from container spec, fallback
-func getPriorityValue(commonLevelSpec, fallback string) string {
-	if commonLevelSpec != "" {
-		return commonLevelSpec
-	}
-	return fallback
 }
 
 // getRolloutsCommand will return the command for the Rollouts controller component.

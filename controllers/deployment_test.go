@@ -727,7 +727,6 @@ var _ = Describe("getRolloutsContainerImage tests", func() {
 	})
 
 	AfterEach(func() {
-		a = *makeTestRolloutManager()
 		os.Unsetenv("ARGO_ROLLOUTS_IMAGE") // Ensure env variable is not set unless needed
 	})
 
@@ -735,21 +734,29 @@ var _ = Describe("getRolloutsContainerImage tests", func() {
 		It("returns the default image and tag combined", func() {
 			a.Spec.Image = ""
 			a.Spec.Version = ""
-			Expect(getRolloutsContainerImage(a)).To(Equal(DefaultArgoRolloutsImage + ":" + DefaultArgoRolloutsVersion))
+			img, err := getRolloutsContainerImage(a)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(img).To(Equal(DefaultArgoRolloutsImage + ":" + DefaultArgoRolloutsVersion))
 		})
 	})
 
 	When("the spec Image is set but Version is empty", func() {
 		It("returns the custom image with the default tag", func() {
 			a.Spec.Image = "custom-image"
-			Expect(getRolloutsContainerImage(a)).To(Equal("custom-image:" + DefaultArgoRolloutsVersion))
+			a.Spec.Version = ""
+			img, err := getRolloutsContainerImage(a)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(img).To(Equal("custom-image:" + DefaultArgoRolloutsVersion))
 		})
 	})
 
 	When("the spec Image is empty but Version is set", func() {
 		It("returns the default image with the custom tag", func() {
+			a.Spec.Image = ""
 			a.Spec.Version = "custom-tag"
-			Expect(getRolloutsContainerImage(a)).To(Equal(DefaultArgoRolloutsImage + ":custom-tag"))
+			img, err := getRolloutsContainerImage(a)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(img).To(Equal(DefaultArgoRolloutsImage + ":custom-tag"))
 		})
 	})
 
@@ -757,14 +764,44 @@ var _ = Describe("getRolloutsContainerImage tests", func() {
 		It("returns the custom image and custom tag combined", func() {
 			a.Spec.Image = "custom-image"
 			a.Spec.Version = "custom-tag"
-			Expect(getRolloutsContainerImage(a)).To(Equal("custom-image:custom-tag"))
+			img, err := getRolloutsContainerImage(a)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(img).To(Equal("custom-image:custom-tag"))
 		})
 	})
 
 	When("the environment variable is set and spec is empty", func() {
 		It("returns the environment variable image", func() {
-			os.Setenv("ARGO_ROLLOUTS_IMAGE", "env-image")
-			Expect(getRolloutsContainerImage(a)).To(Equal("env-image"))
+			a.Spec.Image = ""
+			a.Spec.Version = ""
+			os.Setenv("ARGO_ROLLOUTS_IMAGE", "quay.io/argoproj/argo-rollouts-custom:latest@sha256:841328df1b9f8c4087adbdcfec6cc99ac8308805dea83f6d415d6fb8d40227c1")
+
+			img, err := getRolloutsContainerImage(a)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(img).To(Equal("quay.io/argoproj/argo-rollouts-custom:latest@sha256:841328df1b9f8c4087adbdcfec6cc99ac8308805dea83f6d415d6fb8d40227c1"))
+		})
+	})
+
+	When("the environment variable is set and version is set, but env contains unparseable image", func() {
+		It("returns an error", func() {
+			a.Spec.Image = ""
+			a.Spec.Version = "custom-tag"
+			os.Setenv("ARGO_ROLLOUTS_IMAGE", "quay.io/argoproj/argo-rollouts-custom:latest@sha256:invalidsha256")
+
+			_, err := getRolloutsContainerImage(a)
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	When("the environment variable is set and image/version are set, but env contains unparseable image", func() {
+		It("does not return an error since env var does not need to be parsed", func() {
+			a.Spec.Image = "custom-image"
+			a.Spec.Version = "custom-tag"
+			os.Setenv("ARGO_ROLLOUTS_IMAGE", "quay.io/argoproj/argo-rollouts-custom:latest@sha256:invalidsha256")
+
+			img, err := getRolloutsContainerImage(a)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(img).To(Equal("custom-image:custom-tag"))
 		})
 	})
 
@@ -772,10 +809,38 @@ var _ = Describe("getRolloutsContainerImage tests", func() {
 		It("returns the custom image and tag ignoring the environment variable", func() {
 			a.Spec.Image = "custom-image"
 			a.Spec.Version = "custom-tag"
-			os.Setenv("ARGO_ROLLOUTS_IMAGE", "quay.io/argoproj/argo-rollouts:latest")
-			Expect(getRolloutsContainerImage(a)).To(Equal("custom-image:custom-tag"))
+			os.Setenv("ARGO_ROLLOUTS_IMAGE", "quay.io/argoproj/argo-rollouts-custom:latest")
+			img, err := getRolloutsContainerImage(a)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(img).To(Equal("custom-image:custom-tag"))
 		})
 	})
+
+	When("the environment variable is set, and spec version is set", func() {
+		It("returns the env var image with tag from spec", func() {
+			a.Spec.Image = ""
+			a.Spec.Version = "custom-tag"
+			os.Setenv("ARGO_ROLLOUTS_IMAGE", "quay.io/argoproj/argo-rollouts-custom:latest")
+
+			img, err := getRolloutsContainerImage(a)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(img).To(Equal("quay.io/argoproj/argo-rollouts-custom:custom-tag"))
+		})
+	})
+
+	When("the environment variable is set with a full sha256 value, and spec version is set", func() {
+		It("returns the env var image with tag from spec", func() {
+			a.Spec.Image = ""
+			a.Spec.Version = "custom-tag"
+			os.Setenv("ARGO_ROLLOUTS_IMAGE", "quay.io/argoproj/argo-rollouts-custom:latest@sha256:841328df1b9f8c4087adbdcfec6cc99ac8308805dea83f6d415d6fb8d40227c1")
+
+			img, err := getRolloutsContainerImage(a)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(img).To(Equal("quay.io/argoproj/argo-rollouts-custom:custom-tag"))
+		})
+	})
+
 })
 
 var _ = Describe("rolloutsContainer tests", func() {
