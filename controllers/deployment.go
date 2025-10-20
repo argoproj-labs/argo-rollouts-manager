@@ -7,6 +7,7 @@ import (
 	"reflect"
 
 	rolloutsmanagerv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
+	"github.com/distribution/reference"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -320,10 +321,15 @@ func rolloutsContainer(cr rolloutsmanagerv1alpha1.RolloutManager) (corev1.Contai
 		return corev1.Container{}, err
 	}
 
+	image, err := getRolloutsContainerImage(cr)
+	if err != nil {
+		return corev1.Container{}, err
+	}
+
 	return corev1.Container{
 		Args:            commandArgs,
 		Env:             rolloutsEnv,
-		Image:           getRolloutsContainerImage(cr),
+		Image:           image,
 		ImagePullPolicy: corev1.PullAlways,
 		LivenessProbe: &corev1.Probe{
 			FailureThreshold: 3,
@@ -649,27 +655,62 @@ func boolPtr(val bool) *bool {
 }
 
 // Returns the container image for rollouts controller.
-func getRolloutsContainerImage(cr rolloutsmanagerv1alpha1.RolloutManager) string {
-	defaultImg, defaultTag := false, false
+func getRolloutsContainerImage(cr rolloutsmanagerv1alpha1.RolloutManager) (string, error) {
 
-	img := cr.Spec.Image
+	// Order of priority:
+	// 1) cr.spec.image/tag
+	// 2) env
+	// 3) default images
+
+	image := cr.Spec.Image
 	tag := cr.Spec.Version
 
-	// If spec is empty, use the defaults
-	if img == "" {
-		img = DefaultArgoRolloutsImage
-		defaultImg = true
+	// Check if environment variable is set
+	envVal := os.Getenv(ArgoRolloutsImageEnvName)
+
+	if envVal != "" {
+
+		// If no spec values are provided and env var is set, use env var as-is
+		if image == "" && tag == "" {
+			return envVal, nil
+		}
+
+		// If no cr.Spec.Image, use value from env
+		if image == "" {
+			// Parse environment variable image if it exists and extract the base image name
+			baseImageName, err := extractBaseImageName(envVal)
+			if err != nil {
+				log.Error(err, "Failed to parse environment variable image", "envVal", envVal)
+				return "", err
+			}
+			image = baseImageName
+		}
+
+	}
+
+	if image == "" {
+		image = DefaultArgoRolloutsImage
 	}
 	if tag == "" {
 		tag = DefaultArgoRolloutsVersion
-		defaultTag = true
 	}
 
-	// If an env var is specified then use that, but don't override the spec values (if they are present)
-	if e := os.Getenv(ArgoRolloutsImageEnvName); e != "" && (defaultTag && defaultImg) {
-		return e
+	return combineImageTag(image, tag), nil
+}
+
+// extractBaseImageName extracts the base image name from a full image reference (removing tag/digest)
+func extractBaseImageName(imageRef string) (string, error) {
+	ref, err := reference.Parse(imageRef)
+	if err != nil {
+		return "", err
 	}
-	return combineImageTag(img, tag)
+	var name string
+	if named, ok := ref.(reference.Named); ok {
+		name = named.Name()
+	} else {
+		return "", fmt.Errorf("unable to extract base image name: %s", imageRef)
+	}
+	return name, nil
 }
 
 // getRolloutsCommand will return the command for the Rollouts controller component.
