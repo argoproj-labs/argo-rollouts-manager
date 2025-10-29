@@ -12,14 +12,6 @@ func main() {
 
 	// As of March 2024 (Rollouts v1.6.6):
 	//
-	// Always fail:
-	// - TestAPISIXCanarySetHeaderStep
-	// - TestExperimentWithDryRunMetrics (also fails when running upstream rollouts as a container)
-	// - TestControllerMetrics (also fails when running upstream rollouts as a container)
-	//
-	// Often fail:
-	// - TestBlueGreenPromoteFull
-	//
 	// Intermittently fail:
 	// - TestCanaryDynamicStableScale
 	// - TestCanaryScaleDownOnAbort
@@ -36,9 +28,8 @@ func main() {
 		"TestExperimentSuite/TestExperimentWithDryRunMetrics",
 		"TestFunctionalSuite/TestControllerMetrics",
 		"TestFunctionalSuite/TestBlueGreenPromoteFull",
+		"TestAnalysisSuite/TestCanaryInconclusiveBackgroundAnalysis",
 	}
-
-	// DONE 6 runs, 144 tests, 6 skipped, 47 failures in 2279.668s
 
 	// 1) Read E2E test log, output by run-upstream-argo-rollouts-e2e-tests.sh
 	if len(os.Args) != 2 {

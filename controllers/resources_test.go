@@ -899,7 +899,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 
 					res, err := r.Reconcile(ctx, req)
 					Expect(err).NotTo(HaveOccurred())
-					Expect(res.Requeue).Should(BeFalse(), "reconcile should not requeue request")
+					Expect(res.RequeueAfter).Should(BeZero(), "reconcile should not requeue request")
 
 					err = r.Client.Delete(ctx, a)
 					Expect(err).ToNot(HaveOccurred())
@@ -949,7 +949,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 
 			res, err := r.Reconcile(ctx, req)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(res.Requeue).Should(BeFalse(), "reconcile should not requeue request")
+			Expect(res.RequeueAfter).Should(BeZero(), "reconcile should not requeue request")
 
 			expectedServiceMonitor := serviceMonitor()
 
@@ -1004,7 +1004,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 
 			res, err := r.Reconcile(ctx, req)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(res.Requeue).Should(BeFalse(), "reconcile should not requeue request")
+			Expect(res.RequeueAfter).Should(BeZero(), "reconcile should not requeue request")
 
 			expectedSM := serviceMonitor()
 
@@ -1030,7 +1030,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 		It("Verify ServiceMonitor is not created if the CRD does not exist.", func() {
 			res, err := r.Reconcile(ctx, req)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(res.Requeue).Should(BeFalse(), "reconcile should not requeue request")
+			Expect(res.RequeueAfter).Should(BeZero(), "reconcile should not requeue request")
 
 			sm := &monitoringv1.ServiceMonitor{}
 			Expect(r.Client.Get(ctx, types.NamespacedName{
