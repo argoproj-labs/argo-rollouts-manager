@@ -56,7 +56,7 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 
 			res, err := r.Reconcile(ctx, req)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(res.Requeue).Should(BeFalse(), "reconcile should not requeue request")
+			Expect(res.RequeueAfter).Should(BeZero(), "reconcile should not requeue request")
 
 			By("Check if RolloutManager's Status.Conditions are set.")
 			Expect(r.Client.Get(ctx, types.NamespacedName{Name: rm.Name, Namespace: rm.Namespace}, rm)).To(Succeed())
@@ -102,7 +102,7 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 
 			res, err := r.Reconcile(ctx, req)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(res.Requeue).Should(BeFalse(), "reconcile should not requeue request")
+			Expect(res.RequeueAfter).Should(BeZero(), "reconcile should not requeue request")
 
 			By("Check if RolloutManager's Status.Conditions are set.")
 			Expect(r.Client.Get(ctx, types.NamespacedName{Name: rm.Name, Namespace: rm.Namespace}, rm)).To(Succeed())
@@ -129,7 +129,7 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 
 			res, err := r.Reconcile(ctx, req)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(res.Requeue).Should(BeFalse(), "reconcile should not requeue request")
+			Expect(res.RequeueAfter).Should(BeZero(), "reconcile should not requeue request")
 
 			By("1st RM: Check if RolloutManager's Status.Conditions are set.")
 			Expect(r.Client.Get(ctx, types.NamespacedName{Name: rm.Name, Namespace: rm.Namespace}, rm)).To(Succeed())
@@ -153,7 +153,7 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 
 			res2, err := r2.Reconcile(ctx, req2)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(res2.Requeue).Should(BeFalse(), "reconcile should not requeue request")
+			Expect(res2.RequeueAfter).Should(BeZero(), "reconcile should not requeue request")
 
 			By("2nd RM: Check if RolloutManager's Status.Conditions are set.")
 			Expect(r2.Client.Get(ctx, types.NamespacedName{Name: rm2.Name, Namespace: rm2.Namespace}, rm2)).To(Succeed())
@@ -196,7 +196,7 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 
 			res, err := r.Reconcile(ctx, req)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(res.Requeue).Should(BeFalse(), "reconcile should not requeue request")
+			Expect(res.RequeueAfter).Should(BeZero(), "reconcile should not requeue request")
 
 			By("1st RM: Check if RolloutManager's Status.Conditions are set.")
 			Expect(r.Client.Get(ctx, types.NamespacedName{Name: rm.Name, Namespace: rm.Namespace}, rm)).To(Succeed())
@@ -225,7 +225,7 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 
 			res2, err := r.Reconcile(ctx, req2)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(res2.Requeue).Should(BeFalse(), "reconcile should not requeue request")
+			Expect(res2.RequeueAfter).Should(BeZero(), "reconcile should not requeue request")
 
 			By("2nd RM: Check if RolloutManager's Status.Conditions are set.")
 			Expect(r.Client.Get(ctx, types.NamespacedName{Name: rm2.Name, Namespace: rm2.Namespace}, rm2)).To(Succeed())
@@ -237,7 +237,7 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 			By("1st RM: Reconcile 1st RolloutManager's once again and check it is also failed.")
 			res, err = r.Reconcile(ctx, req)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(res.Requeue).Should(BeFalse(), "reconcile should not requeue request")
+			Expect(res.RequeueAfter).Should(BeZero(), "reconcile should not requeue request")
 
 			By("1st RM: Check if RolloutManager's Status.Conditions are set.")
 			Expect(r.Client.Get(ctx, types.NamespacedName{Name: rm.Name, Namespace: rm.Namespace}, rm)).To(Succeed())
@@ -253,7 +253,7 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 			By("2nd RM: Reconcile 2nd RolloutManager's once again and check whether it has removed failed condition.")
 			res2, err = r.Reconcile(ctx, req2)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(res2.Requeue).Should(BeFalse(), "reconcile should not requeue request")
+			Expect(res2.RequeueAfter).Should(BeZero(), "reconcile should not requeue request")
 
 			By("2nd RM: Check if RolloutManager's Status.Conditions are set.")
 			Expect(r.Client.Get(ctx, types.NamespacedName{Name: rm2.Name, Namespace: rm2.Namespace}, rm2)).To(Succeed())
@@ -285,7 +285,7 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 
 			res, err := r.Reconcile(ctx, req)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(res.Requeue).Should(BeFalse(), "reconcile should not requeue request")
+			Expect(res.RequeueAfter).Should(BeZero(), "reconcile should not requeue request")
 
 			By("Check if RolloutManager's Status.Conditions are set.")
 			Expect(r.Client.Get(ctx, types.NamespacedName{Name: rm.Name, Namespace: rm.Namespace}, rm)).To(Succeed())
@@ -329,7 +329,7 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 
 			res, err := r.Reconcile(ctx, req)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(res.Requeue).Should(BeFalse(), "reconcile should not requeue request")
+			Expect(res.RequeueAfter).Should(BeZero(), "reconcile should not requeue request")
 
 			By("Check if RolloutManager's Status.Conditions are set.")
 			Expect(r.Client.Get(ctx, types.NamespacedName{Name: rm.Name, Namespace: rm.Namespace}, rm)).To(Succeed())
@@ -355,7 +355,7 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 
 			res, err := r.Reconcile(ctx, req)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(res.Requeue).Should(BeFalse(), "reconcile should not requeue request")
+			Expect(res.RequeueAfter).Should(BeZero(), "reconcile should not requeue request")
 
 			By("1st RM: Check if RolloutManager's Status.Conditions are set.")
 			Expect(r.Client.Get(ctx, types.NamespacedName{Name: rm.Name, Namespace: rm.Namespace}, rm)).To(Succeed())
@@ -384,7 +384,7 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 
 			res2, err := r2.Reconcile(ctx, req2)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(res2.Requeue).Should(BeFalse(), "reconcile should not requeue request")
+			Expect(res2.RequeueAfter).Should(BeZero(), "reconcile should not requeue request")
 
 			By("2nd RM: Check if RolloutManager's Status.Conditions are set.")
 			Expect(r2.Client.Get(ctx, types.NamespacedName{Name: rm2.Name, Namespace: rm2.Namespace}, rm2)).To(Succeed())
@@ -431,7 +431,7 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 
 			res, err := r.Reconcile(ctx, req)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(res.Requeue).Should(BeFalse(), "reconcile should not requeue request")
+			Expect(res.RequeueAfter).Should(BeZero(), "reconcile should not requeue request")
 
 			By("1st RM: Check if RolloutManager's Status.Conditions are set.")
 			Expect(r.Client.Get(ctx, types.NamespacedName{Name: rm.Name, Namespace: rm.Namespace}, rm)).To(Succeed())
@@ -464,7 +464,7 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 
 			res2, err := r2.Reconcile(ctx, req2)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(res2.Requeue).Should(BeFalse(), "reconcile should not requeue request")
+			Expect(res2.RequeueAfter).Should(BeZero(), "reconcile should not requeue request")
 
 			By("2nd RM: Check if RolloutManager's Status.Conditions are set.")
 			Expect(r2.Client.Get(ctx, types.NamespacedName{Name: rm2.Name, Namespace: rm2.Namespace}, rm2)).To(Succeed())
@@ -510,7 +510,7 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 
 			res, err := r.Reconcile(ctx, req)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(res.Requeue).Should(BeFalse(), "reconcile should not requeue request")
+			Expect(res.RequeueAfter).Should(BeZero(), "reconcile should not requeue request")
 
 			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(clusterRoleBinding), clusterRoleBinding)).ToNot(Succeed(), "should have been deleted by Reconcile call")
 			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(clusterRole), clusterRole)).ToNot(Succeed(), "should have been deleted by Reconcile call")
