@@ -266,3 +266,8 @@ func listE2ETestNamespaces(ctx context.Context, k8sClient client.Client) (corev1
 	}
 	return nsList, nil
 }
+
+func EnvLocalRun() bool {
+	_, exists := os.LookupEnv("LOCAL_RUN")
+	return exists
+}

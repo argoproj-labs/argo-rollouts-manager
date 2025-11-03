@@ -42,4 +42,6 @@ const (
 	KubernetesHostnameLabel = "kubernetes.io/hostname"
 
 	TopologyKubernetesZoneLabel = "topology.kubernetes.io/zone"
+
+	ImagePullPolicy = "IMAGE_PULL_POLICY"
 )
