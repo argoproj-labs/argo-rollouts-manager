@@ -736,8 +736,8 @@ func (r *RolloutManagerReconciler) reconcileRolloutsSecrets(ctx context.Context,
 	}
 
 	setRolloutsLabelsAndAnnotationsToObject(&expectedSecret.ObjectMeta, cr)
-	if r.ArgoRolloutsCustomLabel != nil {
-		setCustomLabels(&expectedSecret.ObjectMeta, r.ArgoRolloutsCustomLabel)
+	if r.ResourceLabels != nil {
+		setCustomLabels(&expectedSecret.ObjectMeta, r.ResourceLabels)
 	}
 
 	// If the Secret doesn't exist (or an unrelated error occurred)....
