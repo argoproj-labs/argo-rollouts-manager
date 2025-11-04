@@ -14,3 +14,4 @@ spec:
    - bar
   image: "quay.io/random/my-rollout-image"
   version: "sha256:...."
+  imagePullPolicy: "IfNotPresent"

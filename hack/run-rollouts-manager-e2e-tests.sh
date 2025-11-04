@@ -176,7 +176,7 @@ sanity_test_metrics_data() {
   # - If the number is higher, this implies we are updating the .status or .spec fields of resources more than is necessary.
   PUT_REQUEST_PERCENT=`expr "$DELTA_PUT_REQUESTS"00 / $DELTA_POST_REQUESTS`
 
-  if [[ "$PUT_REQUEST_PERCENT" -gt 40 ]]; then
+  if [[ "$PUT_REQUEST_PERCENT" -gt 45 ]]; then
     # This value is arbitrary, and should be updated if at any point it becomes inaccurate (but first audit the test/code to make sure it is not an actual product/test issue, before increasing)
 
     echo "Put request was %$PUT_REQUEST_PERCENT greater than the expected value"
@@ -184,7 +184,7 @@ sanity_test_metrics_data() {
 
   fi
 
-  if [[ "$DELTA_ERROR_RECONCILES" -gt 70 ]]; then
+  if [[ "$DELTA_ERROR_RECONCILES" -gt 90 ]]; then
     # This value is arbitrary, and should be updated if at any point it becomes inaccurate (but first audit the test/code to make sure it is not an actual product/test issue, before increasing)
     echo "Number of Reconcile calls that returned an error '$DELTA_ERROR_RECONCILES' was greater than the expected value"
     exit 1

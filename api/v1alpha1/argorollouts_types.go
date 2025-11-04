@@ -58,6 +58,12 @@ type RolloutManagerSpec struct {
 
 	// HA options for High Availability support for Rollouts.
 	HA *RolloutManagerHASpec `json:"ha,omitempty"`
+
+	// ImagePullPolicy specifies the image pull policy for the Rollouts controller.
+	// Valid values are: Always, IfNotPresent, Never
+	// +kubebuilder:validation:Enum=Always;IfNotPresent;Never
+	// +optional
+	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 }
 
 // Plugin is used to integrate traffic management and metric plugins into the Argo Rollouts controller. For more information on these plugins, see the upstream Argo Rollouts documentation.

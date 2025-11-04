@@ -326,11 +326,16 @@ func rolloutsContainer(cr rolloutsmanagerv1alpha1.RolloutManager) (corev1.Contai
 		return corev1.Container{}, err
 	}
 
+	imagePullPolicy, err := getImagePullPolicy(cr)
+	if err != nil {
+		return corev1.Container{}, err
+	}
+
 	return corev1.Container{
 		Args:            commandArgs,
 		Env:             rolloutsEnv,
 		Image:           image,
-		ImagePullPolicy: corev1.PullAlways,
+		ImagePullPolicy: imagePullPolicy,
 		LivenessProbe: &corev1.Probe{
 			FailureThreshold: 3,
 			ProbeHandler: corev1.ProbeHandler{
@@ -711,6 +716,36 @@ func extractBaseImageName(imageRef string) (string, error) {
 		return "", fmt.Errorf("unable to extract base image name: %s", imageRef)
 	}
 	return name, nil
+}
+
+// getImagePullPolicy returns the image pull policy for the rollouts container.
+// Order of priority:
+// 1) cr.spec.imagePullPolicy
+// 2) IMAGE_PULL_POLICY environment variable
+// 3) default: corev1.PullIfNotPresent
+func getImagePullPolicy(cr rolloutsmanagerv1alpha1.RolloutManager) (corev1.PullPolicy, error) {
+	// First priority: use value from CR spec
+	if cr.Spec.ImagePullPolicy != "" {
+		return cr.Spec.ImagePullPolicy, nil
+	}
+
+	// Second priority: check environment variable
+	envVal := os.Getenv(ImagePullPolicy)
+	if envVal != "" {
+		switch envVal {
+		case string(corev1.PullAlways):
+			return corev1.PullAlways, nil
+		case string(corev1.PullIfNotPresent):
+			return corev1.PullIfNotPresent, nil
+		case string(corev1.PullNever):
+			return corev1.PullNever, nil
+		default:
+			return "", fmt.Errorf("Invalid IMAGE_PULL_POLICY environment variable value: %s", envVal)
+		}
+	}
+
+	// Default: PullIfNotPresent
+	return corev1.PullIfNotPresent, nil
 }
 
 // getRolloutsCommand will return the command for the Rollouts controller component.
