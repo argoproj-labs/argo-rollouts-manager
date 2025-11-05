@@ -539,6 +539,9 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 		})
 
 		It("Test for Custom Labels for secrets created by Rollouts Manager function", func() {
+			r = makeTestReconcilerWithCustomLabels(map[string]string{
+				"custom1": "value",
+			}, &a)
 			Expect(r.reconcileRolloutsSecrets(ctx, a)).To(Succeed())
 			secret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{

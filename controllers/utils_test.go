@@ -792,11 +792,30 @@ func makeTestReconciler(obj ...client.Object) *RolloutManagerReconciler {
 	cl := fake.NewClientBuilder().WithScheme(s).WithStatusSubresource(obj...).WithObjects(obj...).Build()
 
 	return &RolloutManagerReconciler{
-		Client: cl,
-		Scheme: s,
-		ResourceLabels: map[string]string{
-			"custom1": "value",
-		},
+		Client:                       cl,
+		Scheme:                       s,
+		OpenShiftRoutePluginLocation: "file://non-empty-test-url", // Set a non-real, non-empty value for unit tests: override this to test a specific value
+	}
+}
+
+func makeTestReconcilerWithCustomLabels(resourceLabels map[string]string, obj ...client.Object) *RolloutManagerReconciler {
+	s := scheme.Scheme
+
+	err := rolloutsmanagerv1alpha1.AddToScheme(s)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = monitoringv1.AddToScheme(s)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = crdv1.AddToScheme(s)
+	Expect(err).ToNot(HaveOccurred())
+
+	cl := fake.NewClientBuilder().WithScheme(s).WithStatusSubresource(obj...).WithObjects(obj...).Build()
+
+	return &RolloutManagerReconciler{
+		Client:                       cl,
+		Scheme:                       s,
+		ResourceLabels:               resourceLabels,
 		OpenShiftRoutePluginLocation: "file://non-empty-test-url", // Set a non-real, non-empty value for unit tests: override this to test a specific value
 	}
 }

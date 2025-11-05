@@ -76,6 +76,9 @@ var _ = Describe("ConfigMap Test", func() {
 	})
 
 	It("verifies that the custom labels are added to the ConfigMap", func() {
+		r = makeTestReconcilerWithCustomLabels(map[string]string{
+			"custom1": "value",
+		}, &a)
 		expectedConfigMap := &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: DefaultRolloutsConfigMapName,
