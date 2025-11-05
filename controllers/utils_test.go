@@ -798,6 +798,28 @@ func makeTestReconciler(obj ...client.Object) *RolloutManagerReconciler {
 	}
 }
 
+func makeTestReconcilerWithCustomLabels(resourceLabels map[string]string, obj ...client.Object) *RolloutManagerReconciler {
+	s := scheme.Scheme
+
+	err := rolloutsmanagerv1alpha1.AddToScheme(s)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = monitoringv1.AddToScheme(s)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = crdv1.AddToScheme(s)
+	Expect(err).ToNot(HaveOccurred())
+
+	cl := fake.NewClientBuilder().WithScheme(s).WithStatusSubresource(obj...).WithObjects(obj...).Build()
+
+	return &RolloutManagerReconciler{
+		Client:                       cl,
+		Scheme:                       s,
+		ResourceLabels:               resourceLabels,
+		OpenShiftRoutePluginLocation: "file://non-empty-test-url", // Set a non-real, non-empty value for unit tests: override this to test a specific value
+	}
+}
+
 func createNamespace(r *RolloutManagerReconciler, n string) error {
 	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: n}}
 	return r.Client.Create(context.Background(), ns)

@@ -41,6 +41,9 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr ro
 	}
 
 	setRolloutsLabelsAndAnnotationsToObject(&desiredConfigMap.ObjectMeta, cr)
+	if r.ResourceLabels != nil {
+		setCustomLabels(&desiredConfigMap.ObjectMeta, r.ResourceLabels)
+	}
 
 	trafficRouterPluginsMap := map[string]pluginItem{
 		OpenShiftRolloutPluginName: {

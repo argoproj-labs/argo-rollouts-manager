@@ -538,6 +538,29 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 			Expect(secret.ObjectMeta.Annotations["keyannotation"]).To(Equal(a.Spec.AdditionalMetadata.Annotations["keyannotation"]))
 		})
 
+		It("Test for Custom Labels for secrets created by Rollouts Manager function", func() {
+			r = makeTestReconcilerWithCustomLabels(map[string]string{
+				"custom1": "value",
+			}, &a)
+			Expect(r.reconcileRolloutsSecrets(ctx, a)).To(Succeed())
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      DefaultRolloutsNotificationSecretName,
+					Namespace: a.Namespace,
+					Labels: map[string]string{
+						"app.kubernetes.io/component": "argo-rollouts",
+						"app.kubernetes.io/name":      "argo-rollouts",
+						"app.kubernetes.io/part-of":   "argo-rollouts",
+						"custom1":                     "value",
+						"keylabel":                    "valuelabel",
+					},
+				},
+			}
+			fetchedSecret := &corev1.Secret{}
+			Expect(fetchObject(ctx, r.Client, a.Namespace, secret.Name, fetchedSecret)).To(Succeed())
+			Expect(fetchedSecret.ObjectMeta.Labels).To(Equal(secret.ObjectMeta.Labels))
+		})
+
 		It("test for removeClusterScopedResourcesIfApplicable function", func() {
 
 			By("creating default cluster-scoped ClusterRole/ClusterRoleBinding. These should be deleted by the call to removeClusterScopedResourcesIfApplicable")

@@ -75,6 +75,40 @@ var _ = Describe("ConfigMap Test", func() {
 
 	})
 
+	It("verifies that the custom labels are added to the ConfigMap", func() {
+		r = makeTestReconcilerWithCustomLabels(map[string]string{
+			"custom1": "value",
+		}, &a)
+		expectedConfigMap := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: DefaultRolloutsConfigMapName,
+				Labels: map[string]string{
+					"custom1":                     "value",
+					"app.kubernetes.io/component": DefaultArgoRolloutsResourceName,
+					"app.kubernetes.io/name":      DefaultArgoRolloutsResourceName,
+					"app.kubernetes.io/part-of":   DefaultArgoRolloutsResourceName,
+				},
+			},
+		}
+
+		By("Call reconcileConfigMap")
+		Expect(r.reconcileConfigMap(ctx, a)).To(Succeed())
+
+		By("Verify that the fetched ConfigMap matches the desired one")
+
+		fetchedConfigMap := &corev1.ConfigMap{}
+		Expect(fetchObject(ctx, r.Client, a.Namespace, expectedConfigMap.Name, fetchedConfigMap)).To(Succeed())
+
+		Expect(fetchedConfigMap.Labels).To(Equal(expectedConfigMap.Labels))
+
+		By("Call reconcileConfigMap again")
+		Expect(r.reconcileConfigMap(ctx, a)).To(Succeed())
+
+		By("verifying that the data is still present")
+		Expect(fetchedConfigMap.Labels).To(Equal(expectedConfigMap.Labels))
+
+	})
+
 	It("verifies traffic and metric plugin creation/modification and ensures OpenShiftRolloutPlugin existence", func() {
 		By("Add a pod that matches the deployment's selector")
 		addTestPodToFakeClient(r, a.Namespace, existingDeployment)

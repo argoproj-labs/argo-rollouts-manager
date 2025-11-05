@@ -66,6 +66,17 @@ func setRolloutsLabelsAndAnnotations(obj *metav1.ObjectMeta) {
 	obj.Labels["app.kubernetes.io/component"] = DefaultArgoRolloutsResourceName
 }
 
+func setCustomLabels(obj *metav1.ObjectMeta, customLabels map[string]string) {
+	if obj.Labels == nil {
+		obj.Labels = map[string]string{}
+	}
+
+	for k, v := range customLabels {
+		obj.Labels[k] = v
+	}
+
+}
+
 // fetchObject will retrieve the object with the given namespace and name using the Kubernetes API.
 // The result will be stored in the given object.
 func fetchObject(ctx context.Context, client client.Client, namespace string, name string, obj client.Object) error {

@@ -47,6 +47,10 @@ type RolloutManagerReconciler struct {
 	client.Client
 	Scheme                       *runtime.Scheme
 	OpenShiftRoutePluginLocation string
+	//ResourceLabels is used to set custom labels on Argo Rollouts resources
+	// This is used to set the label on the ConfigMap and Secrets created by the controller for now.
+	// The label is used to identify the resources created by the RolloutManager.
+	ResourceLabels map[string]string
 
 	// NamespaceScopedArgoRolloutsController is used to configure scope of Argo Rollouts controller
 	// If value is true then deploy namespace-scoped Argo Rollouts controller else cluster-scoped
