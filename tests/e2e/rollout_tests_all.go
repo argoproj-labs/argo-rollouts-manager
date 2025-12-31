@@ -638,6 +638,8 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 			Expect(configMap.Data[controllers.TrafficRouterPluginConfigMapKey]).To(ContainSubstring(rolloutsManager.Spec.Plugins.TrafficManagement[0].Location))
 			Expect(configMap.Data[controllers.MetricPluginConfigMapKey]).To(ContainSubstring(rolloutsManager.Spec.Plugins.Metric[0].Name))
 			Expect(configMap.Data[controllers.MetricPluginConfigMapKey]).To(ContainSubstring(rolloutsManager.Spec.Plugins.Metric[0].Location))
+			Expect(configMap.Data[controllers.MetricPluginConfigMapKey_PreviousInvalidKey]).ToNot(ContainSubstring(rolloutsManager.Spec.Plugins.Metric[0].Name))
+			Expect(configMap.Data[controllers.MetricPluginConfigMapKey_PreviousInvalidKey]).ToNot(ContainSubstring(rolloutsManager.Spec.Plugins.Metric[0].Location))
 
 			By("Update traffic and metric plugins")
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&rolloutsManager), &rolloutsManager)).To(Succeed())
@@ -661,7 +663,9 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 				return strings.Contains(configMap.Data[controllers.TrafficRouterPluginConfigMapKey], rolloutsManager.Spec.Plugins.TrafficManagement[0].Name) &&
 					strings.Contains(configMap.Data[controllers.TrafficRouterPluginConfigMapKey], rolloutsManager.Spec.Plugins.TrafficManagement[0].Location) &&
 					strings.Contains(configMap.Data[controllers.MetricPluginConfigMapKey], rolloutsManager.Spec.Plugins.Metric[0].Name) &&
-					strings.Contains(configMap.Data[controllers.MetricPluginConfigMapKey], rolloutsManager.Spec.Plugins.Metric[0].Location)
+					strings.Contains(configMap.Data[controllers.MetricPluginConfigMapKey], rolloutsManager.Spec.Plugins.Metric[0].Location) &&
+					!strings.Contains(configMap.Data[controllers.MetricPluginConfigMapKey_PreviousInvalidKey], rolloutsManager.Spec.Plugins.Metric[0].Name)
+
 			}, "1m", "1s").Should(BeTrue())
 
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&rolloutsManager), &rolloutsManager)).To(Succeed())
@@ -704,6 +708,64 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 			}, "60s", "1s").Should(BeTrue())
 
 			Expect(newPods.Items[0].Name).NotTo(Equal(oldPods.Items[0].Name)) // Ensure the Pod names are different
+		})
+
+		When("the argo-rollouts-config contains the old, incorrect metric plugin key in the ConfiMap", func() {
+			It("should remove the key when the RolloutManager CR is reconciled", func() {
+				rolloutsManager := rolloutsmanagerv1alpha1.RolloutManager{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-rollouts-manager-old-key",
+						Namespace: fixture.TestE2ENamespace,
+					},
+					Spec: rolloutsmanagerv1alpha1.RolloutManagerSpec{
+						NamespaceScoped: namespaceScopedParam,
+						Plugins: rolloutsmanagerv1alpha1.Plugins{
+							Metric: []rolloutsmanagerv1alpha1.Plugin{
+								{
+									Name:     "prometheus",
+									Location: "https://github.com/argoproj-labs/sample-rollouts-metric-plugin/releases/download/v0.0.3/metric-plugin-linux-amd64",
+									SHA256:   "08f588b1c799a37bbe8d0fc74cc1b1492dd70b2c",
+								},
+							},
+						},
+					},
+				}
+
+				Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
+
+				By("Verify that RolloutManager is successfully created")
+				Eventually(rolloutsManager, "4m", "5s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
+
+				configMap := corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultRolloutsConfigMapName, Namespace: rolloutsManager.Namespace},
+				}
+
+				By("Verify metric plugin is under the new key and not the old key")
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&configMap), &configMap)).To(Succeed())
+				Expect(configMap.Data[controllers.MetricPluginConfigMapKey]).To(ContainSubstring("prometheus"))
+				Expect(configMap.Data[controllers.MetricPluginConfigMapKey_PreviousInvalidKey]).NotTo(ContainSubstring("prometheus"))
+
+				By("Manually inject data under the old invalid key into the ConfigMap")
+				Expect(k8s.UpdateWithoutConflict(ctx, &configMap, k8sClient, func(obj client.Object) {
+					cm, ok := obj.(*corev1.ConfigMap)
+					Expect(ok).To(BeTrue())
+					cm.Data[controllers.MetricPluginConfigMapKey_PreviousInvalidKey] = cm.Data[controllers.MetricPluginConfigMapKey]
+				})).To(Succeed())
+
+				// We should not need to manually trigger reconciliation here, as the ConfigMap resource is watcehd
+
+				By("Verify the old invalid key is removed and the new key still has the correct data")
+				Eventually(func() bool {
+					if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(&configMap), &configMap); err != nil {
+						GinkgoWriter.Println(err)
+						return false
+					}
+					_, oldKeyExists := configMap.Data[controllers.MetricPluginConfigMapKey_PreviousInvalidKey]
+					return !oldKeyExists &&
+						strings.Contains(configMap.Data[controllers.MetricPluginConfigMapKey], "prometheus") &&
+						strings.Contains(configMap.Data[controllers.MetricPluginConfigMapKey], rolloutsManager.Spec.Plugins.Metric[0].Location)
+				}, "1m", "1s").Should(BeTrue())
+			})
 		})
 
 		When("a namespace-scoped RolloutManager is installed into a namespace that previously contained a cluster-scoped RolloutManager, or vice versa", func() {
