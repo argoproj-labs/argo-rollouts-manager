@@ -21,7 +21,12 @@ import (
 
 // From https://argo-rollouts.readthedocs.io/en/stable/features/traffic-management/plugins/
 const TrafficRouterPluginConfigMapKey = "trafficRouterPlugins"
-const MetricPluginConfigMapKey = "metricPlugins"
+
+// MetricPluginConfigMapKey_PreviousInvalidKey is the previous key that was used by the operator, but this key value is incorrect. See 'MetricPluginConfigMapKey' for correct value.
+const MetricPluginConfigMapKey_PreviousInvalidKey = "metricPlugins"
+
+// From https://argo-rollouts.readthedocs.io/en/stable/analysis/plugins/
+const MetricPluginConfigMapKey = "metricProviderPlugins"
 
 // Reconcile the Rollouts Default Config Map.
 func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager) error {
@@ -143,6 +148,12 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr ro
 
 	// Check if an update is needed by comparing desired and actual plugin configurations
 	updateNeeded := !reflect.DeepEqual(actualTrafficRouterPlugins, trafficRouterPlugins) || !reflect.DeepEqual(actualMetricPlugins, metricPlugins)
+
+	// Remove the previous invalid metric plugin key if it exists, as it was replaced by MetricPluginConfigMapKey
+	if _, hasOldKey := actualConfigMap.Data[MetricPluginConfigMapKey_PreviousInvalidKey]; hasOldKey {
+		delete(actualConfigMap.Data, MetricPluginConfigMapKey_PreviousInvalidKey)
+		updateNeeded = true
+	}
 
 	if updateNeeded {
 		// Update the ConfigMap's plugin data with the new values

@@ -145,6 +145,9 @@ var _ = Describe("ConfigMap Test", func() {
 		Expect(fetchedConfigMap.Data[MetricPluginConfigMapKey]).To(ContainSubstring(a.Spec.Plugins.Metric[0].Name))
 		Expect(fetchedConfigMap.Data[MetricPluginConfigMapKey]).To(ContainSubstring(a.Spec.Plugins.Metric[0].Location))
 
+		Expect(fetchedConfigMap.Data[MetricPluginConfigMapKey_PreviousInvalidKey]).ToNot(ContainSubstring(a.Spec.Plugins.Metric[0].Name))
+		Expect(fetchedConfigMap.Data[MetricPluginConfigMapKey_PreviousInvalidKey]).ToNot(ContainSubstring(a.Spec.Plugins.Metric[0].Location))
+
 		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(a.Spec.Plugins.TrafficManagement[0].Name))
 		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(a.Spec.Plugins.TrafficManagement[0].Location))
 
@@ -174,6 +177,8 @@ var _ = Describe("ConfigMap Test", func() {
 		By("Verify that ConfigMap is updated with the plugins modified by RolloutManger CR")
 		Expect(fetchedConfigMap.Data[MetricPluginConfigMapKey]).To(ContainSubstring(a.Spec.Plugins.Metric[0].Name))
 		Expect(fetchedConfigMap.Data[MetricPluginConfigMapKey]).To(ContainSubstring(updatedPluginLocation))
+		Expect(fetchedConfigMap.Data[MetricPluginConfigMapKey_PreviousInvalidKey]).ToNot(ContainSubstring(a.Spec.Plugins.Metric[0].Name))
+		Expect(fetchedConfigMap.Data[MetricPluginConfigMapKey_PreviousInvalidKey]).ToNot(ContainSubstring(updatedPluginLocation))
 
 		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(a.Spec.Plugins.TrafficManagement[0].Name))
 		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(updatedPluginLocation))
@@ -215,6 +220,51 @@ var _ = Describe("ConfigMap Test", func() {
 		Expect(fetchedConfigMap.Data[MetricPluginConfigMapKey]).NotTo(ContainSubstring("custom-metric-plugin"))
 
 		By("Verify that the pod has been deleted after the above update.")
+		rolloutsPodList := &corev1.PodList{}
+		err := r.Client.List(ctx, rolloutsPodList, client.InNamespace(a.Namespace), client.MatchingLabels(existingDeployment.Spec.Selector.MatchLabels))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(len(rolloutsPodList.Items)).To(BeNumerically("==", 0))
+	})
+
+	It("creates a ConfigMap that uses the old key invalid configmap key 'metricPlugins' for configuring metric plugin, and then calls reconcileConfigMap. The old key should be removed and replaced with the new key", func() {
+		By("Adding a pod that matches the deployment's selector, this lets us verify the deployment has been restarted to pick up the change to the ConfigMap")
+		addTestPodToFakeClient(r, a.Namespace, existingDeployment)
+
+		By("Calling reconcileConfigMap to create the initial ConfigMap")
+		Expect(r.reconcileConfigMap(ctx, a)).To(Succeed())
+
+		By("Fetching the created ConfigMap and add metric plugin data under the old invalid key")
+		fetchedConfigMap := &corev1.ConfigMap{}
+		Expect(fetchObject(ctx, r.Client, a.Namespace, DefaultRolloutsConfigMapName, fetchedConfigMap)).To(Succeed())
+		fetchedConfigMap.Data[MetricPluginConfigMapKey_PreviousInvalidKey] = "- name: custom-metric-plugin\n  location: " + metricPluginLocation + "\n  sha256: \"\"\n"
+		Expect(r.Client.Update(ctx, fetchedConfigMap)).To(Succeed())
+
+		By("Adding metric plugin through the CR")
+		a.Spec.Plugins.Metric = []v1alpha1.Plugin{
+			{Name: "custom-metric-plugin", Location: metricPluginLocation},
+		}
+		Expect(r.Client.Update(ctx, &a)).To(Succeed())
+
+		By("Calling reconcileConfigMap again")
+		Expect(r.reconcileConfigMap(ctx, a)).To(Succeed())
+
+		By("Fetching the ConfigMap after reconciliation")
+		updatedConfigMap := &corev1.ConfigMap{}
+		Expect(fetchObject(ctx, r.Client, a.Namespace, DefaultRolloutsConfigMapName, updatedConfigMap)).To(Succeed())
+
+		By("Verifying that the new key contains the metric plugin data")
+		Expect(updatedConfigMap.Data[MetricPluginConfigMapKey]).To(ContainSubstring("custom-metric-plugin"))
+		Expect(updatedConfigMap.Data[MetricPluginConfigMapKey]).To(ContainSubstring(metricPluginLocation))
+
+		By("Verifying that the old invalid key has been removed")
+		_, oldKeyExists := updatedConfigMap.Data[MetricPluginConfigMapKey_PreviousInvalidKey]
+		Expect(oldKeyExists).To(BeFalse())
+
+		By("Verifying that the traffic router plugin is still present")
+		Expect(updatedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(OpenShiftRolloutPluginName))
+		Expect(updatedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(r.OpenShiftRoutePluginLocation))
+
+		By("Verifying that the pod has been deleted after the ConfigMap update")
 		rolloutsPodList := &corev1.PodList{}
 		err := r.Client.List(ctx, rolloutsPodList, client.InNamespace(a.Namespace), client.MatchingLabels(existingDeployment.Spec.Selector.MatchLabels))
 		Expect(err).NotTo(HaveOccurred())
