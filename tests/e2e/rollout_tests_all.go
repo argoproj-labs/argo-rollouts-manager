@@ -617,7 +617,7 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 							{
 								Name:     "prometheus",
 								Location: "https://github.com/argoproj-labs/sample-rollouts-metric-plugin/releases/download/v0.0.3/metric-plugin-linux-amd64",
-								SHA256:   "08f588b1c799a37bbe8d0fc74cc1b1492dd70b2c",
+								SHA256:   "4acc0e7a2c99bd8fe2d9b8ee6da08d531ee3a4373c55c77e3b5ee55c866fae69",
 							}},
 					},
 				},
@@ -724,7 +724,7 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 								{
 									Name:     "prometheus",
 									Location: "https://github.com/argoproj-labs/sample-rollouts-metric-plugin/releases/download/v0.0.3/metric-plugin-linux-amd64",
-									SHA256:   "08f588b1c799a37bbe8d0fc74cc1b1492dd70b2c",
+									SHA256:   "4acc0e7a2c99bd8fe2d9b8ee6da08d531ee3a4373c55c77e3b5ee55c866fae69",
 								},
 							},
 						},
