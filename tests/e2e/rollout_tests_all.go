@@ -615,7 +615,7 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 						},
 						Metric: []rolloutsmanagerv1alpha1.Plugin{
 							{
-								Name:     "prometheus",
+								Name:     "argoproj-labs/prometheus",
 								Location: "https://github.com/argoproj-labs/sample-rollouts-metric-plugin/releases/download/v0.0.3/metric-plugin-linux-amd64",
 								SHA256:   "4acc0e7a2c99bd8fe2d9b8ee6da08d531ee3a4373c55c77e3b5ee55c866fae69",
 							}},
@@ -722,7 +722,7 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 						Plugins: rolloutsmanagerv1alpha1.Plugins{
 							Metric: []rolloutsmanagerv1alpha1.Plugin{
 								{
-									Name:     "prometheus",
+									Name:     "argoproj-labs/prometheus",
 									Location: "https://github.com/argoproj-labs/sample-rollouts-metric-plugin/releases/download/v0.0.3/metric-plugin-linux-amd64",
 									SHA256:   "4acc0e7a2c99bd8fe2d9b8ee6da08d531ee3a4373c55c77e3b5ee55c866fae69",
 								},
@@ -752,7 +752,15 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 					cm.Data[controllers.MetricPluginConfigMapKey_PreviousInvalidKey] = cm.Data[controllers.MetricPluginConfigMapKey]
 				})).To(Succeed())
 
-				// We should not need to manually trigger reconciliation here, as the ConfigMap resource is watcehd
+				By("Trigger re-reconcile of RolloutManager by updating an annotation")
+				Expect(k8s.UpdateWithoutConflict(ctx, &rolloutsManager, k8sClient, func(obj client.Object) {
+					annots := obj.GetAnnotations()
+					if annots == nil {
+						annots = map[string]string{}
+					}
+					annots["trigger-reconcile"] = "true"
+					obj.SetAnnotations(annots)
+				})).To(Succeed())
 
 				By("Verify the old invalid key is removed and the new key still has the correct data")
 				Eventually(func() bool {
@@ -760,10 +768,17 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 						GinkgoWriter.Println(err)
 						return false
 					}
+
 					_, oldKeyExists := configMap.Data[controllers.MetricPluginConfigMapKey_PreviousInvalidKey]
-					return !oldKeyExists &&
+					res := !oldKeyExists &&
 						strings.Contains(configMap.Data[controllers.MetricPluginConfigMapKey], "prometheus") &&
 						strings.Contains(configMap.Data[controllers.MetricPluginConfigMapKey], rolloutsManager.Spec.Plugins.Metric[0].Location)
+
+					if !res {
+						GinkgoWriter.Println("configMap:", configMap.Data)
+					}
+
+					return res
 				}, "1m", "1s").Should(BeTrue())
 			})
 		})
