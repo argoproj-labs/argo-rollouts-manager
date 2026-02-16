@@ -1,6 +1,6 @@
 #!/bin/bash
 
-CURRENT_ROLLOUTS_VERSION=v1.8.3
+CURRENT_ROLLOUTS_VERSION=v1.8.4
 
 function cleanup {
   echo "* Cleaning up"
