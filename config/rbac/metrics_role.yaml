@@ -3,11 +3,11 @@ kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/name: clusterrole
-    app.kubernetes.io/instance: proxy-role
+    app.kubernetes.io/instance: metrics-role
     app.kubernetes.io/created-by: argo-rollouts-manager
     app.kubernetes.io/part-of: argo-rollouts-manager
     app.kubernetes.io/managed-by: kustomize
-  name: proxy-role
+  name: metrics-role
 rules:
 - apiGroups:
   - authentication.k8s.io
