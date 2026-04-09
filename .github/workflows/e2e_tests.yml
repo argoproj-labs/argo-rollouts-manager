@@ -47,4 +47,4 @@ jobs:
       - name: Run tests
         run: |
           set -o pipefail
-          make start-test-e2e-all 2>&1 | tee /tmp/e2e-test.log
+          DISABLE_METRICS=true make start-test-e2e-all 2>&1 | tee /tmp/e2e-test.log
