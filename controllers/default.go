@@ -44,4 +44,6 @@ const (
 	TopologyKubernetesZoneLabel = "topology.kubernetes.io/zone"
 
 	ImagePullPolicy = "IMAGE_PULL_POLICY"
+	// DefaultRolloutsNetworkPolicy is the default name for Rollouts NetworkPolicy.
+	DefaultRolloutsNetworkPolicy = "network-policy"
 )

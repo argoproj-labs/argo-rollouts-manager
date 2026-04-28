@@ -23,7 +23,8 @@ import (
 
 // RolloutManagerSpec defines the desired state of Argo Rollouts
 type RolloutManagerSpec struct {
-
+	// NetworkPolicy controls whether the operator should create NetworkPolicy resources.
+	NetworkPolicy RolloutManagerNetworkPolicySpec `json:"networkPolicy,omitempty"`
 	// Env lets you specify environment for Rollouts pods
 	Env []corev1.EnvVar `json:"env,omitempty"`
 
@@ -64,6 +65,19 @@ type RolloutManagerSpec struct {
 	// +kubebuilder:validation:Enum=Always;IfNotPresent;Never
 	// +optional
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+}
+
+// RolloutManagerNetworkPolicySpec defines whether the operator should create NetworkPolicies.
+type RolloutManagerNetworkPolicySpec struct {
+	// Enabled defines whether NetworkPolicy resources should be created for this instance.
+	// When enabled, the operator will reconcile NetworkPolicies for components.
+	// When disabled, the operator will remove any previously-created NetworkPolicies.
+	// +kubebuilder:default=true
+	Enabled *bool `json:"enabled,omitempty"`
+}
+
+func (a *RolloutManagerNetworkPolicySpec) IsEnabled() bool {
+	return a == nil || a.Enabled == nil || *a.Enabled
 }
 
 // Plugin is used to integrate traffic management and metric plugins into the Argo Rollouts controller. For more information on these plugins, see the upstream Argo Rollouts documentation.

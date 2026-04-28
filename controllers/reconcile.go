@@ -133,13 +133,18 @@ func (r *RolloutManagerReconciler) reconcileRolloutsManager(ctx context.Context,
 		return wrapCondition(createCondition(err.Error())), err
 	}
 
+	log.Info("reconciling Rollouts NetworkPolicy")
+	if err := r.reconcileRolloutsNetworkPolicy(ctx, cr); err != nil {
+		log.Error(err, "failed to reconcile Rollout's NetworkPolicy.")
+		return wrapCondition(createCondition(err.Error())), err
+	}
+
 	log.Info("reconciling status of workloads")
 	rr, err := r.determineStatusPhase(ctx, cr)
 	if err != nil {
 		log.Error(err, "failed to reconcile status of workloads.")
 		return wrapCondition(createCondition(err.Error())), err
 	}
-
 	rr.condition = createCondition("") // success
 
 	return rr, nil
