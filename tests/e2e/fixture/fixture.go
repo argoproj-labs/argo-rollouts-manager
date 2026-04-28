@@ -23,6 +23,7 @@ import (
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	crdv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierr "k8s.io/apimachinery/pkg/api/errors"
@@ -204,6 +205,9 @@ func getKubeClient(config *rest.Config) (client.Client, *runtime.Scheme, error) 
 	}
 
 	if err := crdv1.AddToScheme(scheme); err != nil {
+		return nil, nil, err
+	}
+	if err := networkingv1.AddToScheme(scheme); err != nil {
 		return nil, nil, err
 	}
 

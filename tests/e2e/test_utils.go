@@ -20,6 +20,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -363,6 +364,56 @@ func validateService(k8sClient client.Client, rolloutsManager rmv1alpha1.Rollout
 	By("Verify that ClusterRoleBinding has correct Ports.")
 	Expect(service.Spec.Selector).To(Equal(map[string]string{
 		controllers.DefaultRolloutsSelectorKey: controllers.DefaultArgoRolloutsResourceName,
+	}))
+}
+
+func ValidateNetworkPolicy(k8sClient client.Client, rolloutsManager rmv1alpha1.RolloutManager) {
+	policy := &networkingv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-%s", rolloutsManager.Name, controllers.DefaultRolloutsNetworkPolicy),
+			Namespace: rolloutsManager.Namespace,
+		},
+	}
+
+	Eventually(policy, "10s", "1s").Should(k8s.ExistByName(k8sClient))
+
+	By("Verify that NetworkPolicy has correct labels and annotations.")
+	Expect(policy.Labels["app.kubernetes.io/name"]).To(Equal(controllers.DefaultArgoRolloutsResourceName))
+	Expect(policy.Labels["app.kubernetes.io/part-of"]).To(Equal(controllers.DefaultArgoRolloutsResourceName))
+	Expect(policy.Labels["app.kubernetes.io/component"]).To(Equal(controllers.DefaultArgoRolloutsResourceName))
+
+	expectMetadataOnObjectMeta(&policy.ObjectMeta, rolloutsManager.Spec.AdditionalMetadata)
+
+	By("Verify that NetworkPolicy has correct pod selector.")
+	Expect(policy.Spec.PodSelector.MatchLabels).To(Equal(map[string]string{
+		controllers.DefaultRolloutsSelectorKey: controllers.DefaultArgoRolloutsResourceName,
+	}))
+
+	By("Verify that NetworkPolicy has correct policy types.")
+	Expect(policy.Spec.PolicyTypes).To(Equal([]networkingv1.PolicyType{
+		networkingv1.PolicyTypeIngress,
+	}))
+
+	By("Verify that NetworkPolicy has correct ingress rules and ports.")
+	Expect(policy.Spec.Ingress).To(HaveLen(1))
+
+	expectedTCP := corev1.ProtocolTCP
+
+	Expect(policy.Spec.Ingress[0].Ports).To(Equal([]networkingv1.NetworkPolicyPort{
+		{
+			Protocol: &expectedTCP,
+			Port: func() *intstr.IntOrString {
+				p := intstr.FromInt(8080)
+				return &p
+			}(),
+		},
+		{
+			Protocol: &expectedTCP,
+			Port: func() *intstr.IntOrString {
+				p := intstr.FromInt(8090)
+				return &p
+			}(),
+		},
 	}))
 }
 
