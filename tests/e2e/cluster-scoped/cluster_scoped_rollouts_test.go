@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -18,8 +19,10 @@ import (
 	controllers "github.com/argoproj-labs/argo-rollouts-manager/controllers"
 
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 var _ = Describe("Cluster-scoped RolloutManager tests", func() {
@@ -95,6 +98,27 @@ var _ = Describe("Cluster-scoped RolloutManager tests", func() {
 
 			By("Create and validate rollouts.")
 			utils.ValidateArgoRolloutsResources(ctx, k8sClient, nsName, testServiceNodePort_31000, testServiceNodePort_32000)
+			By("Verify that RolloutManager successfully created Network Policy.")
+			utils.ValidateNetworkPolicy(k8sClient, rolloutsManager)
+			Eventually(func() error {
+				key := client.ObjectKeyFromObject(&rolloutsManager)
+
+				if err := k8sClient.Get(ctx, key, &rolloutsManager); err != nil {
+					return err
+				}
+
+				rolloutsManager.Spec.NetworkPolicy.Enabled = ptr.To(false)
+
+				return k8sClient.Update(ctx, &rolloutsManager)
+			}, "1m", "1s").Should(Succeed())
+			By("Verify that RolloutManager successfully removed Network Policy.")
+			policy := &networkingv1.NetworkPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      fmt.Sprintf("%s-%s", rolloutsManager.Name, controllers.DefaultRolloutsNetworkPolicy),
+					Namespace: rolloutsManager.Namespace,
+				},
+			}
+			Eventually(policy, "10s", "1s").ShouldNot(k8s.ExistByName(k8sClient))
 		})
 
 		/*
