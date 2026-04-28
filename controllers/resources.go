@@ -8,6 +8,7 @@ import (
 	rolloutsmanagerv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	crdv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -645,6 +646,144 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsServiceAndMonitor(ctx
 		return nil
 	}
 
+}
+
+func (r *RolloutManagerReconciler) deleteArgoCDNetworkPolicies(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager) error {
+	names := []string{
+		fmt.Sprintf("%s-%s", cr.Name, DefaultRolloutsNetworkPolicy),
+	}
+	for _, name := range names {
+		existing := &networkingv1.NetworkPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: cr.Namespace,
+			},
+		}
+		if err := fetchObject(ctx, r.Client, cr.Namespace, existing.Name, existing); err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			return err
+		}
+		log.Info(fmt.Sprintf("Deleting NetworkPolicy %s because networkPolicy is disabled", existing.Name))
+		if err := r.Client.Delete(ctx, existing); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func returnNetworkPolicyHeaders(cr rolloutsmanagerv1alpha1.RolloutManager, networkPolicyName string) *networkingv1.NetworkPolicy {
+	networkObj := &networkingv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-%s", cr.Name, networkPolicyName),
+			Namespace: cr.Namespace,
+		},
+	}
+	setRolloutsLabelsAndAnnotationsToObject(&networkObj.ObjectMeta, cr)
+	return networkObj
+}
+
+// reconcileRolloutsNetworkPolicy reconciles the NetworkPolicy for Rollouts
+func (r *RolloutManagerReconciler) reconcileRolloutsNetworkPolicy(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager) error {
+	if !cr.Spec.NetworkPolicy.IsEnabled() {
+		return r.deleteArgoCDNetworkPolicies(ctx, cr)
+	}
+	labels := map[string]string{
+		DefaultRolloutsSelectorKey: DefaultArgoRolloutsResourceName,
+	}
+	tcpProtocol := corev1.ProtocolTCP
+	port8080 := intstr.FromInt(8080)
+	port8090 := intstr.FromInt(8090)
+	desired := returnNetworkPolicyHeaders(cr, DefaultRolloutsNetworkPolicy)
+	desired.Spec = networkingv1.NetworkPolicySpec{
+		PodSelector: metav1.LabelSelector{
+			MatchLabels: labels,
+		},
+		PolicyTypes: []networkingv1.PolicyType{
+			networkingv1.PolicyTypeIngress,
+		},
+		Ingress: []networkingv1.NetworkPolicyIngressRule{
+			{
+				Ports: []networkingv1.NetworkPolicyPort{
+					{
+						Protocol: &tcpProtocol,
+						Port:     &port8080,
+					},
+					{
+						Protocol: &tcpProtocol,
+						Port:     &port8090,
+					},
+				},
+			},
+		},
+	}
+
+	existing := &networkingv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      desired.Name,
+			Namespace: desired.Namespace,
+		},
+	}
+
+	if err := fetchObject(ctx, r.Client, cr.Namespace, existing.Name, existing); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return fmt.Errorf("failed to get NetworkPolicy %s: %w", existing.Name, err)
+		}
+		if err := controllerutil.SetControllerReference(&cr, desired, r.Scheme); err != nil {
+			log.Error(err, "Failed to set controller reference on rollouts network policy")
+			return fmt.Errorf("failed to set controller reference on rollouts network policy: %w", err)
+		}
+		log.Info(fmt.Sprintf("Creating NetworkPolicy %s", desired.Name))
+		if err := r.Client.Create(ctx, desired); err != nil {
+			log.Error(err, "Failed to create network policy", "name", desired.Name, "namespace", cr.Namespace)
+			return fmt.Errorf("failed to create network policy %s in namespace %s: %w", desired.Name, cr.Namespace, err)
+		}
+		return nil
+	}
+	updateNeeded := false
+	explanation := ""
+	if !reflect.DeepEqual(existing.Spec.PodSelector, desired.Spec.PodSelector) {
+		existing.Spec.PodSelector = desired.Spec.PodSelector
+		explanation = "pod selector"
+		updateNeeded = true
+	}
+	if !reflect.DeepEqual(existing.Spec.PolicyTypes, desired.Spec.PolicyTypes) {
+		existing.Spec.PolicyTypes = desired.Spec.PolicyTypes
+		if updateNeeded {
+			explanation += ", "
+		}
+		explanation += "policy types"
+		updateNeeded = true
+	}
+	if !reflect.DeepEqual(existing.Spec.Ingress, desired.Spec.Ingress) {
+		existing.Spec.Ingress = desired.Spec.Ingress
+		if updateNeeded {
+			explanation += ", "
+		}
+		explanation += "ingress rules"
+		updateNeeded = true
+	}
+	normalizedExisting := existing.DeepCopy()
+	removeUserLabelsAndAnnotations(&normalizedExisting.ObjectMeta, cr)
+	if !areStringMapsEqual(normalizedExisting.Labels, desired.Labels) || !areStringMapsEqual(normalizedExisting.Annotations, desired.Annotations) {
+		updateNeeded = true
+		log.Info(fmt.Sprintf("Labels/Annotations of NetworkPolicy %s do not match the expected state, hence updating it", existing.Name))
+		existing.Labels = combineStringMaps(existing.Labels, desired.Labels)
+		existing.Annotations = combineStringMaps(existing.Annotations, desired.Annotations)
+		if explanation != "" {
+			explanation += ", "
+		}
+		explanation += "labels/annotations"
+	}
+	if updateNeeded {
+		log.Info(fmt.Sprintf("NetworkPolicy %s does not match the expected state, updating %s", existing.Name, explanation))
+		if err := r.Client.Update(ctx, existing); err != nil {
+			log.Error(err, "Failed to update network policy", "name", existing.Name, "namespace", cr.Namespace)
+			return fmt.Errorf("failed to update network policy %s in namespace %s: %w", existing.Name, cr.Namespace, err)
+		}
+	}
+	return nil
 }
 
 // reconcileRolloutsMetricsService reconciles the Service which is used to gather metrics from Rollouts install
