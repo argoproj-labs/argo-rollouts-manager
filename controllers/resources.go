@@ -1073,6 +1073,7 @@ func GetPolicyRules() []rbacv1.PolicyRule {
 		{
 			APIGroups: []string{
 				"elbv2.k8s.aws",
+				"eks.amazonaws.com",
 			},
 			Resources: []string{
 				"targetgroupbindings",

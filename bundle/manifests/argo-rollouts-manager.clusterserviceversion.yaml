@@ -21,7 +21,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2026-04-15T09:18:19Z"
+    createdAt: "2026-04-29T08:25:26Z"
     operators.operatorframework.io/builder: operator-sdk-v1.35.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   name: argo-rollouts-manager.v0.0.1
@@ -218,6 +218,7 @@ spec:
           - get
           - update
         - apiGroups:
+          - eks.amazonaws.com
           - elbv2.k8s.aws
           resources:
           - targetgroupbindings
