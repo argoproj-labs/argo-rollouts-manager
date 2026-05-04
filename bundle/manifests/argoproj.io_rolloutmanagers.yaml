@@ -264,8 +264,9 @@ spec:
                   to watch a namespace or the whole cluster
                 type: boolean
               networkPolicy:
-                description: NetworkPolicy controls whether the operator should create
-                  NetworkPolicy resources.
+                description: |-
+                  NetworkPolicy controls whether the operator should create NetworkPolicy resources.
+                  if empty, the default is to create network policies
                 properties:
                   enabled:
                     default: true

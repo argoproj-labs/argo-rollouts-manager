@@ -22,9 +22,11 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 // This file contains tests that should run in both namespace-scoped and cluster-scoped scenarios.
@@ -72,6 +74,27 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 
 				By("Verify that expected resources are created.")
 				ValidateArgoRolloutManagerResources(ctx, rolloutManager, k8sClient, namespaceScopedParam)
+				By("Verify that RolloutManager successfully created Network Policy.")
+				ValidateNetworkPolicy(k8sClient, rolloutManager)
+				err := k8s.UpdateWithoutConflict(ctx, &rolloutManager, k8sClient, func(obj client.Object) {
+					goObj, ok := obj.(*rolloutsmanagerv1alpha1.RolloutManager)
+					Expect(ok).To(BeTrue())
+
+					if goObj.Spec.NetworkPolicy == nil {
+						goObj.Spec.NetworkPolicy = &rolloutsmanagerv1alpha1.RolloutManagerNetworkPolicySpec{}
+					}
+
+					goObj.Spec.NetworkPolicy.Enabled = ptr.To(false)
+				})
+				Expect(err).ToNot(HaveOccurred())
+				By("Verify that RolloutManager successfully removed Network Policy.")
+				policy := &networkingv1.NetworkPolicy{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      controllers.DefaultRolloutsNetworkPolicy,
+						Namespace: rolloutManager.Namespace,
+					},
+				}
+				Eventually(policy, "10s", "1s").ShouldNot(k8s.ExistByName(k8sClient))
 			})
 		})
 
