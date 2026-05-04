@@ -370,7 +370,7 @@ func validateService(k8sClient client.Client, rolloutsManager rmv1alpha1.Rollout
 func ValidateNetworkPolicy(k8sClient client.Client, rolloutsManager rmv1alpha1.RolloutManager) {
 	policy := &networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-%s", rolloutsManager.Name, controllers.DefaultRolloutsNetworkPolicy),
+			Name:      controllers.DefaultRolloutsNetworkPolicy,
 			Namespace: rolloutsManager.Namespace,
 		},
 	}
