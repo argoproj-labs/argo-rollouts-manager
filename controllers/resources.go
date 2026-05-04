@@ -648,35 +648,31 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsServiceAndMonitor(ctx
 
 }
 
-func (r *RolloutManagerReconciler) deleteArgoCDNetworkPolicies(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager) error {
-	names := []string{
-		fmt.Sprintf("%s-%s", cr.Name, DefaultRolloutsNetworkPolicy),
+func (r *RolloutManagerReconciler) deleteRolloutsNetworkPolicies(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager) error {
+	existing := &networkingv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      DefaultRolloutsNetworkPolicy,
+			Namespace: cr.Namespace,
+		},
 	}
-	for _, name := range names {
-		existing := &networkingv1.NetworkPolicy{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      name,
-				Namespace: cr.Namespace,
-			},
+	if err := fetchObject(ctx, r.Client, cr.Namespace, existing.Name, existing); err != nil {
+		if apierrors.IsNotFound(err) {
+			// If the NetworkPolicy does not exist, we can return early
+			return nil
 		}
-		if err := fetchObject(ctx, r.Client, cr.Namespace, existing.Name, existing); err != nil {
-			if apierrors.IsNotFound(err) {
-				continue
-			}
-			return err
-		}
-		log.Info(fmt.Sprintf("Deleting NetworkPolicy %s because networkPolicy is disabled", existing.Name))
-		if err := r.Client.Delete(ctx, existing); err != nil {
-			return err
-		}
+		return err
+	}
+	log.Info(fmt.Sprintf("Deleting NetworkPolicy %s because networkPolicy is disabled", existing.Name))
+	if err := r.Client.Delete(ctx, existing); err != nil {
+		return err
 	}
 	return nil
 }
 
-func returnNetworkPolicyHeaders(cr rolloutsmanagerv1alpha1.RolloutManager, networkPolicyName string) *networkingv1.NetworkPolicy {
+func generateNetworkPolicyHeaders(cr rolloutsmanagerv1alpha1.RolloutManager, networkPolicyName string) *networkingv1.NetworkPolicy {
 	networkObj := &networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-%s", cr.Name, networkPolicyName),
+			Name:      networkPolicyName,
 			Namespace: cr.Namespace,
 		},
 	}
@@ -687,7 +683,7 @@ func returnNetworkPolicyHeaders(cr rolloutsmanagerv1alpha1.RolloutManager, netwo
 // reconcileRolloutsNetworkPolicy reconciles the NetworkPolicy for Rollouts
 func (r *RolloutManagerReconciler) reconcileRolloutsNetworkPolicy(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager) error {
 	if !cr.Spec.NetworkPolicy.IsEnabled() {
-		return r.deleteArgoCDNetworkPolicies(ctx, cr)
+		return r.deleteRolloutsNetworkPolicies(ctx, cr)
 	}
 	labels := map[string]string{
 		DefaultRolloutsSelectorKey: DefaultArgoRolloutsResourceName,
@@ -695,7 +691,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsNetworkPolicy(ctx context.Co
 	tcpProtocol := corev1.ProtocolTCP
 	port8080 := intstr.FromInt(8080)
 	port8090 := intstr.FromInt(8090)
-	desired := returnNetworkPolicyHeaders(cr, DefaultRolloutsNetworkPolicy)
+	desired := generateNetworkPolicyHeaders(cr, DefaultRolloutsNetworkPolicy)
 	desired.Spec = networkingv1.NetworkPolicySpec{
 		PodSelector: metav1.LabelSelector{
 			MatchLabels: labels,

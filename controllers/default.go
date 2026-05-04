@@ -45,5 +45,5 @@ const (
 
 	ImagePullPolicy = "IMAGE_PULL_POLICY"
 	// DefaultRolloutsNetworkPolicy is the default name for Rollouts NetworkPolicy.
-	DefaultRolloutsNetworkPolicy = "network-policy"
+	DefaultRolloutsNetworkPolicy = "argo-rollouts-network-policy"
 )

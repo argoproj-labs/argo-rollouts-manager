@@ -170,13 +170,9 @@ func (r *RolloutManagerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	bld.For(&rolloutsmanagerv1alpha1.RolloutManager{})
 
-	// Watch for changes to NetworkPolicy sub-resources owned by ArgoCD instances.
+	// Watch for changes to NetworkPolicy sub-resources owned by RolloutManager instances.
 	// This ensures that if a NetworkPolicy is deleted, the controller reconciles and recreates it.
-	bld.Owns(&networkingv1.NetworkPolicy{ObjectMeta: metav1.ObjectMeta{
-		Labels: map[string]string{
-			"app.kubernetes.io/part-of": DefaultArgoRolloutsResourceName,
-		},
-	}})
+	bld.Owns(&networkingv1.NetworkPolicy{})
 	// If the .spec of any RolloutManager changes (or a RM is created/deleted), inform the other RolloutManagers on the cluster
 	bld.Watches(
 		&rolloutsmanagerv1alpha1.RolloutManager{},

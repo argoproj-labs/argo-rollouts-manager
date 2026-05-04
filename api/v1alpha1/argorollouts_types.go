@@ -24,7 +24,8 @@ import (
 // RolloutManagerSpec defines the desired state of Argo Rollouts
 type RolloutManagerSpec struct {
 	// NetworkPolicy controls whether the operator should create NetworkPolicy resources.
-	NetworkPolicy RolloutManagerNetworkPolicySpec `json:"networkPolicy,omitempty"`
+	// if empty, the default is to create network policies
+	NetworkPolicy *RolloutManagerNetworkPolicySpec `json:"networkPolicy,omitempty"`
 	// Env lets you specify environment for Rollouts pods
 	Env []corev1.EnvVar `json:"env,omitempty"`
 
