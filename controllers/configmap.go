@@ -17,6 +17,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // From https://argo-rollouts.readthedocs.io/en/stable/features/traffic-management/plugins/
@@ -133,6 +134,9 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr ro
 		if errors.IsNotFound(err) {
 			// ConfigMap is not present, create default config map
 			log.Info("configMap not found, creating default configmap with openshift route plugin information")
+			if err := controllerutil.SetControllerReference(&cr, desiredConfigMap, r.Scheme); err != nil {
+				return fmt.Errorf("failed to set owner reference on ConfigMap %s: %w", desiredConfigMap.Name, err)
+			}
 			return r.Client.Create(ctx, desiredConfigMap)
 		}
 		return fmt.Errorf("failed to get the ConfigMap associated with %s: %w", desiredConfigMap.Name, err)
@@ -149,6 +153,18 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr ro
 
 	// Check if an update is needed by comparing desired and actual plugin configurations
 	updateNeeded := !reflect.DeepEqual(actualTrafficRouterPlugins, trafficRouterPlugins) || !reflect.DeepEqual(actualMetricPlugins, metricPlugins)
+
+	// Backfill the owner reference on ConfigMaps that were created by a previous version of the
+	// operator (before the ConfigMap was owned by the RolloutManager CR), so that it is garbage
+	// collected on RolloutManager deletion like every other namespace-scoped resource.
+	previousOwnerRefs := actualConfigMap.GetOwnerReferences()
+	if err := controllerutil.SetControllerReference(&cr, actualConfigMap, r.Scheme); err != nil {
+		return fmt.Errorf("failed to set owner reference on existing ConfigMap %s: %w", actualConfigMap.Name, err)
+	}
+	if !reflect.DeepEqual(previousOwnerRefs, actualConfigMap.GetOwnerReferences()) {
+		log.Info("Adding missing owner reference to existing ConfigMap", "configMapName", actualConfigMap.Name)
+		updateNeeded = true
+	}
 
 	// Remove the previous invalid metric plugin key if it exists, as it was replaced by MetricPluginConfigMapKey
 	if _, hasOldKey := actualConfigMap.Data[MetricPluginConfigMapKey_PreviousInvalidKey]; hasOldKey {

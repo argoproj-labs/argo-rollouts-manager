@@ -75,6 +75,45 @@ var _ = Describe("ConfigMap Test", func() {
 
 	})
 
+	It("verifies that the ConfigMap has an owner reference set to the RolloutManager CR, so that it is garbage collected when the RolloutManager is deleted", func() {
+		By("Call reconcileConfigMap")
+		Expect(r.reconcileConfigMap(ctx, a)).To(Succeed())
+
+		By("Verify that the created ConfigMap has an owner reference pointing at the RolloutManager CR")
+		fetchedConfigMap := &corev1.ConfigMap{}
+		Expect(fetchObject(ctx, r.Client, a.Namespace, DefaultRolloutsConfigMapName, fetchedConfigMap)).To(Succeed())
+
+		Expect(fetchedConfigMap.OwnerReferences).To(HaveLen(1))
+		Expect(fetchedConfigMap.OwnerReferences[0].Name).To(Equal(a.Name))
+		Expect(fetchedConfigMap.OwnerReferences[0].Kind).To(Equal("RolloutManager"))
+		Expect(fetchedConfigMap.OwnerReferences[0].Controller).ToNot(BeNil())
+		Expect(*fetchedConfigMap.OwnerReferences[0].Controller).To(BeTrue())
+	})
+
+	It("verifies that a pre-existing ConfigMap that is missing the owner reference (as would be the case for a ConfigMap created by a previous version of the operator) has the owner reference added to it on reconcile", func() {
+		By("Call reconcileConfigMap to create the ConfigMap")
+		Expect(r.reconcileConfigMap(ctx, a)).To(Succeed())
+
+		By("Simulate a ConfigMap created by a previous version of the operator, which did not set an owner reference")
+		fetchedConfigMap := &corev1.ConfigMap{}
+		Expect(fetchObject(ctx, r.Client, a.Namespace, DefaultRolloutsConfigMapName, fetchedConfigMap)).To(Succeed())
+		fetchedConfigMap.OwnerReferences = nil
+		Expect(r.Client.Update(ctx, fetchedConfigMap)).To(Succeed())
+
+		By("Verify the owner reference is indeed missing before reconciling")
+		Expect(fetchObject(ctx, r.Client, a.Namespace, DefaultRolloutsConfigMapName, fetchedConfigMap)).To(Succeed())
+		Expect(fetchedConfigMap.OwnerReferences).To(BeEmpty())
+
+		By("Call reconcileConfigMap again")
+		Expect(r.reconcileConfigMap(ctx, a)).To(Succeed())
+
+		By("Verify that the owner reference has been backfilled onto the existing ConfigMap")
+		Expect(fetchObject(ctx, r.Client, a.Namespace, DefaultRolloutsConfigMapName, fetchedConfigMap)).To(Succeed())
+		Expect(fetchedConfigMap.OwnerReferences).To(HaveLen(1))
+		Expect(fetchedConfigMap.OwnerReferences[0].Name).To(Equal(a.Name))
+		Expect(fetchedConfigMap.OwnerReferences[0].Kind).To(Equal("RolloutManager"))
+	})
+
 	It("verifies that the custom labels are added to the ConfigMap", func() {
 		r = makeTestReconcilerWithCustomLabels(map[string]string{
 			"custom1": "value",
