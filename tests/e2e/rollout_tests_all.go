@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/ptr"
 )
 
 // This file contains tests that should run in both namespace-scoped and cluster-scoped scenarios.
@@ -85,7 +84,7 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 						goObj.Spec.NetworkPolicy = &rolloutsmanagerv1alpha1.RolloutManagerNetworkPolicySpec{}
 					}
 
-					goObj.Spec.NetworkPolicy.Enabled = ptr.To(false)
+					goObj.Spec.NetworkPolicy.Enabled = new(false)
 				})
 				Expect(err).ToNot(HaveOccurred())
 				By("Verify that RolloutManager successfully removed Network Policy.")

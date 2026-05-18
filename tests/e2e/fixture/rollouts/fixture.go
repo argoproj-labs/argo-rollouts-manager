@@ -109,7 +109,7 @@ func HasEmptyStatus(ctx context.Context, name, namespace string) (bool, error) {
 		return true, nil
 	}
 
-	statusMapVal := (mapVal["status"]).(map[string]interface{})
+	statusMapVal := (mapVal["status"]).(map[string]any)
 
 	return len(statusMapVal) == 0, nil
 }
@@ -127,7 +127,7 @@ func HasStatusPhase(ctx context.Context, name, namespace string, expectedPhase s
 		return false, nil
 	}
 
-	statusMapVal := (mapVal["status"]).(map[string]interface{})
+	statusMapVal := (mapVal["status"]).(map[string]any)
 
 	if statusMapVal["phase"] == nil {
 		return false, nil

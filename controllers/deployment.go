@@ -3,6 +3,7 @@ package rollouts
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"reflect"
 
@@ -36,12 +37,8 @@ func generateDesiredRolloutsDeployment(cr rolloutsmanagerv1alpha1.RolloutManager
 	}
 	annotations := map[string]string{}
 	if cr.Spec.AdditionalMetadata != nil {
-		for k, v := range cr.Spec.AdditionalMetadata.Labels {
-			labels[k] = v
-		}
-		for k, v := range cr.Spec.AdditionalMetadata.Annotations {
-			annotations[k] = v
-		}
+		maps.Copy(labels, cr.Spec.AdditionalMetadata.Labels)
+		maps.Copy(annotations, cr.Spec.AdditionalMetadata.Annotations)
 	}
 
 	// Default number of replicas is 1, update it to 2 if HA is enabled
@@ -366,9 +363,9 @@ func rolloutsContainer(cr rolloutsmanagerv1alpha1.RolloutManager) (corev1.Contai
 					"ALL",
 				},
 			},
-			AllowPrivilegeEscalation: boolPtr(false),
-			ReadOnlyRootFilesystem:   boolPtr(true),
-			RunAsNonRoot:             boolPtr(true),
+			AllowPrivilegeEscalation: new(false),
+			ReadOnlyRootFilesystem:   new(true),
+			RunAsNonRoot:             new(true),
 			SeccompProfile: &corev1.SeccompProfile{
 				Type: corev1.SeccompProfileTypeRuntimeDefault,
 			},
@@ -622,8 +619,10 @@ func normalizeMap(in map[string]string) map[string]string {
 }
 
 // boolPtr returns a pointer to val
+//
+//go:fix inline
 func boolPtr(val bool) *bool {
-	return &val
+	return new(val)
 }
 
 // Returns the container image for rollouts controller.

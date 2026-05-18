@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	maps0 "maps"
 	"os"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 
@@ -48,12 +51,8 @@ func setAdditionalRolloutsLabelsAndAnnotationsToObject(obj *metav1.ObjectMeta, c
 		if obj.Annotations == nil {
 			obj.Annotations = map[string]string{}
 		}
-		for k, v := range cr.Spec.AdditionalMetadata.Labels {
-			obj.Labels[k] = v
-		}
-		for k, v := range cr.Spec.AdditionalMetadata.Annotations {
-			obj.Annotations[k] = v
-		}
+		maps.Copy(obj.Labels, cr.Spec.AdditionalMetadata.Labels)
+		maps.Copy(obj.Annotations, cr.Spec.AdditionalMetadata.Annotations)
 	}
 
 }
@@ -71,9 +70,7 @@ func setCustomLabels(obj *metav1.ObjectMeta, customLabels map[string]string) {
 		obj.Labels = map[string]string{}
 	}
 
-	for k, v := range customLabels {
-		obj.Labels[k] = v
-	}
+	maps.Copy(obj.Labels, customLabels)
 
 }
 
@@ -92,9 +89,7 @@ func appendStringMap(src map[string]string, add map[string]string) map[string]st
 	if len(src) <= 0 {
 		res = make(map[string]string, len(add))
 	}
-	for key, val := range add {
-		res[key] = val
-	}
+	maps.Copy(res, add)
 	return res
 }
 
@@ -135,9 +130,7 @@ func combineStringMaps(maps ...map[string]string) map[string]string {
 		if currMap == nil {
 			continue
 		}
-		for k, v := range maps[idx] {
-			res[k] = v
-		}
+		maps0.Copy(res, maps[idx])
 	}
 
 	return res
@@ -214,12 +207,7 @@ func combineImageTag(img string, tag string) string {
 
 // contains returns true if a string is part of the given slice.
 func contains(s []string, g string) bool {
-	for _, a := range s {
-		if a == g {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(s, g)
 }
 
 // isMergable returns error if any of the extraArgs is already part of the default command Arguments.
@@ -293,10 +281,8 @@ func validateRolloutsScope(cr rolloutsmanagerv1alpha1.RolloutManager, namespaceS
 func allowedClusterScopedNamespace(cr rolloutsmanagerv1alpha1.RolloutManager) bool {
 	clusterConfigNamespaces := splitList(os.Getenv(ClusterScopedArgoRolloutsNamespaces))
 	if len(clusterConfigNamespaces) > 0 {
-		for _, n := range clusterConfigNamespaces {
-			if n == cr.Namespace {
-				return true
-			}
+		if slices.Contains(clusterConfigNamespaces, cr.Namespace) {
+			return true
 		}
 	}
 	return false
