@@ -26,4 +26,5 @@ nav:
     - OLM: install/olm.md
   - Usage:
     - Getting Started: usage/getting_started.md
+    - Security Model: docs/usage/security_model.md
   - Overview: index.md
