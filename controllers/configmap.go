@@ -68,6 +68,7 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr ro
 			trafficRouterPluginsMap[plugin.Name] = pluginItem{
 				Name:     plugin.Name,
 				Location: plugin.Location,
+				Sha256:   plugin.SHA256,
 			}
 		}
 	}
@@ -134,7 +135,7 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr ro
 			log.Info("configMap not found, creating default configmap with openshift route plugin information")
 			return r.Client.Create(ctx, desiredConfigMap)
 		}
-		return fmt.Errorf("failed to get the serviceAccount associated with %s: %w", desiredConfigMap.Name, err)
+		return fmt.Errorf("failed to get the ConfigMap associated with %s: %w", desiredConfigMap.Name, err)
 	}
 
 	// Unmarshal the existing plugin data from the actual ConfigMap
@@ -170,8 +171,10 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr ro
 		if err := r.restartRolloutsPod(ctx, cr.Namespace); err != nil {
 			return err
 		}
+	} else {
+		log.Info("No changes detected in ConfigMap, skipping update and pod restart")
 	}
-	log.Info("No changes detected in ConfigMap, skipping update and pod restart")
+
 	return nil
 }
 

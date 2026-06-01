@@ -659,8 +659,10 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&configMap), &configMap)).To(Succeed())
 			Expect(configMap.Data[controllers.TrafficRouterPluginConfigMapKey]).To(ContainSubstring(rolloutsManager.Spec.Plugins.TrafficManagement[0].Name))
 			Expect(configMap.Data[controllers.TrafficRouterPluginConfigMapKey]).To(ContainSubstring(rolloutsManager.Spec.Plugins.TrafficManagement[0].Location))
+			Expect(configMap.Data[controllers.TrafficRouterPluginConfigMapKey]).To(ContainSubstring(rolloutsManager.Spec.Plugins.TrafficManagement[0].SHA256))
 			Expect(configMap.Data[controllers.MetricPluginConfigMapKey]).To(ContainSubstring(rolloutsManager.Spec.Plugins.Metric[0].Name))
 			Expect(configMap.Data[controllers.MetricPluginConfigMapKey]).To(ContainSubstring(rolloutsManager.Spec.Plugins.Metric[0].Location))
+			Expect(configMap.Data[controllers.MetricPluginConfigMapKey]).To(ContainSubstring(rolloutsManager.Spec.Plugins.Metric[0].SHA256))
 			Expect(configMap.Data[controllers.MetricPluginConfigMapKey_PreviousInvalidKey]).ToNot(ContainSubstring(rolloutsManager.Spec.Plugins.Metric[0].Name))
 			Expect(configMap.Data[controllers.MetricPluginConfigMapKey_PreviousInvalidKey]).ToNot(ContainSubstring(rolloutsManager.Spec.Plugins.Metric[0].Location))
 
@@ -685,8 +687,10 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 				}
 				return strings.Contains(configMap.Data[controllers.TrafficRouterPluginConfigMapKey], rolloutsManager.Spec.Plugins.TrafficManagement[0].Name) &&
 					strings.Contains(configMap.Data[controllers.TrafficRouterPluginConfigMapKey], rolloutsManager.Spec.Plugins.TrafficManagement[0].Location) &&
+					strings.Contains(configMap.Data[controllers.TrafficRouterPluginConfigMapKey], rolloutsManager.Spec.Plugins.TrafficManagement[0].SHA256) &&
 					strings.Contains(configMap.Data[controllers.MetricPluginConfigMapKey], rolloutsManager.Spec.Plugins.Metric[0].Name) &&
 					strings.Contains(configMap.Data[controllers.MetricPluginConfigMapKey], rolloutsManager.Spec.Plugins.Metric[0].Location) &&
+					strings.Contains(configMap.Data[controllers.MetricPluginConfigMapKey], rolloutsManager.Spec.Plugins.Metric[0].SHA256) &&
 					!strings.Contains(configMap.Data[controllers.MetricPluginConfigMapKey_PreviousInvalidKey], rolloutsManager.Spec.Plugins.Metric[0].Name)
 
 			}, "1m", "1s").Should(BeTrue())
@@ -766,6 +770,7 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 				By("Verify metric plugin is under the new key and not the old key")
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&configMap), &configMap)).To(Succeed())
 				Expect(configMap.Data[controllers.MetricPluginConfigMapKey]).To(ContainSubstring("prometheus"))
+				Expect(configMap.Data[controllers.MetricPluginConfigMapKey]).To(ContainSubstring(rolloutsManager.Spec.Plugins.Metric[0].SHA256))
 				Expect(configMap.Data[controllers.MetricPluginConfigMapKey_PreviousInvalidKey]).NotTo(ContainSubstring("prometheus"))
 
 				By("Manually inject data under the old invalid key into the ConfigMap")
@@ -795,7 +800,8 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 					_, oldKeyExists := configMap.Data[controllers.MetricPluginConfigMapKey_PreviousInvalidKey]
 					res := !oldKeyExists &&
 						strings.Contains(configMap.Data[controllers.MetricPluginConfigMapKey], "prometheus") &&
-						strings.Contains(configMap.Data[controllers.MetricPluginConfigMapKey], rolloutsManager.Spec.Plugins.Metric[0].Location)
+						strings.Contains(configMap.Data[controllers.MetricPluginConfigMapKey], rolloutsManager.Spec.Plugins.Metric[0].Location) &&
+						strings.Contains(configMap.Data[controllers.MetricPluginConfigMapKey], rolloutsManager.Spec.Plugins.Metric[0].SHA256)
 
 					if !res {
 						GinkgoWriter.Println("configMap:", configMap.Data)

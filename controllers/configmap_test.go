@@ -121,7 +121,7 @@ var _ = Describe("ConfigMap Test", func() {
 
 		By("Adding traffic and metric plugins through the CR")
 		a.Spec.Plugins.TrafficManagement = []v1alpha1.Plugin{
-			{Name: "custom-traffic-plugin", Location: trafficrouterPluginLocation},
+			{Name: "custom-traffic-plugin", Location: trafficrouterPluginLocation, SHA256: "sha256-traffic-test"},
 		}
 		a.Spec.Plugins.Metric = []v1alpha1.Plugin{
 			{Name: "custom-metric-plugin", Location: metricPluginLocation, SHA256: "sha256-test"},
@@ -144,18 +144,20 @@ var _ = Describe("ConfigMap Test", func() {
 		By("Verify that the fetched ConfigMap contains plugins added by CR")
 		Expect(fetchedConfigMap.Data[MetricPluginConfigMapKey]).To(ContainSubstring(a.Spec.Plugins.Metric[0].Name))
 		Expect(fetchedConfigMap.Data[MetricPluginConfigMapKey]).To(ContainSubstring(a.Spec.Plugins.Metric[0].Location))
+		Expect(fetchedConfigMap.Data[MetricPluginConfigMapKey]).To(ContainSubstring(a.Spec.Plugins.Metric[0].SHA256))
 
 		Expect(fetchedConfigMap.Data[MetricPluginConfigMapKey_PreviousInvalidKey]).ToNot(ContainSubstring(a.Spec.Plugins.Metric[0].Name))
 		Expect(fetchedConfigMap.Data[MetricPluginConfigMapKey_PreviousInvalidKey]).ToNot(ContainSubstring(a.Spec.Plugins.Metric[0].Location))
 
 		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(a.Spec.Plugins.TrafficManagement[0].Name))
 		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(a.Spec.Plugins.TrafficManagement[0].Location))
+		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(a.Spec.Plugins.TrafficManagement[0].SHA256))
 
 		By("Update metric and traffic plugins through RolloutManager CR")
 		updatedPluginLocation := "https://test-updated-plugin-location"
 
 		a.Spec.Plugins.TrafficManagement = []v1alpha1.Plugin{
-			{Name: "custom-traffic-plugin", Location: updatedPluginLocation},
+			{Name: "custom-traffic-plugin", Location: updatedPluginLocation, SHA256: "sha256-traffic-updated"},
 		}
 		a.Spec.Plugins.Metric = []v1alpha1.Plugin{
 			{Name: "custom-metric-plugin", Location: updatedPluginLocation, SHA256: "sha256-test"},
@@ -177,11 +179,13 @@ var _ = Describe("ConfigMap Test", func() {
 		By("Verify that ConfigMap is updated with the plugins modified by RolloutManger CR")
 		Expect(fetchedConfigMap.Data[MetricPluginConfigMapKey]).To(ContainSubstring(a.Spec.Plugins.Metric[0].Name))
 		Expect(fetchedConfigMap.Data[MetricPluginConfigMapKey]).To(ContainSubstring(updatedPluginLocation))
+		Expect(fetchedConfigMap.Data[MetricPluginConfigMapKey]).To(ContainSubstring(a.Spec.Plugins.Metric[0].SHA256))
 		Expect(fetchedConfigMap.Data[MetricPluginConfigMapKey_PreviousInvalidKey]).ToNot(ContainSubstring(a.Spec.Plugins.Metric[0].Name))
 		Expect(fetchedConfigMap.Data[MetricPluginConfigMapKey_PreviousInvalidKey]).ToNot(ContainSubstring(updatedPluginLocation))
 
 		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(a.Spec.Plugins.TrafficManagement[0].Name))
 		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(updatedPluginLocation))
+		Expect(fetchedConfigMap.Data[TrafficRouterPluginConfigMapKey]).To(ContainSubstring(a.Spec.Plugins.TrafficManagement[0].SHA256))
 
 		By("Verify that OpenShiftRolloutPlugin is not updated through RolloutManager CR")
 		a.Spec.Plugins = v1alpha1.Plugins{
