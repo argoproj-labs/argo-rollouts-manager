@@ -4,7 +4,7 @@ Author(s): Jonathan West (@jgwest)
 
 This document describes the security model of the Argo Rollouts Manager operator (also referred to as the Argo Rollouts operator), which installs and maintains Argo Rollouts on a Kubernetes cluster. 
 
-**Note**: Argo Rollouts is entirely separate from Argo CD. The 'Argo' prefix refers to a collection of minimaly related sibling projects.
+**Note**: Argo Rollouts is entirely separate from Argo CD. The 'Argo' prefix refers to a collection of minimally related sibling projects.
 
 # Analysis
 
@@ -106,9 +106,9 @@ To interact with Argo Rollouts, one creates/modifies/updates/deletes Argo Rollou
 
 For example:
 
-* To deploy an Application using Argo Rollouts, the user would create a Rollout CR in the namespace, via e.g. `kubectl create rolloutmanager/my-app -n (namespace) -f (...)`
-* To see the status of the deployment, the user would look at .status field of Rollout CR via e.g. `kubectl get rolloutmanager/my-app -o yaml -n (namespace)`  
-* Likewise to delete an Application e.g. `kubectl delete rolloutmanager/my-app`.
+* To deploy an Application using Argo Rollouts, the user would create a Rollout CR in the namespace, via e.g. `kubectl create rollout/my-app -n (namespace) -f (...)`
+* To see the status of the deployment, the user would look at .status field of Rollout CR via e.g. `kubectl get rollout/my-app -o yaml -n (namespace)`  
+* Likewise to delete an Application e.g. `kubectl delete rollout/my-app`.
 
 A user’s privilege to use Argo Rollouts resources is thus equivalent to their K8s RBAC API access to those resources. This is similar to other deployment mechanisms, such as K8s Deployments/ReplicaSets/Jobs/etc.
 
@@ -224,14 +224,14 @@ An LLM-based analysis notes the following (which I have not manually vetted as o
 * Argo Rollouts operator  
   * The only security sensitive resources that Argo Rollouts operator has are those that are granted to it by OLM (Secrets and ServiceAccounts), which are controlled via that mechanism.  
 * Argo Rollouts  
-  * Argo Rollouts CRs are restricted to operating only within the namespace they are defined. For instance, a Rollout CR (used to deploy an application) in namespace ‘a’ cannot touch any resources (ReplicaSets, Ingresses, etc) in any other namespace, e.g. a namespace ‘b’.
+  * Argo Rollouts CRs are restricted to operating only within the namespace they are defined (except in limited circumstances described elsewhere in this doc). For instance, a Rollout CR (used to deploy an application) in namespace ‘a’ cannot touch any resources (ReplicaSets, Ingresses, etc) in any other namespace, e.g. a namespace ‘b’.
 
 ### Least Common Mechanism
 
 * Argo Rollouts operator  
   * The only security sensitive resources that Argo Rollouts operator has are those that are granted to it by OLM (Secrets and ServiceAccounts), which are controlled via that mechanism.  
 * Argo Rollouts  
-  * Argo Rollouts CRs are restricted to operating only within the namespace they are defined. For instance, a Rollout CR (used to deploy an application) in namespace ‘a’ cannot touch any resources (ReplicaSets, Ingresses, etc) in any other namespace, e.g. a namespace ‘b’.  
+  * Argo Rollouts CRs are restricted to operating only within the namespace they are defined (except in limited circumstances described elsewhere in the doc). For instance, a Rollout CR (used to deploy an application) in namespace ‘a’ cannot touch any resources (ReplicaSets, Ingresses, etc) in any other namespace, e.g. a namespace ‘b’.  
   * The only other opportunity for side channel attacks is data transfer between Argo Rollouts container and Argo Rollouts traffic manager/metrics plugin  
   * Plugins communicate via intra-container RPC, so opportunity for attack is limited.
 
@@ -242,7 +242,7 @@ An LLM-based analysis notes the following (which I have not manually vetted as o
   * With cluster-scoped, we have an additional restriction that forces the administrator to name the specific namespace into which the cluster-scoped Rollouts will be installed.  
   * Between these two points, it should be clear (for the admin) to understand the behaviour of the operator and rollouts instance.  
 * Argo Rollouts  
-  * Argo Rollouts CRs are namespace-scoped: this makes it easy to reason about their impact. To the best of my knowledge, a Rollouts CR cannot under any circumstance reach outside the Namespace in which it is defined.  
+  * Argo Rollouts CRs are namespace-scoped: this makes it easy to reason about their impact. To the best of my knowledge, a Rollouts CR reach outside the Namespace in which it is defined, with the limited exceptions being those described elsewhere in the doc.
   * Likewise, since Argo Rollouts inherits K8s auth mechanisms, a cluster admin's existing understanding of cluster security should translate to securing Argo Rollouts.
 
 ### Compromise Recording
