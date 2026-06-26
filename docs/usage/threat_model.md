@@ -1,8 +1,8 @@
-# Security Model for Argo Rollouts Manager Operator 
+# Threat Model for Argo Rollouts Manager Operator 
 
 Author(s): Jonathan West (@jgwest)
 
-This document describes the security model of the Argo Rollouts Manager operator (also referred to as the Argo Rollouts operator), which installs and maintains Argo Rollouts on a Kubernetes cluster. 
+This document describes the threat model of the Argo Rollouts Manager operator (also referred to as the Argo Rollouts operator), which installs and maintains Argo Rollouts on a Kubernetes cluster. 
 
 **Note**: Argo Rollouts is entirely separate from Argo CD. The 'Argo' prefix refers to a collection of minimally related sibling projects.
 
