@@ -2,6 +2,7 @@ package rollouts
 
 import (
 	"context"
+	"slices"
 	"sort"
 
 	"fmt"
@@ -151,13 +152,15 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr ro
 		return fmt.Errorf("failed to unmarshal metric plugins: %s", err)
 	}
 
-	// Check if an update is needed by comparing desired and actual plugin configurations
-	updateNeeded := !reflect.DeepEqual(actualTrafficRouterPlugins, trafficRouterPlugins) || !reflect.DeepEqual(actualMetricPlugins, metricPlugins)
+	// Check if the plugin data itself has changed; only this should trigger a pod restart,
+	// since the rollouts controller only needs to restart to pick up new plugin configuration.
+	pluginDataChanged := !reflect.DeepEqual(actualTrafficRouterPlugins, trafficRouterPlugins) || !reflect.DeepEqual(actualMetricPlugins, metricPlugins)
+	updateNeeded := pluginDataChanged
 
 	// Backfill the owner reference on ConfigMaps that were created by a previous version of the
 	// operator (before the ConfigMap was owned by the RolloutManager CR), so that it is garbage
 	// collected on RolloutManager deletion like every other namespace-scoped resource.
-	previousOwnerRefs := actualConfigMap.GetOwnerReferences()
+	previousOwnerRefs := slices.Clone(actualConfigMap.GetOwnerReferences())
 	if err := controllerutil.SetControllerReference(&cr, actualConfigMap, r.Scheme); err != nil {
 		return fmt.Errorf("failed to set owner reference on existing ConfigMap %s: %w", actualConfigMap.Name, err)
 	}
@@ -183,9 +186,14 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr ro
 		if err := r.Client.Update(ctx, actualConfigMap); err != nil {
 			return fmt.Errorf("failed to update ConfigMap: %v", err)
 		}
-		// Restarting rollouts pod only if configMap is updated
-		if err := r.restartRolloutsPod(ctx, cr.Namespace); err != nil {
-			return err
+
+		// Only restart Rollouts pods when the plugin data itself changed; owner-reference
+		// backfills and stale-key cleanup don't affect running pods, so skip the restart
+		// (which would otherwise interrupt rollout reconciliation for no reason).
+		if pluginDataChanged {
+			if err := r.restartRolloutsPod(ctx, cr.Namespace); err != nil {
+				return err
+			}
 		}
 	} else {
 		log.Info("No changes detected in ConfigMap, skipping update and pod restart")

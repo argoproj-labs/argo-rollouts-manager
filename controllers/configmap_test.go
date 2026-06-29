@@ -11,6 +11,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 var _ = Describe("ConfigMap Test", func() {
@@ -112,6 +113,27 @@ var _ = Describe("ConfigMap Test", func() {
 		Expect(fetchedConfigMap.OwnerReferences).To(HaveLen(1))
 		Expect(fetchedConfigMap.OwnerReferences[0].Name).To(Equal(a.Name))
 		Expect(fetchedConfigMap.OwnerReferences[0].Kind).To(Equal("RolloutManager"))
+	})
+
+	It("verifies that a stale owner reference UID (as would be left behind if the owning RolloutManager was deleted and recreated with the same name but a new UID) is corrected and persisted on reconcile", func() {
+		By("Call reconcileConfigMap to create the ConfigMap")
+		Expect(r.reconcileConfigMap(ctx, a)).To(Succeed())
+
+		By("Simulate a stale owner reference UID left behind by a deleted-and-recreated RolloutManager of the same name")
+		fetchedConfigMap := &corev1.ConfigMap{}
+		Expect(fetchObject(ctx, r.Client, a.Namespace, DefaultRolloutsConfigMapName, fetchedConfigMap)).To(Succeed())
+		Expect(fetchedConfigMap.OwnerReferences).To(HaveLen(1))
+		fetchedConfigMap.OwnerReferences[0].UID = types.UID("stale-uid-from-deleted-rolloutmanager")
+		Expect(r.Client.Update(ctx, fetchedConfigMap)).To(Succeed())
+
+		By("Call reconcileConfigMap again")
+		Expect(r.reconcileConfigMap(ctx, a)).To(Succeed())
+
+		By("Verify that the owner reference UID has been corrected to the current RolloutManager's UID, and that the correction was persisted")
+		Expect(fetchObject(ctx, r.Client, a.Namespace, DefaultRolloutsConfigMapName, fetchedConfigMap)).To(Succeed())
+		Expect(fetchedConfigMap.OwnerReferences).To(HaveLen(1))
+		Expect(fetchedConfigMap.OwnerReferences[0].UID).To(Equal(a.UID))
+		Expect(fetchedConfigMap.OwnerReferences[0].UID).ToNot(Equal(types.UID("stale-uid-from-deleted-rolloutmanager")))
 	})
 
 	It("verifies that the custom labels are added to the ConfigMap", func() {

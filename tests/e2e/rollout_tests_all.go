@@ -150,7 +150,7 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 				By("deleting the argo-rollouts-config configmap")
 				Eventually(&corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{Name: controllers.DefaultRolloutsConfigMapName, Namespace: rolloutManager.Namespace},
-				}, "10s", "1s").ShouldNot(k8s.ExistByName(k8sClient))
+				}, "10s", "1s").Should(k8s.NotExistByName(k8sClient))
 
 				By("deleting the service")
 				Eventually(&corev1.Service{
