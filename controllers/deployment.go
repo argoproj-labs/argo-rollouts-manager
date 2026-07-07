@@ -360,19 +360,6 @@ func rolloutsContainer(cr rolloutsmanagerv1alpha1.RolloutManager) (corev1.Contai
 				Name:          "metrics",
 			},
 		},
-		ReadinessProbe: &corev1.Probe{
-			FailureThreshold: int32(5),
-			ProbeHandler: corev1.ProbeHandler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Path: "/metrics",
-					Port: intstr.FromString("metrics"),
-				},
-			},
-			InitialDelaySeconds: int32(10),
-			PeriodSeconds:       int32(5),
-			SuccessThreshold:    int32(1),
-			TimeoutSeconds:      int32(4),
-		},
 		SecurityContext: &corev1.SecurityContext{
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{
@@ -495,7 +482,6 @@ func normalizeDeployment(inputParam appsv1.Deployment, cr rolloutsmanagerv1alpha
 	inputContainer := input.Spec.Template.Spec.Containers[0]
 	inputLivenessProbe := inputContainer.LivenessProbe
 	inputPorts := inputContainer.Ports
-	inputReadinessProbe := inputContainer.ReadinessProbe
 	inputSecurityContext := inputContainer.SecurityContext
 	inputVolumeMounts := inputContainer.VolumeMounts
 
@@ -505,14 +491,7 @@ func normalizeDeployment(inputParam appsv1.Deployment, cr rolloutsmanagerv1alpha
 
 	if inputLivenessProbe.ProbeHandler.HTTPGet == nil {
 		return appsv1.Deployment{}, fmt.Errorf("incorrect http get in liveness probe")
-	}
 
-	if inputReadinessProbe == nil {
-		return appsv1.Deployment{}, fmt.Errorf("incorrect readiness probe")
-	}
-
-	if inputReadinessProbe.ProbeHandler.HTTPGet == nil {
-		return appsv1.Deployment{}, fmt.Errorf("incorrect http get in readiness probe")
 	}
 
 	if inputPorts == nil || len(inputPorts) != 2 {
@@ -607,20 +586,8 @@ func normalizeDeployment(inputParam appsv1.Deployment, cr rolloutsmanagerv1alpha
 				Name:          inputPorts[1].Name,
 			},
 		},
-		ReadinessProbe: &corev1.Probe{
-			FailureThreshold: inputReadinessProbe.FailureThreshold,
-			ProbeHandler: corev1.ProbeHandler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Path: inputReadinessProbe.ProbeHandler.HTTPGet.Path,
-					Port: inputReadinessProbe.ProbeHandler.HTTPGet.Port,
-				},
-			},
-			InitialDelaySeconds: inputReadinessProbe.InitialDelaySeconds,
-			PeriodSeconds:       inputReadinessProbe.PeriodSeconds,
-			SuccessThreshold:    inputReadinessProbe.SuccessThreshold,
-			TimeoutSeconds:      inputReadinessProbe.TimeoutSeconds,
-		},
-		Resources: inputContainer.Resources,
+		ReadinessProbe: inputContainer.ReadinessProbe,
+		Resources:      inputContainer.Resources,
 		SecurityContext: &corev1.SecurityContext{
 			Capabilities: &corev1.Capabilities{
 				Drop: inputSecurityContext.Capabilities.Drop,

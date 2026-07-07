@@ -650,14 +650,6 @@ var _ = Describe("normalizeDeployment tests to verify that an error is returned"
 			deployment.Spec.Template.Spec.Containers[0].LivenessProbe.ProbeHandler.HTTPGet = nil
 		}, "incorrect http get in liveness probe"),
 
-		Entry("readiness probe is nil", func() {
-			deployment.Spec.Template.Spec.Containers[0].ReadinessProbe = nil
-		}, "incorrect readiness probe"),
-
-		Entry("readiness probe http get is nil", func() {
-			deployment.Spec.Template.Spec.Containers[0].ReadinessProbe.ProbeHandler.HTTPGet = nil
-		}, "incorrect http get in readiness probe"),
-
 		Entry("input ports is nil", func() {
 			deployment.Spec.Template.Spec.Containers[0].Ports = nil
 		}, "incorrect input ports"),
