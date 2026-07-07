@@ -26,6 +26,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 )
 
@@ -907,6 +908,46 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 			})
 		})
 
+		When("A RolloutManager is created", func() {
+			It("should not have a readiness probe on the deployment, and should remove one if it already exists", func() {
+				By("creating a RolloutManager and waiting for it to be available")
+				Expect(k8sClient.Create(ctx, &rolloutManager)).To(Succeed())
+				Eventually(rolloutManager, "60s", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
+				deployment := appsv1.Deployment{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      controllers.DefaultArgoRolloutsResourceName,
+						Namespace: rolloutManager.Namespace,
+					},
+				}
+				Eventually(&deployment, "10s", "1s").Should(k8s.ExistByName(k8sClient))
+				By("verifying that the deployment does not have a readiness probe on new install")
+				Expect(deployment.Spec.Template.Spec.Containers[0].ReadinessProbe).To(BeNil())
+				By("manually adding a readiness probe to the deployment to simulate an existing install")
+				err := k8s.UpdateWithoutConflict(ctx, &deployment, k8sClient, func(obj client.Object) {
+					depl, ok := obj.(*appsv1.Deployment)
+					Expect(ok).To(BeTrue())
+					depl.Spec.Template.Spec.Containers[0].ReadinessProbe = &corev1.Probe{
+						FailureThreshold: int32(5),
+						ProbeHandler: corev1.ProbeHandler{
+							HTTPGet: &corev1.HTTPGetAction{
+								Path: "/metrics",
+								Port: intstr.FromString("metrics"),
+							},
+						},
+						InitialDelaySeconds: int32(10),
+						PeriodSeconds:       int32(5),
+						SuccessThreshold:    int32(1),
+						TimeoutSeconds:      int32(4),
+					}
+				})
+				Expect(err).ToNot(HaveOccurred())
+				By("verifying that the operator removes the readiness probe on the next reconciliation")
+				Eventually(func() *corev1.Probe {
+					Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(&deployment), &deployment)).To(Succeed())
+					return deployment.Spec.Template.Spec.Containers[0].ReadinessProbe
+				}, "30s", "1s").Should(BeNil())
+			})
+		})
 		It("should contain two replicas and the '--leader-elect' argument set to true, and verify that the anti-affinity rule is added by default when HA is enabled", func() {
 			By("Create cluster-scoped RolloutManager in a namespace.")
 
