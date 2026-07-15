@@ -92,7 +92,9 @@ var _ = Describe("Argo RolloutManager ImagePullPolicy E2E tests", func() {
 			}
 			By("adding image pull policy env variable to IMAGE_PULL_POLICY in Subscription")
 			Expect(os.Setenv("IMAGE_PULL_POLICY", "Always")).To(Succeed())
-			defer os.Unsetenv("IMAGE_PULL_POLICY")
+			defer func() {
+				Expect(os.Unsetenv("IMAGE_PULL_POLICY")).To(Succeed())
+			}()
 
 			By("creating a RolloutManager without imagePullPolicy")
 			rolloutManager = v1alpha1.RolloutManager{

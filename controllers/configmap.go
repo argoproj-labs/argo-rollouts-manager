@@ -138,7 +138,7 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr ro
 			if err := controllerutil.SetControllerReference(&cr, desiredConfigMap, r.Scheme); err != nil {
 				return fmt.Errorf("failed to set owner reference on ConfigMap %s: %w", desiredConfigMap.Name, err)
 			}
-			return r.Client.Create(ctx, desiredConfigMap)
+			return r.Create(ctx, desiredConfigMap)
 		}
 		return fmt.Errorf("failed to get the ConfigMap associated with %s: %w", desiredConfigMap.Name, err)
 	}
@@ -183,7 +183,7 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr ro
 		log.Info("Updating Rollouts ConfigMap due to detected difference")
 
 		// Update the ConfigMap in the cluster
-		if err := r.Client.Update(ctx, actualConfigMap); err != nil {
+		if err := r.Update(ctx, actualConfigMap); err != nil {
 			return fmt.Errorf("failed to update ConfigMap: %v", err)
 		}
 
@@ -205,7 +205,7 @@ func (r *RolloutManagerReconciler) reconcileConfigMap(ctx context.Context, cr ro
 // restartRolloutsPod deletes the Rollouts Pod to trigger a restart
 func (r *RolloutManagerReconciler) restartRolloutsPod(ctx context.Context, namespace string) error {
 	deployment := &appsv1.Deployment{}
-	if err := r.Client.Get(ctx, types.NamespacedName{Name: DefaultArgoRolloutsResourceName, Namespace: namespace}, deployment); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: DefaultArgoRolloutsResourceName, Namespace: namespace}, deployment); err != nil {
 		if errors.IsNotFound(err) {
 			// If Deployment isn't found, return nil as there is no child pod to restart
 			return nil
@@ -218,15 +218,15 @@ func (r *RolloutManagerReconciler) restartRolloutsPod(ctx context.Context, names
 		client.InNamespace(namespace),
 		client.MatchingLabels(deployment.Spec.Selector.MatchLabels),
 	}
-	if err := r.Client.List(ctx, podList, listOpts...); err != nil {
+	if err := r.List(ctx, podList, listOpts...); err != nil {
 		return fmt.Errorf("failed to list Rollouts Pods: %w", err)
 	}
 
 	for i := range podList.Items {
 		pod := podList.Items[i]
-		if pod.ObjectMeta.DeletionTimestamp == nil {
+		if pod.DeletionTimestamp == nil {
 			log.Info("Deleting Rollouts Pod", "podName", pod.Name)
-			if err := r.Client.Delete(ctx, &pod); err != nil {
+			if err := r.Delete(ctx, &pod); err != nil {
 				if errors.IsNotFound(err) {
 					log.Info(fmt.Sprintf("Pod %s already deleted", pod.Name))
 					continue

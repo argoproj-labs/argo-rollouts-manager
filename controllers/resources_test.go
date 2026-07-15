@@ -560,7 +560,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 			}
 			fetchedSecret := &corev1.Secret{}
 			Expect(fetchObject(ctx, r.Client, a.Namespace, secret.Name, fetchedSecret)).To(Succeed())
-			Expect(fetchedSecret.ObjectMeta.Labels).To(Equal(secret.ObjectMeta.Labels))
+			Expect(fetchedSecret.ObjectMeta.Labels).To(Equal(secret.Labels))
 		})
 
 		It("test for removeClusterScopedResourcesIfApplicable function", func() {
@@ -838,7 +838,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 
 		AfterEach(func() {
 			By("Unset Env variable.")
-			os.Unsetenv(ClusterScopedArgoRolloutsNamespaces)
+			Expect(os.Unsetenv(ClusterScopedArgoRolloutsNamespaces)).To(Succeed())
 		})
 
 		a := makeTestRolloutManager()
@@ -908,7 +908,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 				It("Cleans up all resources created for RolloutManager", func() {
 
 					By("Set Env variable.")
-					os.Setenv(ClusterScopedArgoRolloutsNamespaces, a.Namespace)
+					Expect(os.Setenv(ClusterScopedArgoRolloutsNamespaces, a.Namespace)).To(Succeed())
 
 					ctx := context.Background()
 					req := reconcile.Request{
@@ -926,7 +926,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 					Expect(err).NotTo(HaveOccurred())
 					Expect(res.RequeueAfter).Should(BeZero(), "reconcile should not requeue request")
 
-					err = r.Client.Delete(ctx, a)
+					err = r.Delete(ctx, a)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(fetchObject(ctx, r.Client, a.Namespace, test.name, test.resource)).ToNot(Succeed(), fmt.Sprintf("Expected %s to be deleted", test.name))
 				})
@@ -956,12 +956,12 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 			}
 
 			By("Set Env variable.")
-			os.Setenv(ClusterScopedArgoRolloutsNamespaces, a.Namespace)
+			Expect(os.Setenv(ClusterScopedArgoRolloutsNamespaces, a.Namespace)).To(Succeed())
 		})
 
 		AfterEach(func() {
 			By("Unset Env variable.")
-			os.Unsetenv(ClusterScopedArgoRolloutsNamespaces)
+			Expect(os.Unsetenv(ClusterScopedArgoRolloutsNamespaces)).To(Succeed())
 		})
 
 		It("Verify whether RolloutManager creating ServiceMonitor", func() {
@@ -1306,7 +1306,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 
 		getCopy := func(ns string) (*corev1.Secret, error) {
 			s := &corev1.Secret{}
-			return s, r.Client.Get(ctx, client.ObjectKey{Name: RolloutManagerImagePullSecretName, Namespace: ns}, s)
+			return s, r.Get(ctx, client.ObjectKey{Name: RolloutManagerImagePullSecretName, Namespace: ns}, s)
 		}
 
 		BeforeEach(func() {

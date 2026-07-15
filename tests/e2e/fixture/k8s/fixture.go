@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	. "github.com/onsi/gomega"
+	. "github.com/onsi/gomega" //nolint:staticcheck // Keep the Gomega DSL consistent with the e2e tests (ST1001).
 	matcher "github.com/onsi/gomega/types"
 	"k8s.io/client-go/util/retry"
 

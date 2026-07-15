@@ -363,12 +363,12 @@ var _ = Describe("validateRolloutsScope tests", func() {
 
 		BeforeEach(func() {
 			By("Set Env variable.")
-			os.Setenv(ClusterScopedArgoRolloutsNamespaces, rolloutsManager.Namespace)
+			Expect(os.Setenv(ClusterScopedArgoRolloutsNamespaces, rolloutsManager.Namespace)).To(Succeed())
 		})
 
 		AfterEach(func() {
 			By("Unset Env variable.")
-			os.Unsetenv(ClusterScopedArgoRolloutsNamespaces)
+			Expect(os.Unsetenv(ClusterScopedArgoRolloutsNamespaces)).To(Succeed())
 		})
 
 		namespaceScopedArgoRolloutsController := false
@@ -387,7 +387,7 @@ var _ = Describe("validateRolloutsScope tests", func() {
 		It("should return error, if cluster-scoped RolloutManager is created in a namespace which is not specified in env variable.", func() {
 
 			By("Unset Env variable.")
-			os.Unsetenv(ClusterScopedArgoRolloutsNamespaces)
+			Expect(os.Unsetenv(ClusterScopedArgoRolloutsNamespaces)).To(Succeed())
 
 			By("Create cluster-scoped RolloutManager.")
 			Expect(k8sClient.Create(ctx, &rolloutsManager)).To(Succeed())
@@ -824,5 +824,5 @@ func makeTestReconcilerWithCustomLabels(resourceLabels map[string]string, obj ..
 
 func createNamespace(r *RolloutManagerReconciler, n string) error {
 	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: n}}
-	return r.Client.Create(context.Background(), ns)
+	return r.Create(context.Background(), ns)
 }

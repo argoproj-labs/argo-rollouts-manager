@@ -31,12 +31,12 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 		rm = makeTestRolloutManager()
 
 		By("Set Env variable.")
-		os.Setenv(ClusterScopedArgoRolloutsNamespaces, rm.Namespace)
+		Expect(os.Setenv(ClusterScopedArgoRolloutsNamespaces, rm.Namespace)).To(Succeed())
 	})
 
 	AfterEach(func() {
 		By("Unset Env variable.")
-		os.Unsetenv(ClusterScopedArgoRolloutsNamespaces)
+		Expect(os.Unsetenv(ClusterScopedArgoRolloutsNamespaces)).To(Succeed())
 	})
 
 	When("NAMESPACE_SCOPED_ARGO_ROLLOUTS environment variable is set to False.", func() {
@@ -71,14 +71,14 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 			By("Check Role and RoleBinding are not created.")
 
 			role := &rbacv1.Role{}
-			err = r.Client.Get(ctx, types.NamespacedName{
+			err = r.Get(ctx, types.NamespacedName{
 				Name:      DefaultArgoRolloutsResourceName,
 				Namespace: testNamespace,
 			}, role)
 			Expect(errors.IsNotFound(err)).To(BeTrue(), "Role should not be created")
 
 			roleBinding := &rbacv1.RoleBinding{}
-			err = r.Client.Get(ctx, types.NamespacedName{
+			err = r.Get(ctx, types.NamespacedName{
 				Name:      DefaultArgoRolloutsResourceName,
 				Namespace: testNamespace,
 			}, roleBinding)
@@ -167,14 +167,14 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 
 			By("2nd RM: Check Role and RoleBinding are not created.")
 			role := &rbacv1.Role{}
-			err = r2.Client.Get(ctx, types.NamespacedName{
+			err = r2.Get(ctx, types.NamespacedName{
 				Name:      DefaultArgoRolloutsResourceName,
 				Namespace: testNamespace,
 			}, role)
 			Expect(errors.IsNotFound(err)).To(BeTrue(), "Role should not be created")
 
 			roleBinding := &rbacv1.RoleBinding{}
-			err = r2.Client.Get(ctx, types.NamespacedName{
+			err = r2.Get(ctx, types.NamespacedName{
 				Name:      DefaultArgoRolloutsResourceName,
 				Namespace: testNamespace,
 			}, roleBinding)
@@ -211,7 +211,7 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 			rm2.Namespace = "test-ns"
 
 			By("Update Env variable.")
-			os.Setenv(ClusterScopedArgoRolloutsNamespaces, rm.Namespace+","+rm2.Namespace)
+			Expect(os.Setenv(ClusterScopedArgoRolloutsNamespaces, rm.Namespace+","+rm2.Namespace)).To(Succeed())
 
 			Expect(createNamespace(r, rm2.Namespace)).To(Succeed())
 			Expect(r.Client.Create(ctx, rm2)).ToNot(HaveOccurred())
@@ -299,14 +299,14 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 
 			By("Check ClusterRole and ClusterRoleBinding are not created.")
 			clusterRole := &rbacv1.ClusterRole{}
-			err = r.Client.Get(ctx, types.NamespacedName{
+			err = r.Get(ctx, types.NamespacedName{
 				Name:      DefaultArgoRolloutsResourceName,
 				Namespace: testNamespace,
 			}, clusterRole)
 			Expect(errors.IsNotFound(err)).To(BeTrue(), "ClusterRole should not be created")
 
 			clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
-			err = r.Client.Get(ctx, types.NamespacedName{
+			err = r.Get(ctx, types.NamespacedName{
 				Name:      DefaultArgoRolloutsResourceName,
 				Namespace: testNamespace,
 			}, clusterRoleBinding)
@@ -398,14 +398,14 @@ var _ = Describe("RolloutManagerReconciler tests", func() {
 
 			By("2nd RM: Check ClusterRole and ClusterRoleBinding are not created.")
 			clusterRole := &rbacv1.ClusterRole{}
-			err = r2.Client.Get(ctx, types.NamespacedName{
+			err = r2.Get(ctx, types.NamespacedName{
 				Name:      DefaultArgoRolloutsResourceName,
 				Namespace: testNamespace,
 			}, clusterRole)
 			Expect(errors.IsNotFound(err)).To(BeTrue(), "ClusterRole should not be created")
 
 			clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
-			err = r2.Client.Get(ctx, types.NamespacedName{
+			err = r2.Get(ctx, types.NamespacedName{
 				Name:      DefaultArgoRolloutsResourceName,
 				Namespace: testNamespace,
 			}, clusterRoleBinding)

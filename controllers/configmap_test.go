@@ -286,7 +286,7 @@ var _ = Describe("ConfigMap Test", func() {
 
 		By("Verify that the pod has been deleted after the above update.")
 		rolloutsPodList := &corev1.PodList{}
-		err := r.Client.List(ctx, rolloutsPodList, client.InNamespace(a.Namespace), client.MatchingLabels(existingDeployment.Spec.Selector.MatchLabels))
+		err := r.List(ctx, rolloutsPodList, client.InNamespace(a.Namespace), client.MatchingLabels(existingDeployment.Spec.Selector.MatchLabels))
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(rolloutsPodList.Items)).To(BeNumerically("==", 0))
 	})
@@ -331,7 +331,7 @@ var _ = Describe("ConfigMap Test", func() {
 
 		By("Verifying that the pod has been deleted after the ConfigMap update")
 		rolloutsPodList := &corev1.PodList{}
-		err := r.Client.List(ctx, rolloutsPodList, client.InNamespace(a.Namespace), client.MatchingLabels(existingDeployment.Spec.Selector.MatchLabels))
+		err := r.List(ctx, rolloutsPodList, client.InNamespace(a.Namespace), client.MatchingLabels(existingDeployment.Spec.Selector.MatchLabels))
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(rolloutsPodList.Items)).To(BeNumerically("==", 0))
 	})
@@ -356,6 +356,6 @@ func addTestPodToFakeClient(r *RolloutManagerReconciler, namespace string, deplo
 	}
 
 	// Add the pod to the fake client
-	err := r.Client.Create(context.TODO(), testPod)
+	err := r.Create(context.TODO(), testPod)
 	Expect(err).ToNot(HaveOccurred())
 }

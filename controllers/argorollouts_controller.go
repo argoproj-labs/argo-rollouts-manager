@@ -117,7 +117,7 @@ func (r *RolloutManagerReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	// First retrieve the Namespace of the request: if it's being deleted, no more work for us.
 	rolloutManagerNamespace := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: req.Namespace}}
-	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(&rolloutManagerNamespace), &rolloutManagerNamespace); err != nil {
+	if err := r.Get(ctx, client.ObjectKeyFromObject(&rolloutManagerNamespace), &rolloutManagerNamespace); err != nil {
 		if apierrors.IsNotFound(err) { // If Namespace doesn't exist, our work is done
 			reqLogger.Info("Skipping reconciliation of RolloutManager as request Namespace no longer exists")
 
@@ -139,7 +139,7 @@ func (r *RolloutManagerReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	// Next, fetch and reconcile the RolloutManager instance
 	rolloutManager := &rolloutsmanagerv1alpha1.RolloutManager{}
-	if err := r.Client.Get(ctx, req.NamespacedName, rolloutManager); err != nil {
+	if err := r.Get(ctx, req.NamespacedName, rolloutManager); err != nil {
 		if apierrors.IsNotFound(err) {
 
 			// The RolloutManager CR has likely been deleted: owned objects are automatically garbage collected.
@@ -310,7 +310,7 @@ func (r *RolloutManagerReconciler) enqueueAllRolloutManagers(ctx context.Context
 
 	var rolloutManagerList rolloutsmanagerv1alpha1.RolloutManagerList
 
-	if err := r.Client.List(ctx, &rolloutManagerList); err != nil {
+	if err := r.List(ctx, &rolloutManagerList); err != nil {
 		log.Error(err, "Unable to list all RolloutManagers in enqueueAllRolloutManagers")
 		return []reconcile.Request{}
 	}

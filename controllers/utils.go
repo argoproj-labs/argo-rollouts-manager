@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	maps0 "maps"
 	"os"
 	"reflect"
 	"slices"
@@ -117,24 +116,18 @@ func areStringMapsEqual(one map[string]string, two map[string]string) bool {
 
 }
 
-// combineStringMaps will combine multiple maps: maps defined earlier in the 'maps' slice may have their values overriden by maps defined later in the 'maps' slice.
-func combineStringMaps(maps ...map[string]string) map[string]string {
-
-	if maps == nil {
+// combineStringMaps combines maps in order, with later values overriding earlier ones.
+func combineStringMaps(inputs ...map[string]string) map[string]string {
+	if inputs == nil {
 		return nil
 	}
 
-	res := make(map[string]string, 0)
-	for idx := range maps {
-		currMap := maps[idx]
-		if currMap == nil {
-			continue
-		}
-		maps0.Copy(res, maps[idx])
+	res := make(map[string]string)
+	for _, input := range inputs {
+		maps.Copy(res, input)
 	}
 
 	return res
-
 }
 
 // Merges two slices of EnvVar entries into a single one. If existing

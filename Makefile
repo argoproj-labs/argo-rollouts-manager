@@ -337,9 +337,11 @@ GO_SEC = $(shell pwd)/bin/gosec
 go_sec: ## Download gosec locally if necessary.
 	$(call go-get-tool,$(GO_SEC),github.com/securego/gosec/v2/cmd/gosec@latest)
 
-GOLANGCI_LINT = $(shell pwd)/bin/golangci-lint
-golangci_lint: ## Download gosec locally if necessary.
-	$(call go-get-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint@latest)
+GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
+GOLANGCI_LINT_VERSION ?= latest
+.PHONY: golangci_lint
+golangci_lint: | $(LOCALBIN) ## Install the latest stable golangci-lint v2 release.
+	GOBIN="$(abspath $(LOCALBIN))" go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 
 
 .PHONY: lint
