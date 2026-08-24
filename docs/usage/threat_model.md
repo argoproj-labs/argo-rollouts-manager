@@ -149,7 +149,7 @@ Analysis:
 * We do not currently expose this feature via **RolloutManager** CR, but that does not prevent a user from setting these env vars manually via **.spec.env** in RolloutManager CR  
   * This feature is available in upstream Argo Rollouts and may be configured via the `.spec.env` field in RolloutManager CR, even though it is not explicitly exposed in the RolloutManager CRD.  
 * Namespace-scoped Argo Rollouts instance:  
-  * Setting a different namespace in `ARGO_ROLLOUTS_ANALYSIS_JOB_NAMESPACE`, does not allow namespace-scoped Argo CD instances to escape their boundary.  
+  * Setting a different namespace in `ARGO_ROLLOUTS_ANALYSIS_JOB_NAMESPACE`, does not allow namespace-scoped Argo Rollouts instances to escape their boundary.  
   * Setting a different namespace than the one containing the RolloutsManager CR will cause the controller to throw an ‘unable to create Job in namespace’ error (but not break security boundaries)  
 * Cluster-scoped Argo Rollouts instance:  
   * As a consequence of this feature, a user that can set `.spec` field in `RolloutManager` CR has the ability to create Jobs in any namespace.  
