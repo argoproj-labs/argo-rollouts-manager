@@ -1,6 +1,6 @@
 # RolloutManager Custom Resource
 
-This page provides the information about Argo Rollout Custom Resource specification.
+This page provides the information about Argo Rollout Custom Resource specification.d
 
 Name | Default | Description
 --- | --- | ---
