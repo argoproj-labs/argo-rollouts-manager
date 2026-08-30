@@ -1,5 +1,5 @@
 
-# Development
+# Development.
 
 ## Prerequisites
 
