@@ -340,7 +340,8 @@ go_sec: ## Download gosec locally if necessary.
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 GOLANGCI_LINT_VERSION ?= latest
 .PHONY: golangci_lint
-golangci_lint: | $(LOCALBIN) ## Install the latest stable golangci-lint v2 release.
+golangci_lint: | $(LOCALBIN) ## Install golangci-lint v2 locally if necessary.
+	@test -x "$(GOLANGCI_LINT)" && "$(GOLANGCI_LINT)" --version | grep -Eq '^golangci-lint has version v?2\.' || \
 	GOBIN="$(abspath $(LOCALBIN))" go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 
 
