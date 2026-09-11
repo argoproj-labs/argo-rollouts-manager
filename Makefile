@@ -338,11 +338,17 @@ go_sec: ## Download gosec locally if necessary.
 	$(call go-get-tool,$(GO_SEC),github.com/securego/gosec/v2/cmd/gosec@latest)
 
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
+ifeq ($(origin GOLANGCI_LINT_VERSION),undefined)
+GOLANGCI_LINT_VERSION_CHECK = grep -Eq '^golangci-lint has version v?2\.'
+else
+GOLANGCI_LINT_VERSION_CHECK = awk '/^golangci-lint has version / { sub(/^v/, "", $$4); print $$4 }' | \
+	grep -Fxq -- "$(patsubst v%,%,$(GOLANGCI_LINT_VERSION))"
+endif
 GOLANGCI_LINT_VERSION ?= latest
 .PHONY: golangci_lint
 golangci_lint: | $(LOCALBIN) ## Install golangci-lint v2 locally if necessary.
-	@test -x "$(GOLANGCI_LINT)" && "$(GOLANGCI_LINT)" --version | grep -Eq '^golangci-lint has version v?2\.' || \
-	GOBIN="$(abspath $(LOCALBIN))" go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+	@test -x "$(GOLANGCI_LINT)" && "$(GOLANGCI_LINT)" --version | $(GOLANGCI_LINT_VERSION_CHECK) || \
+	GOBIN="$(abspath $(LOCALBIN))" go install "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)"
 
 
 .PHONY: lint
