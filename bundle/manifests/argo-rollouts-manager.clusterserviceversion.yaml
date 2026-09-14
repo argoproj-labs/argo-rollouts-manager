@@ -21,7 +21,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2026-05-04T06:48:36Z"
+    createdAt: "2026-09-14T02:07:34Z"
     operators.operatorframework.io/builder: operator-sdk-v1.35.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   name: argo-rollouts-manager.v0.0.1
@@ -87,6 +87,8 @@ spec:
           verbs:
           - get
           - list
+          - patch
+          - update
           - watch
         - apiGroups:
           - ""
@@ -331,6 +333,7 @@ spec:
           - watch
         - apiGroups:
           - traefik.containo.us
+          - traefik.io
           resources:
           - traefikservices
           verbs:

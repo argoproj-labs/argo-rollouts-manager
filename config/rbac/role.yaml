@@ -32,6 +32,8 @@ rules:
   verbs:
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - ""
@@ -276,6 +278,7 @@ rules:
   - watch
 - apiGroups:
   - traefik.containo.us
+  - traefik.io
   resources:
   - traefikservices
   verbs:
