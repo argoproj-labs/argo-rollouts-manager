@@ -181,7 +181,3 @@ type RolloutManagerList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []RolloutManager `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&RolloutManager{}, &RolloutManagerList{})
-}
