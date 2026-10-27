@@ -509,3 +509,29 @@ func removeUserLabelsAndAnnotations(obj *metav1.ObjectMeta, cr rolloutsmanagerv1
 	}
 
 }
+
+// check if labeled pullsecret exists in same ns
+
+const OperatorNamespaceFile = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+
+// GetOperatorNamespace returns the namespace of the operator
+func GetOperatorNamespace() (string, error) {
+	// Env var takes priority — allows test and dev overrides even when running inside a pod.
+	if ns := os.Getenv("OPERATOR_NAMESPACE"); ns != "" {
+		return ns, nil
+	}
+
+	if _, err := os.Stat(OperatorNamespaceFile); os.IsNotExist(err) {
+		return "", fmt.Errorf("operator namespace file does not exist and if running locally set OPERATOR_NAMESPACE")
+	}
+
+	data, err := os.ReadFile(OperatorNamespaceFile)
+	if err != nil {
+		return "", fmt.Errorf("failed to read operator namespace: %w", err)
+	}
+	ns := strings.TrimSpace(string(data))
+	if ns == "" {
+		return "", fmt.Errorf("operator namespace file is empty")
+	}
+	return ns, nil
+}

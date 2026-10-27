@@ -21,6 +21,10 @@ make install generate fmt vet
 # Set namespaces used for cluster-scoped e2e tests
 export CLUSTER_SCOPED_ARGO_ROLLOUTS_NAMESPACES="argo-rollouts,test-rom-ns-1,rom-ns-1"
 
+# Required for image-pull-secret propagation (out-of-cluster: no SA file to fall back to)
+# Must match the test's value in run-rollouts-manager-e2e-tests.sh
+export OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-argo-rollouts}"
+
 if [ "$RUN_IN_BACKGROUND" == "true" ]; then
   go run ./cmd/main.go 2>&1 | tee /tmp/e2e-operator-run.log &
 else

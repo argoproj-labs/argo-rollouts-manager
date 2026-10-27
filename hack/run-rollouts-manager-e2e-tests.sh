@@ -134,6 +134,9 @@ fi
 
 set -ex
 
+# Must match the operator's value in start-rollouts-manager-for-e2e-tests.sh
+export OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-argo-rollouts}"
+
 if [ "$NAMESPACE_SCOPED_ARGO_ROLLOUTS" == "true" ]; then
 
   go test -v -p=1 -timeout=30m -race -count=1 -coverprofile=coverage.out ./tests/e2e/namespace-scoped

@@ -46,4 +46,13 @@ const (
 	ImagePullPolicy = "IMAGE_PULL_POLICY"
 	// DefaultRolloutsNetworkPolicy is the default name for Rollouts NetworkPolicy.
 	DefaultRolloutsNetworkPolicy = "argo-rollouts-network-policy"
+
+	// RolloutManagerImagePullSecretPropagateLabel is applied to Secrets in the operator namespace
+	// that should be copied to all RolloutManager namespaces and referenced as imagePullSecrets.
+	RolloutManagerImagePullSecretPropagateLabel = "operator.argoproj.io/propagate-image-pull-secret"
+
+	// RolloutManagerImagePullSecretCopiedLabel marks a Secret as a copy of a propagated image pull secret.
+	// The value is the source secret name.
+	RolloutManagerImagePullSecretCopiedLabel = "operator.argoproj.io/image-pull-secret-source"
+	OpenshiftConfigAPICRDName                = "config.openshift.io/v1"
 )
