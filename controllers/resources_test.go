@@ -36,7 +36,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 		})
 
 		It("Test for reconcileRolloutsServiceAccount function", func() {
-			_, err := r.reconcileRolloutsServiceAccount(ctx, a)
+			_, err := r.reconcileRolloutsServiceAccount(ctx, a, nil)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -69,7 +69,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 		})
 
 		It("Test for reconcileRolloutsRoleBinding function", func() {
-			sa, err := r.reconcileRolloutsServiceAccount(ctx, a)
+			sa, err := r.reconcileRolloutsServiceAccount(ctx, a, nil)
 			Expect(err).ToNot(HaveOccurred())
 			role, err := r.reconcileRolloutsRole(ctx, a)
 			Expect(err).ToNot(HaveOccurred())
@@ -96,7 +96,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 		})
 
 		It("Test for reconcileRolloutsClusterRoleBinding function", func() {
-			sa, err := r.reconcileRolloutsServiceAccount(ctx, a)
+			sa, err := r.reconcileRolloutsServiceAccount(ctx, a, nil)
 			Expect(err).ToNot(HaveOccurred())
 			clusterRole, err := r.reconcileRolloutsClusterRole(ctx, a)
 			Expect(err).ToNot(HaveOccurred())
@@ -293,7 +293,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 		})
 
 		It("Test for reconcileRolloutsServiceAccount function", func() {
-			sa, err := r.reconcileRolloutsServiceAccount(ctx, a)
+			sa, err := r.reconcileRolloutsServiceAccount(ctx, a, nil)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(sa.ObjectMeta.Labels["keylabel"]).To(Equal(a.Spec.AdditionalMetadata.Labels["keylabel"]))
 			Expect(sa.ObjectMeta.Annotations["keyannotation"]).To(Equal(a.Spec.AdditionalMetadata.Annotations["keyannotation"]))
@@ -345,7 +345,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 		})
 
 		It("Test for reconcileRolloutsRoleBinding function", func() {
-			sa, err := r.reconcileRolloutsServiceAccount(ctx, a)
+			sa, err := r.reconcileRolloutsServiceAccount(ctx, a, nil)
 			Expect(err).ToNot(HaveOccurred())
 			role, err := r.reconcileRolloutsRole(ctx, a)
 			Expect(err).ToNot(HaveOccurred())
@@ -383,7 +383,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 		})
 
 		It("Test for reconcileRolloutsClusterRoleBinding function", func() {
-			sa, err := r.reconcileRolloutsServiceAccount(ctx, a)
+			sa, err := r.reconcileRolloutsServiceAccount(ctx, a, nil)
 			Expect(err).ToNot(HaveOccurred())
 			clusterRole, err := r.reconcileRolloutsClusterRole(ctx, a)
 			Expect(err).ToNot(HaveOccurred())
@@ -617,7 +617,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 				})
 				Expect(r.Client.Create(ctx, serviceAccount)).To(Succeed())
 
-				serviceAccount, err = r.reconcileRolloutsServiceAccount(ctx, a)
+				serviceAccount, err = r.reconcileRolloutsServiceAccount(ctx, a, nil)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(serviceAccount.ObjectMeta.Labels["my-label"]).ToNot(BeEmpty())
 				Expect(serviceAccount.ObjectMeta.Labels["my-label"]).To(Equal("my-value"))
@@ -965,7 +965,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 		It("Verify whether RolloutManager creating ServiceMonitor", func() {
 			smCRD := &crdv1.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: serviceMonitorsCRDName,
+					Name: "servicemonitors.monitoring.coreos.com",
 				},
 			}
 			Expect(r.Client.Create(ctx, smCRD)).To(Succeed())
@@ -999,7 +999,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 
 			smCRD := &crdv1.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: serviceMonitorsCRDName,
+					Name: "servicemonitors.monitoring.coreos.com",
 				},
 			}
 			Expect(r.Client.Create(ctx, smCRD)).To(Succeed())
@@ -1219,7 +1219,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 		It("Should delete existing RoleBinding when ClusterRoleBinding is reconciled", func() {
 
 			By("Reconcile RoleBinding")
-			sa, err := r.reconcileRolloutsServiceAccount(ctx, a)
+			sa, err := r.reconcileRolloutsServiceAccount(ctx, a, nil)
 			Expect(err).ToNot(HaveOccurred())
 			role, err := r.reconcileRolloutsRole(ctx, a)
 			Expect(err).ToNot(HaveOccurred())
@@ -1245,7 +1245,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 		It("Should delete existing ClusterRoleBinding when RoleBinding is reconciled", func() {
 
 			By("Reconcile ClusterRoleBinding")
-			sa, err := r.reconcileRolloutsServiceAccount(ctx, a)
+			sa, err := r.reconcileRolloutsServiceAccount(ctx, a, nil)
 			Expect(err).ToNot(HaveOccurred())
 			clusterRole, err := r.reconcileRolloutsClusterRole(ctx, a)
 			Expect(err).ToNot(HaveOccurred())
