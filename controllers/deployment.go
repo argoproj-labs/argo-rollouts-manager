@@ -618,13 +618,6 @@ func normalizeMap(in map[string]string) map[string]string {
 	return in
 }
 
-// boolPtr returns a pointer to val
-//
-//go:fix inline
-func boolPtr(val bool) *bool {
-	return new(val)
-}
-
 // Returns the container image for rollouts controller.
 func getRolloutsContainerImage(cr rolloutsmanagerv1alpha1.RolloutManager) (string, error) {
 
