@@ -3,6 +3,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -24,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -1002,6 +1004,401 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 			Expect(required).To(HaveLen(1))
 			Expect(required[0].TopologyKey).To(Equal(controllers.KubernetesHostnameLabel))
 			Expect(required[0].LabelSelector.MatchLabels).To(Equal(depl.Spec.Selector.MatchLabels))
+		})
+
+		When("an image pull secret is labeled for propagation in the operator namespace", func() {
+			managedRef := corev1.LocalObjectReference{Name: controllers.RolloutManagerImagePullSecretName}
+
+			var (
+				operatorNS  string
+				rmNamespace string
+			)
+
+			// Names of the secrets these tests create in the operator namespace.
+			testSecretNames := []string{
+				"test-pull-secret",
+				"test-pull-secret-removal",
+				"pull-secret-a",
+				"pull-secret-b",
+				"conflict-pull-secret",
+				"data-change-secret",
+				controllers.RolloutManagerImagePullSecretName, // copy created by the same-namespace test
+			}
+
+			BeforeEach(func() {
+				// OPERATOR_NAMESPACE controls where the controller looks for labeled pull secrets.
+				// Default must match hack/start-rollouts-manager-for-e2e-tests.sh and hack/run-rollouts-manager-e2e-tests.sh.
+				operatorNS = os.Getenv("OPERATOR_NAMESPACE")
+				if operatorNS == "" {
+					operatorNS = "argo-rollouts"
+				}
+
+				// RM lives in its own namespace so the cross-namespace copy path is always exercised.
+				// Must be listed in CLUSTER_SCOPED_ARGO_ROLLOUTS_NAMESPACES (hack/start-rollouts-manager-for-e2e-tests.sh)
+				// so the cluster-scoped run accepts it.
+				rmNamespace = "test-rom-ns-1"
+				Expect(operatorNS).ToNot(Equal(rmNamespace))
+				Expect(CreateNamespace(ctx, k8sClient, rmNamespace)).To(Succeed())
+
+				// EnsureCleanSlate recreates fixture.TestE2ENamespace; any other operator namespace must be ensured here.
+				if operatorNS != fixture.TestE2ENamespace {
+					ns := &corev1.Namespace{}
+					err := k8sClient.Get(ctx, client.ObjectKey{Name: operatorNS}, ns)
+					if apierrors.IsNotFound(err) {
+						Expect(k8sClient.Create(ctx, &corev1.Namespace{
+							ObjectMeta: metav1.ObjectMeta{Name: operatorNS},
+						})).To(Succeed())
+					} else {
+						Expect(err).ToNot(HaveOccurred())
+					}
+				}
+
+				// Delete only the secrets these tests create, before and after each spec (including failed specs),
+				// so a leftover labeled secret can't leak into later specs when operatorNS is not recreated by EnsureCleanSlate.
+				deleteTestSecrets := func() {
+					for _, name := range testSecretNames {
+						_ = k8sClient.Delete(ctx, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: operatorNS}})
+					}
+				}
+				deleteTestSecrets()
+				DeferCleanup(deleteTestSecrets)
+			})
+
+			It("should add a labeled pull secret to the rollouts SA", func() {
+				By("creating a pull secret with the propagate label in the operator namespace")
+				pullSecret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pull-secret",
+						Namespace: operatorNS,
+						Labels: map[string]string{
+							controllers.RolloutManagerImagePullSecretPropagateLabel: "true",
+						},
+					},
+					Type: corev1.SecretTypeDockerConfigJson,
+					Data: map[string][]byte{
+						corev1.DockerConfigJsonKey: []byte(`{"auths":{"registry.example.com":{"auth":"dXNlcjpwYXNz"}}}`),
+					},
+				}
+				Expect(k8sClient.Create(ctx, pullSecret)).To(Succeed())
+
+				By("creating a RolloutManager")
+				rolloutManager := rolloutsmanagerv1alpha1.RolloutManager{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "imagepullsecret-rm",
+						Namespace: rmNamespace,
+					},
+					Spec: rolloutsmanagerv1alpha1.RolloutManagerSpec{
+						NamespaceScoped: namespaceScopedParam,
+					},
+				}
+				Expect(k8sClient.Create(ctx, &rolloutManager)).To(Succeed())
+				Eventually(rolloutManager, "60s", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
+
+				By("verifying the secret is copied to the RM namespace")
+				copiedSecret := &corev1.Secret{}
+				Eventually(func() error {
+					return k8sClient.Get(ctx, client.ObjectKey{Name: controllers.RolloutManagerImagePullSecretName, Namespace: rmNamespace}, copiedSecret)
+				}, "15s", "1s").Should(Succeed())
+				Expect(copiedSecret.Labels[controllers.RolloutManagerImagePullSecretCopiedLabel]).To(Equal("test-pull-secret"))
+				Expect(copiedSecret.Data).To(Equal(pullSecret.Data))
+
+				By("verifying the rollouts SA has imagePullSecrets set")
+				sa := &corev1.ServiceAccount{}
+				Eventually(func() []corev1.LocalObjectReference {
+					_ = k8sClient.Get(ctx, client.ObjectKey{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rmNamespace}, sa)
+					return sa.ImagePullSecrets
+				}, "15s", "1s").Should(ContainElement(managedRef))
+
+				By("verifying the Deployment pod template is annotated so pods are rolled to pick up the pull secret")
+				Eventually(func() map[string]string {
+					depl := &appsv1.Deployment{}
+					_ = k8sClient.Get(ctx, client.ObjectKey{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rmNamespace}, depl)
+					return depl.Spec.Template.Annotations
+				}, "15s", "1s").Should(HaveKeyWithValue(controllers.RolloutManagerImagePullSecretAnnotation, controllers.RolloutManagerImagePullSecretName))
+			})
+
+			It("should remove only the managed SA imagePullSecrets entry when the label is removed", func() {
+				By("creating a pull secret with the propagate label")
+				pullSecret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pull-secret-removal",
+						Namespace: operatorNS,
+						Labels: map[string]string{
+							controllers.RolloutManagerImagePullSecretPropagateLabel: "true",
+						},
+					},
+					Type: corev1.SecretTypeDockerConfigJson,
+					Data: map[string][]byte{
+						corev1.DockerConfigJsonKey: []byte(`{"auths":{"registry.example.com":{"auth":"dXNlcjpwYXNz"}}}`),
+					},
+				}
+				Expect(k8sClient.Create(ctx, pullSecret)).To(Succeed())
+
+				By("creating a RolloutManager")
+				rolloutManager := rolloutsmanagerv1alpha1.RolloutManager{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "imagepullsecret-removal-rm",
+						Namespace: rmNamespace,
+					},
+					Spec: rolloutsmanagerv1alpha1.RolloutManagerSpec{
+						NamespaceScoped: namespaceScopedParam,
+					},
+				}
+				Expect(k8sClient.Create(ctx, &rolloutManager)).To(Succeed())
+				Eventually(rolloutManager, "60s", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
+
+				By("waiting for SA to have imagePullSecrets")
+				sa := &corev1.ServiceAccount{}
+				Eventually(func() []corev1.LocalObjectReference {
+					_ = k8sClient.Get(ctx, client.ObjectKey{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rmNamespace}, sa)
+					return sa.ImagePullSecrets
+				}, "15s", "1s").Should(ContainElement(managedRef))
+
+				By("adding a user/platform injected pull secret to the SA")
+				foreignRef := corev1.LocalObjectReference{Name: "user-injected-pull-secret"}
+				Expect(k8s.UpdateWithoutConflict(ctx, sa, k8sClient, func(obj client.Object) {
+					o := obj.(*corev1.ServiceAccount)
+					o.ImagePullSecrets = append(o.ImagePullSecrets, foreignRef)
+				})).To(Succeed())
+
+				By("verifying the operator keeps the injected entry alongside the managed one")
+				Consistently(func() []corev1.LocalObjectReference {
+					_ = k8sClient.Get(ctx, client.ObjectKey{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rmNamespace}, sa)
+					return sa.ImagePullSecrets
+				}, "10s", "2s").Should(ContainElements(managedRef, foreignRef))
+
+				By("removing the propagate label from the source secret")
+				Expect(k8s.UpdateWithoutConflict(ctx, pullSecret, k8sClient, func(obj client.Object) {
+					delete(obj.(*corev1.Secret).Labels, controllers.RolloutManagerImagePullSecretPropagateLabel)
+				})).To(Succeed())
+
+				By("verifying only the managed entry is removed from the SA")
+				Eventually(func() []corev1.LocalObjectReference {
+					_ = k8sClient.Get(ctx, client.ObjectKey{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rmNamespace}, sa)
+					return sa.ImagePullSecrets
+				}, "30s", "1s").Should(SatisfyAll(Not(ContainElement(managedRef)), ContainElement(foreignRef)))
+
+				By("verifying the copied secret is deleted from the RM namespace")
+				copiedSecret := &corev1.Secret{}
+				Eventually(func() bool {
+					err := k8sClient.Get(ctx, client.ObjectKey{Name: controllers.RolloutManagerImagePullSecretName, Namespace: rmNamespace}, copiedSecret)
+					return apierrors.IsNotFound(err)
+				}, "30s", "1s").Should(BeTrue())
+			})
+
+			It("should remove the propagated secret and fail the RolloutManager when multiple secrets have the propagation label", func() {
+				newLabeledSecret := func(name string) *corev1.Secret {
+					return &corev1.Secret{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      name,
+							Namespace: operatorNS,
+							Labels: map[string]string{
+								controllers.RolloutManagerImagePullSecretPropagateLabel: "true",
+							},
+						},
+						Type: corev1.SecretTypeDockerConfigJson,
+						Data: map[string][]byte{
+							corev1.DockerConfigJsonKey: []byte(`{"auths":{"registry.example.com":{"auth":"dXNlcjpwYXNz"}}}`),
+						},
+					}
+				}
+				saPullSecrets := func() []corev1.LocalObjectReference {
+					sa := &corev1.ServiceAccount{}
+					_ = k8sClient.Get(ctx, client.ObjectKey{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rmNamespace}, sa)
+					return sa.ImagePullSecrets
+				}
+
+				By("creating one labeled pull secret and a RolloutManager")
+				Expect(k8sClient.Create(ctx, newLabeledSecret("pull-secret-a"))).To(Succeed())
+				rolloutManager := rolloutsmanagerv1alpha1.RolloutManager{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "imagepullsecret-multi-rm",
+						Namespace: rmNamespace,
+					},
+					Spec: rolloutsmanagerv1alpha1.RolloutManagerSpec{
+						NamespaceScoped: namespaceScopedParam,
+					},
+				}
+				Expect(k8sClient.Create(ctx, &rolloutManager)).To(Succeed())
+				Eventually(rolloutManager, "60s", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
+				Eventually(saPullSecrets, "15s", "1s").Should(ContainElement(managedRef))
+
+				By("labeling a second pull secret")
+				Expect(k8sClient.Create(ctx, newLabeledSecret("pull-secret-b"))).To(Succeed())
+
+				By("verifying the RolloutManager reports the error")
+				Eventually(func() string {
+					rm := &rolloutsmanagerv1alpha1.RolloutManager{}
+					if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(&rolloutManager), rm); err != nil {
+						return ""
+					}
+					for _, c := range rm.Status.Conditions {
+						if c.Type == rolloutsmanagerv1alpha1.RolloutManagerConditionType {
+							return c.Message
+						}
+					}
+					return ""
+				}, "30s", "1s").Should(ContainSubstring("found 2 secrets labeled"))
+
+				By("verifying the managed SA entry and the copy are removed")
+				Eventually(saPullSecrets, "15s", "1s").ShouldNot(ContainElement(managedRef))
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: controllers.RolloutManagerImagePullSecretName, Namespace: rmNamespace}, &corev1.Secret{})
+				Expect(apierrors.IsNotFound(err)).To(BeTrue(), "expected no image pull secret copy in RM namespace")
+
+				By("removing one label so only one secret remains labeled")
+				secretA := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "pull-secret-a", Namespace: operatorNS}}
+				Expect(k8s.UpdateWithoutConflict(ctx, secretA, k8sClient, func(obj client.Object) {
+					delete(obj.(*corev1.Secret).Labels, controllers.RolloutManagerImagePullSecretPropagateLabel)
+				})).To(Succeed())
+
+				By("verifying the RolloutManager recovers and the SA has the managed entry again")
+				Eventually(rolloutManager, "60s", "1s").Should(rolloutManagerFixture.HaveSuccessCondition())
+				Eventually(saPullSecrets, "15s", "1s").Should(ContainElement(managedRef))
+
+				By("verifying the copy is sourced from pull-secret-b")
+				copiedSecret := &corev1.Secret{}
+				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: controllers.RolloutManagerImagePullSecretName, Namespace: rmNamespace}, copiedSecret)).To(Succeed())
+				Expect(copiedSecret.Labels[controllers.RolloutManagerImagePullSecretCopiedLabel]).To(Equal("pull-secret-b"))
+			})
+
+			It("should not overwrite an existing unmanaged secret with the same name", func() {
+				By("creating an unmanaged secret with the copy's fixed name in the RM namespace")
+				preExisting := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      controllers.RolloutManagerImagePullSecretName,
+						Namespace: rmNamespace,
+					},
+					Type: corev1.SecretTypeOpaque,
+					Data: map[string][]byte{"key": []byte("original")},
+				}
+				Expect(k8sClient.Create(ctx, preExisting)).To(Succeed())
+
+				By("creating a labeled pull secret in the operator namespace")
+				Expect(k8sClient.Create(ctx, &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "conflict-pull-secret",
+						Namespace: operatorNS,
+						Labels: map[string]string{
+							controllers.RolloutManagerImagePullSecretPropagateLabel: "true",
+						},
+					},
+					Type: corev1.SecretTypeDockerConfigJson,
+					Data: map[string][]byte{
+						corev1.DockerConfigJsonKey: []byte(`{"auths":{"registry.example.com":{"auth":"dXNlcjpwYXNz"}}}`),
+					},
+				})).To(Succeed())
+
+				By("creating a RolloutManager")
+				rolloutManager := rolloutsmanagerv1alpha1.RolloutManager{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "conflict-rm",
+						Namespace: rmNamespace,
+					},
+					Spec: rolloutsmanagerv1alpha1.RolloutManagerSpec{
+						NamespaceScoped: namespaceScopedParam,
+					},
+				}
+				Expect(k8sClient.Create(ctx, &rolloutManager)).To(Succeed())
+				Eventually(rolloutManager, "60s", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
+
+				By("verifying the pre-existing secret is not overwritten")
+				existing := &corev1.Secret{}
+				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: controllers.RolloutManagerImagePullSecretName, Namespace: rmNamespace}, existing)).To(Succeed())
+				Expect(existing.Data["key"]).To(Equal([]byte("original")))
+				Expect(existing.Labels).ToNot(HaveKey(controllers.RolloutManagerImagePullSecretCopiedLabel))
+
+				By("verifying the SA does not reference the unmanaged secret")
+				sa := &corev1.ServiceAccount{}
+				Consistently(func() []corev1.LocalObjectReference {
+					_ = k8sClient.Get(ctx, client.ObjectKey{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rmNamespace}, sa)
+					return sa.ImagePullSecrets
+				}, "10s", "2s").ShouldNot(ContainElement(managedRef))
+			})
+
+			It("should update the copied secret when source pull secret data changes", func() {
+				By("creating a pull secret")
+				pullSecret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "data-change-secret",
+						Namespace: operatorNS,
+						Labels: map[string]string{
+							controllers.RolloutManagerImagePullSecretPropagateLabel: "true",
+						},
+					},
+					Type: corev1.SecretTypeDockerConfigJson,
+					Data: map[string][]byte{
+						corev1.DockerConfigJsonKey: []byte(`{"auths":{"registry.example.com":{"auth":"dXNlcjpwYXNz"}}}`),
+					},
+				}
+				Expect(k8sClient.Create(ctx, pullSecret)).To(Succeed())
+
+				By("creating a RolloutManager")
+				rolloutManager := rolloutsmanagerv1alpha1.RolloutManager{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "data-change-rm",
+						Namespace: rmNamespace,
+					},
+					Spec: rolloutsmanagerv1alpha1.RolloutManagerSpec{
+						NamespaceScoped: namespaceScopedParam,
+					},
+				}
+				Expect(k8sClient.Create(ctx, &rolloutManager)).To(Succeed())
+				Eventually(rolloutManager, "60s", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
+
+				By("waiting for SA to have imagePullSecrets")
+				sa := &corev1.ServiceAccount{}
+				Eventually(func() []corev1.LocalObjectReference {
+					_ = k8sClient.Get(ctx, client.ObjectKey{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: rmNamespace}, sa)
+					return sa.ImagePullSecrets
+				}, "15s", "1s").Should(ContainElement(managedRef))
+
+				By("updating the pull secret data")
+				newData := []byte(`{"auths":{"registry2.example.com":{"auth":"bmV3cGFzcw=="}}}`)
+				Expect(k8s.UpdateWithoutConflict(ctx, pullSecret, k8sClient, func(obj client.Object) {
+					obj.(*corev1.Secret).Data[corev1.DockerConfigJsonKey] = newData
+				})).To(Succeed())
+
+				By("verifying the copied secret data is updated")
+				copiedSecret := &corev1.Secret{}
+				Eventually(func() []byte {
+					_ = k8sClient.Get(ctx, client.ObjectKey{Name: controllers.RolloutManagerImagePullSecretName, Namespace: rmNamespace}, copiedSecret)
+					return copiedSecret.Data[corev1.DockerConfigJsonKey]
+				}, "15s", "1s").Should(Equal(newData))
+			})
+
+			It("should copy the source secret even when the RM is in the operator namespace", func() {
+				By("creating a pull secret with the propagate label in the operator namespace")
+				Expect(k8sClient.Create(ctx, &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pull-secret",
+						Namespace: operatorNS,
+						Labels: map[string]string{
+							controllers.RolloutManagerImagePullSecretPropagateLabel: "true",
+						},
+					},
+					Type: corev1.SecretTypeDockerConfigJson,
+					Data: map[string][]byte{
+						corev1.DockerConfigJsonKey: []byte(`{"auths":{"registry.example.com":{"auth":"dXNlcjpwYXNz"}}}`),
+					},
+				})).To(Succeed())
+
+				By("creating a RolloutManager in the operator namespace")
+				rolloutManager, err := CreateRolloutManager(ctx, k8sClient, "same-ns-rm", operatorNS, namespaceScopedParam)
+				Expect(err).ToNot(HaveOccurred())
+				Eventually(rolloutManager, "60s", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
+
+				By("verifying the rollouts SA references the managed copy")
+				sa := &corev1.ServiceAccount{}
+				Eventually(func() []corev1.LocalObjectReference {
+					_ = k8sClient.Get(ctx, client.ObjectKey{Name: controllers.DefaultArgoRolloutsResourceName, Namespace: operatorNS}, sa)
+					return sa.ImagePullSecrets
+				}, "15s", "1s").Should(ContainElement(managedRef))
+
+				By("verifying the copy exists in the operator namespace")
+				copiedSecret := &corev1.Secret{}
+				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: controllers.RolloutManagerImagePullSecretName, Namespace: operatorNS}, copiedSecret)).To(Succeed())
+				Expect(copiedSecret.Labels[controllers.RolloutManagerImagePullSecretCopiedLabel]).To(Equal("test-pull-secret"))
+			})
 		})
 	})
 }

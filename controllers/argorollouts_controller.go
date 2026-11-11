@@ -18,6 +18,7 @@ package rollouts
 
 import (
 	"context"
+	"fmt"
 
 	rolloutsmanagerv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -57,13 +58,9 @@ type RolloutManagerReconciler struct {
 	// If value is true then deploy namespace-scoped Argo Rollouts controller else cluster-scoped
 	NamespaceScopedArgoRolloutsController bool
 
-	// IsOpenShiftCluster is true when the operator is running on an OpenShift cluster.
-	// Set once during SetupWithManager; stored here to avoid a package-level race.
-	IsOpenShiftCluster bool
-
 	// OperatorNamespace is the namespace the operator pod runs in.
 	// Resolved once at SetupWithManager from OPERATOR_NAMESPACE env var or SA namespace file.
-	// Empty means the namespace could not be determined; pull-secret propagation is skipped.
+	// Required to be set at all times.
 	OperatorNamespace string
 }
 
@@ -72,6 +69,7 @@ var log = logr.Log.WithName("rollouts-controller")
 const (
 	serviceMonitorsGroupVersion = "monitoring.coreos.com/v1"
 	serviceMonitorsResourceName = "servicemonitors" // resource name as returned by API discovery
+	serviceMonitorsCRDName      = "servicemonitors.monitoring.coreos.com"
 )
 
 //+kubebuilder:rbac:groups=argoproj.io,resources=rolloutmanagers,verbs=get;list;watch;create;update;patch;delete
@@ -224,45 +222,37 @@ func (r *RolloutManagerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		bld.Owns(&monitoringv1.ServiceMonitor{})
 	}
 
-	var err error
-	// "clusterversions" is a reliable canary resource that exists on every OpenShift cluster.
-	if r.IsOpenShiftCluster, err = r.doesCRDExist(mgr.GetConfig(), OpenshiftConfigAPICRDName, "clusterversions"); err != nil {
-		return err
-	}
-
 	// Resolve the operator namespace once at startup and store it on the struct so reconcile
 	// loops don't re-read the filesystem on every call.
-	if operatorNamespace, nsErr := GetOperatorNamespace(); nsErr != nil {
-		log.Info("cannot determine operator namespace; image pull secret propagation will be disabled", "error", nsErr)
-	} else {
-		r.OperatorNamespace = operatorNamespace
+	operatorNamespace, err := GetOperatorNamespace()
+	if err != nil {
+		return fmt.Errorf("cannot determine operator namespace: %w", err)
 	}
+	r.OperatorNamespace = operatorNamespace
 
-	if !r.IsOpenShiftCluster && r.OperatorNamespace != "" {
-		// Watch for labeled pull secrets in the operator namespace; re-trigger all RMs when they change.
-		// UpdateFunc checks both old and new objects so that removing the label also fires a reconcile.
-		bld.Watches(&corev1.Secret{},
-			handler.EnqueueRequestsFromMapFunc(r.enqueueAllRolloutManagers),
-			builder.WithPredicates(predicate.Funcs{
-				CreateFunc: func(e event.CreateEvent) bool {
-					return e.Object.GetNamespace() == r.OperatorNamespace &&
-						e.Object.GetLabels()[RolloutManagerImagePullSecretPropagateLabel] == "true"
-				},
-				UpdateFunc: func(e event.UpdateEvent) bool {
-					if e.ObjectNew.GetNamespace() != r.OperatorNamespace {
-						return false
-					}
-					newHasLabel := e.ObjectNew.GetLabels()[RolloutManagerImagePullSecretPropagateLabel] == "true"
-					oldHasLabel := e.ObjectOld.GetLabels()[RolloutManagerImagePullSecretPropagateLabel] == "true"
-					return newHasLabel || oldHasLabel
-				},
-				DeleteFunc: func(e event.DeleteEvent) bool {
-					return e.Object.GetNamespace() == r.OperatorNamespace &&
-						e.Object.GetLabels()[RolloutManagerImagePullSecretPropagateLabel] == "true"
-				},
-				GenericFunc: func(e event.GenericEvent) bool { return false },
-			}))
-	}
+	// Watch for labeled pull secrets in the operator namespace; re-trigger all RMs when they change.
+	// UpdateFunc checks both old and new objects so that removing the label also fires a reconcile.
+	bld.Watches(&corev1.Secret{},
+		handler.EnqueueRequestsFromMapFunc(r.enqueueAllRolloutManagers),
+		builder.WithPredicates(predicate.Funcs{
+			CreateFunc: func(e event.CreateEvent) bool {
+				return e.Object.GetNamespace() == r.OperatorNamespace &&
+					e.Object.GetLabels()[RolloutManagerImagePullSecretPropagateLabel] == "true"
+			},
+			UpdateFunc: func(e event.UpdateEvent) bool {
+				if e.ObjectNew.GetNamespace() != r.OperatorNamespace {
+					return false
+				}
+				newHasLabel := e.ObjectNew.GetLabels()[RolloutManagerImagePullSecretPropagateLabel] == "true"
+				oldHasLabel := e.ObjectOld.GetLabels()[RolloutManagerImagePullSecretPropagateLabel] == "true"
+				return newHasLabel || oldHasLabel
+			},
+			DeleteFunc: func(e event.DeleteEvent) bool {
+				return e.Object.GetNamespace() == r.OperatorNamespace &&
+					e.Object.GetLabels()[RolloutManagerImagePullSecretPropagateLabel] == "true"
+			},
+			GenericFunc: func(e event.GenericEvent) bool { return false },
+		}))
 
 	return bld.Complete(r)
 }
@@ -336,13 +326,17 @@ func (r *RolloutManagerReconciler) enqueueAllRolloutManagers(ctx context.Context
 
 }
 
-// doesCRDExist checks whether a given API group/version is available on the cluster.
-// If resourceName is non-empty, it further checks that a specific resource exists within that group.
+// doesCRDExist checks whether a resource (as named by API discovery, e.g. "servicemonitors") exists
+// within the given API group/version on the cluster. resourceName is required.
 //
 // NOTE: this function should only be called from SetupWithManager. There are more efficient methods to determine this, elsewhere.
 func (r *RolloutManagerReconciler) doesCRDExist(cfg *rest.Config, groupVersion, resourceName string) (bool, error) {
 
 	// Idealy we would use client.Client to retrieve the CRD, here, but since the manager has not yet started, we don't have access to the client from the manager. We would need to convert the rest.Config into a client.Client, and it's easier to use
+
+	if resourceName == "" {
+		return false, fmt.Errorf("resource name must not be empty when checking group version %s", groupVersion)
+	}
 
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
 	if err != nil {
@@ -354,9 +348,6 @@ func (r *RolloutManagerReconciler) doesCRDExist(cfg *rest.Config, groupVersion, 
 			return false, nil
 		}
 		return false, err
-	}
-	if resourceName == "" {
-		return true, nil
 	}
 	for _, resource := range apiResources.APIResources {
 		if resource.Name == resourceName {
