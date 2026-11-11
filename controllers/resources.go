@@ -1510,6 +1510,10 @@ func (r *RolloutManagerReconciler) reconcileRolloutsManagerImagePullSecret(ctx c
 	found := err == nil
 
 	if found && !metav1.IsControlledBy(existing, &cr) {
+		// The source itself already has the fixed name in this namespace: reference it directly, no copy needed.
+		if src != nil && src.Namespace == cr.Namespace && src.Name == RolloutManagerImagePullSecretName {
+			return []corev1.LocalObjectReference{{Name: RolloutManagerImagePullSecretName}}, nil
+		}
 		log.Info("secret with the image pull secret copy name already exists and is not managed by this RolloutManager, skipping",
 			"secret", RolloutManagerImagePullSecretName, "namespace", cr.Namespace)
 		return nil, nil

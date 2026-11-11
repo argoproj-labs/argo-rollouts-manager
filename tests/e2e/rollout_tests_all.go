@@ -1014,16 +1014,8 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 				rmNamespace string
 			)
 
-			// Names of the secrets these tests create in the operator namespace.
-			testSecretNames := []string{
-				"test-pull-secret",
-				"test-pull-secret-removal",
-				"pull-secret-a",
-				"pull-secret-b",
-				"conflict-pull-secret",
-				"data-change-secret",
-				controllers.RolloutManagerImagePullSecretName, // copy created by the same-namespace test
-			}
+			// Marks the source secrets these tests create in the operator namespace, so cleanup never touches other secrets.
+			const e2eTestSecretLabel = "argo-rollouts-manager-e2e/image-pull-secret-test"
 
 			BeforeEach(func() {
 				// OPERATOR_NAMESPACE controls where the controller looks for labeled pull secrets.
@@ -1055,9 +1047,20 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 
 				// Delete only the secrets these tests create, before and after each spec (including failed specs),
 				// so a leftover labeled secret can't leak into later specs when operatorNS is not recreated by EnsureCleanSlate.
+				// Pre-existing secrets in operatorNS are preserved: sources are matched by e2eTestSecretLabel, and the
+				// operator's copy (made by the same-namespace test) by its fixed name plus the copied-secret label.
 				deleteTestSecrets := func() {
-					for _, name := range testSecretNames {
-						_ = k8sClient.Delete(ctx, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: operatorNS}})
+					Expect(k8sClient.DeleteAllOf(ctx, &corev1.Secret{}, client.InNamespace(operatorNS),
+						client.MatchingLabels{e2eTestSecretLabel: "true"})).To(Succeed())
+
+					copied := &corev1.Secret{}
+					err := k8sClient.Get(ctx, client.ObjectKey{Name: controllers.RolloutManagerImagePullSecretName, Namespace: operatorNS}, copied)
+					if apierrors.IsNotFound(err) {
+						return
+					}
+					Expect(err).ToNot(HaveOccurred())
+					if _, ok := copied.Labels[controllers.RolloutManagerImagePullSecretCopiedLabel]; ok {
+						Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, copied))).To(Succeed())
 					}
 				}
 				deleteTestSecrets()
@@ -1072,6 +1075,7 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 						Namespace: operatorNS,
 						Labels: map[string]string{
 							controllers.RolloutManagerImagePullSecretPropagateLabel: "true",
+							e2eTestSecretLabel: "true",
 						},
 					},
 					Type: corev1.SecretTypeDockerConfigJson,
@@ -1125,6 +1129,7 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 						Namespace: operatorNS,
 						Labels: map[string]string{
 							controllers.RolloutManagerImagePullSecretPropagateLabel: "true",
+							e2eTestSecretLabel: "true",
 						},
 					},
 					Type: corev1.SecretTypeDockerConfigJson,
@@ -1194,6 +1199,7 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 							Namespace: operatorNS,
 							Labels: map[string]string{
 								controllers.RolloutManagerImagePullSecretPropagateLabel: "true",
+								e2eTestSecretLabel: "true",
 							},
 						},
 						Type: corev1.SecretTypeDockerConfigJson,
@@ -1280,6 +1286,7 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 						Namespace: operatorNS,
 						Labels: map[string]string{
 							controllers.RolloutManagerImagePullSecretPropagateLabel: "true",
+							e2eTestSecretLabel: "true",
 						},
 					},
 					Type: corev1.SecretTypeDockerConfigJson,
@@ -1323,6 +1330,7 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 						Namespace: operatorNS,
 						Labels: map[string]string{
 							controllers.RolloutManagerImagePullSecretPropagateLabel: "true",
+							e2eTestSecretLabel: "true",
 						},
 					},
 					Type: corev1.SecretTypeDockerConfigJson,
@@ -1374,6 +1382,7 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 						Namespace: operatorNS,
 						Labels: map[string]string{
 							controllers.RolloutManagerImagePullSecretPropagateLabel: "true",
+							e2eTestSecretLabel: "true",
 						},
 					},
 					Type: corev1.SecretTypeDockerConfigJson,
@@ -1385,6 +1394,12 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 				By("creating a RolloutManager in the operator namespace")
 				rolloutManager, err := CreateRolloutManager(ctx, k8sClient, "same-ns-rm", operatorNS, namespaceScopedParam)
 				Expect(err).ToNot(HaveOccurred())
+				// EnsureCleanSlate only recreates the default operator namespace; with a custom OPERATOR_NAMESPACE
+				// this RM would otherwise outlive the spec and break later cluster-scoped tests.
+				DeferCleanup(func() {
+					Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, &rolloutManager))).To(Succeed())
+					Eventually(&rolloutManager, "60s", "1s").Should(k8s.NotExistByName(k8sClient))
+				})
 				Eventually(rolloutManager, "60s", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
 
 				By("verifying the rollouts SA references the managed copy")
