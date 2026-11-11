@@ -6,6 +6,7 @@ import (
 	"maps"
 	"os"
 	"reflect"
+	"slices"
 
 	rolloutsmanagerv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 	"github.com/distribution/reference"
@@ -39,6 +40,9 @@ func generateDesiredRolloutsDeployment(cr rolloutsmanagerv1alpha1.RolloutManager
 	if cr.Spec.AdditionalMetadata != nil {
 		maps.Copy(labels, cr.Spec.AdditionalMetadata.Labels)
 		maps.Copy(annotations, cr.Spec.AdditionalMetadata.Annotations)
+	}
+	if slices.Contains(sa.ImagePullSecrets, corev1.LocalObjectReference{Name: RolloutManagerImagePullSecretName}) {
+		annotations[RolloutManagerImagePullSecretAnnotation] = RolloutManagerImagePullSecretName
 	}
 
 	// Default number of replicas is 1, update it to 2 if HA is enabled

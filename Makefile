@@ -14,6 +14,9 @@ $(warning "No container runtime (Docker or Podman) found in PATH. Please install
 endif
 NAMESPACE_SCOPED_ARGO_ROLLOUTS ?= false
 
+# OPERATOR_NAMESPACE is the namespace the operator watches for labeled image pull secrets (required when running locally).
+OPERATOR_NAMESPACE ?= argo-rollouts
+
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
 # To re-generate a bundle for other specific channels without changing the standard setup, you can:
@@ -166,7 +169,7 @@ build: manifests generate fmt vet ## Build manager binary.
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
-	NAMESPACE_SCOPED_ARGO_ROLLOUTS=$(NAMESPACE_SCOPED_ARGO_ROLLOUTS) go run ./cmd/main.go
+	OPERATOR_NAMESPACE=$(OPERATOR_NAMESPACE) NAMESPACE_SCOPED_ARGO_ROLLOUTS=$(NAMESPACE_SCOPED_ARGO_ROLLOUTS) go run ./cmd/main.go
 
 # If you wish built the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64 ). However, you must enable docker buildKit for it.

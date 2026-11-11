@@ -2,10 +2,10 @@ package rollouts
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"maps"
 	"reflect"
-	"sort"
+	"slices"
 
 	rolloutsmanagerv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -40,9 +40,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsServiceAccount(ctx context.C
 			return nil, err
 		}
 
-		if !r.IsOpenShiftCluster && len(imagePullSecrets) > 0 {
-			expectedServiceAccount.ImagePullSecrets = imagePullSecrets
-		}
+		expectedServiceAccount.ImagePullSecrets = imagePullSecrets
 
 		log.Info(fmt.Sprintf("Creating ServiceAccount %s", expectedServiceAccount.Name))
 		return expectedServiceAccount, r.Client.Create(ctx, expectedServiceAccount)
@@ -61,20 +59,13 @@ func (r *RolloutManagerReconciler) reconcileRolloutsServiceAccount(ctx context.C
 		liveServiceAccount.Annotations = combineStringMaps(liveServiceAccount.Annotations, expectedServiceAccount.Annotations)
 	}
 
-	if !r.IsOpenShiftCluster && r.OperatorNamespace != "" {
-		desired := imagePullSecrets
-		if desired == nil {
-			desired = []corev1.LocalObjectReference{}
-		}
-		existing := make([]corev1.LocalObjectReference, len(liveServiceAccount.ImagePullSecrets))
-		copy(existing, liveServiceAccount.ImagePullSecrets)
-		sort.Slice(existing, func(i, j int) bool { return existing[i].Name < existing[j].Name })
-		if !reflect.DeepEqual(existing, desired) {
-			liveServiceAccount.ImagePullSecrets = desired
-			log.Info("Updating ServiceAccount image pull secrets",
-				"Namespace", liveServiceAccount.Namespace, "Name", liveServiceAccount.Name)
-			updateNeeded = true
-		}
+	// Entries added by users or the platform (e.g. OpenShift's injected dockercfg secret) are preserved;
+	// only the operator-managed entry is added or removed.
+	if merged := mergeImagePullSecrets(liveServiceAccount.ImagePullSecrets, imagePullSecrets); !reflect.DeepEqual(merged, liveServiceAccount.ImagePullSecrets) {
+		liveServiceAccount.ImagePullSecrets = merged
+		log.Info("Updating ServiceAccount image pull secrets",
+			"Namespace", liveServiceAccount.Namespace, "Name", liveServiceAccount.Name)
+		updateNeeded = true
 	}
 
 	if updateNeeded {
@@ -615,7 +606,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsServiceAndMonitor(ctx
 	// Checks if user is using the Prometheus operator by checking CustomResourceDefinition for ServiceMonitor
 	smCRD := &crdv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "servicemonitors.monitoring.coreos.com",
+			Name: serviceMonitorsCRDName,
 		},
 	}
 
@@ -1458,14 +1449,24 @@ func serviceMonitorMatches(sm *monitoringv1.ServiceMonitor, matchLabel string) b
 	return true
 }
 
-// reconcileRolloutsManagerImagePullSecret copies pull secrets labeled with
-// RolloutManagerImagePullSecretPropagateLabel from the operator namespace into cr.Namespace,
-// cleans up stale copies, and returns LocalObjectReferences for the SA's imagePullSecrets.
+// mergeImagePullSecrets keeps every entry not owned by the operator, in its existing order,
+// then appends the operator-managed entries.
+func mergeImagePullSecrets(live, managed []corev1.LocalObjectReference) []corev1.LocalObjectReference {
+	merged := slices.DeleteFunc(slices.Clone(live), func(ref corev1.LocalObjectReference) bool {
+		return ref.Name == RolloutManagerImagePullSecretName
+	})
+	return append(merged, managed...)
+}
+
+// reconcileRolloutsManagerImagePullSecret copies the pull secret labeled with
+// RolloutManagerImagePullSecretPropagateLabel from the operator namespace into cr.Namespace under the
+// fixed name RolloutManagerImagePullSecretName, removes the copy when no single source exists, and
+// returns the reference to add to the ServiceAccount's imagePullSecrets.
 func (r *RolloutManagerReconciler) reconcileRolloutsManagerImagePullSecret(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager) ([]corev1.LocalObjectReference, error) {
 
 	operatorNS := r.OperatorNamespace
 	if operatorNS == "" {
-		return nil, nil // namespace undetermined at startup; skip gracefully
+		return nil, fmt.Errorf("operator namespace is not set")
 	}
 
 	sourceSecrets := &corev1.SecretList{}
@@ -1475,113 +1476,141 @@ func (r *RolloutManagerReconciler) reconcileRolloutsManagerImagePullSecret(ctx c
 		return nil, fmt.Errorf("failed to list image pull secrets in operator namespace: %w", err)
 	}
 
-	log.V(1).Info("found labeled image pull secrets in operator namespace",
-		"count", len(sourceSecrets.Items), "operatorNamespace", operatorNS)
-
-	// desiredNames tracks secrets that should exist as copies (used for cleanup).
-	desiredNames := make(map[string]bool)
-	var refs []corev1.LocalObjectReference
-
 	if len(sourceSecrets.Items) > 1 {
-		// More than one labeled secret is ambiguous — remove all propagated copies and clear SA refs.
-		// This matches the openshift-gitops operator behavior.
-		log.Info("multiple image pull secrets with propagation label found; removing all propagated copies until only one remains",
-			"operatorNamespace", operatorNS, "count", len(sourceSecrets.Items))
-		// desiredNames stays empty → cleanup block below deletes all existing copies.
-	} else {
-		for i := range sourceSecrets.Items {
-			src := &sourceSecrets.Items[i]
-
-			if operatorNS == cr.Namespace {
-				// Same namespace: use directly, no copy needed.
-				desiredNames[src.Name] = true
-				refs = append(refs, corev1.LocalObjectReference{Name: src.Name})
-				continue
-			}
-
-			existing := &corev1.Secret{}
-			err := r.Get(ctx, client.ObjectKey{Name: src.Name, Namespace: cr.Namespace}, existing)
-			if err != nil {
-				if !apierrors.IsNotFound(err) {
-					return nil, fmt.Errorf("failed to get secret %s in namespace %s: %w", src.Name, cr.Namespace, err)
-				}
-
-				log.V(1).Info("copying image pull secret to rollouts namespace",
-					"secret", src.Name, "from", operatorNS, "to", cr.Namespace)
-
-				dst := &corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:        src.Name,
-						Namespace:   cr.Namespace,
-						Annotations: maps.Clone(src.Annotations),
-						Labels: map[string]string{
-							RolloutManagerImagePullSecretCopiedLabel: src.Name,
-						},
-					},
-					Type: src.Type,
-					Data: src.Data,
-				}
-
-				if err := controllerutil.SetControllerReference(&cr, dst, r.Scheme); err != nil {
-					return nil, fmt.Errorf("failed to set owner on copied secret %s: %w", src.Name, err)
-				}
-
-				log.Info("Creating a new Secret instance",
-					"Namespace", dst.Namespace, "Name", dst.Name)
-				if err := r.Create(ctx, dst); err != nil {
-					return nil, fmt.Errorf("failed to create copied secret %s: %w", src.Name, err)
-				}
-				desiredNames[src.Name] = true
-				refs = append(refs, corev1.LocalObjectReference{Name: src.Name})
-				continue
-			}
-
-			if existing.Labels[RolloutManagerImagePullSecretCopiedLabel] != src.Name || !metav1.IsControlledBy(existing, &cr) {
-				log.Info("secret with same name already exists and is not managed by this RolloutManager, skipping",
-					"secret", src.Name, "namespace", cr.Namespace)
-				continue // conflict: do not add to desiredNames or refs
-			}
-
-			if !reflect.DeepEqual(existing.Data, src.Data) || existing.Type != src.Type {
-				existing.Data = src.Data
-				existing.Type = src.Type
-				log.Info("image pull secret data changed",
-					"Namespace", existing.Namespace, "Name", existing.Name)
-				if err := r.Update(ctx, existing); err != nil {
-					return nil, fmt.Errorf("failed to update copied secret %s: %w", src.Name, err)
-				}
-			}
-			desiredNames[src.Name] = true
-			refs = append(refs, corev1.LocalObjectReference{Name: src.Name})
+		// More than one labeled secret is ambiguous: remove what was propagated and fail the reconcile
+		// so the misconfiguration surfaces in the RolloutManager status.
+		names := make([]string, 0, len(sourceSecrets.Items))
+		for _, s := range sourceSecrets.Items {
+			names = append(names, s.Name)
 		}
-	} // end of len == 1 else block
+		log.Error(nil, "RolloutManager reconcile is blocked: multiple secrets have the image pull secret propagation label; remove the label from all but one",
+			"RolloutManager", cr.Name, "Namespace", cr.Namespace,
+			"label", RolloutManagerImagePullSecretPropagateLabel, "operatorNamespace", operatorNS, "secrets", names)
+		return nil, r.failImagePullSecretPropagation(ctx, cr, fmt.Errorf("found %d secrets labeled %s=true in namespace %s; only one is supported",
+			len(sourceSecrets.Items), RolloutManagerImagePullSecretPropagateLabel, operatorNS))
+	}
 
-	// Cleanup: delete operator-managed copies whose source secret no longer has the label,
-	// or all copies when more than one labeled secret was found.
-	if operatorNS != cr.Namespace {
-		existingCopies := &corev1.SecretList{}
-		if err := r.List(ctx, existingCopies,
-			client.InNamespace(cr.Namespace),
-			client.HasLabels{RolloutManagerImagePullSecretCopiedLabel}); err != nil {
-			return nil, fmt.Errorf("failed to list copied image pull secrets: %w", err)
-		}
-
-		for i := range existingCopies.Items {
-			cp := &existingCopies.Items[i]
-			if !metav1.IsControlledBy(cp, &cr) {
-				continue
-			}
-			sourceName := cp.Labels[RolloutManagerImagePullSecretCopiedLabel]
-			if !desiredNames[sourceName] {
-				log.Info("Deleting stale image pull secret",
-					"Namespace", cp.Namespace, "Name", cp.Name)
-				if err := r.Delete(ctx, cp); err != nil && !apierrors.IsNotFound(err) {
-					return nil, fmt.Errorf("failed to delete stale copied secret %s: %w", cp.Name, err)
-				}
-			}
+	var src *corev1.Secret
+	if len(sourceSecrets.Items) == 1 {
+		src = &sourceSecrets.Items[0]
+		if src.Type != corev1.SecretTypeDockerConfigJson && src.Type != corev1.SecretTypeDockercfg {
+			log.Error(nil, "RolloutManager reconcile is blocked: secret with the image pull secret propagation label is not an image pull secret",
+				"RolloutManager", cr.Name, "Namespace", cr.Namespace,
+				"secret", src.Name, "operatorNamespace", operatorNS, "type", src.Type)
+			return nil, r.failImagePullSecretPropagation(ctx, cr, fmt.Errorf("secret %s in namespace %s labeled %s=true has type %q; must be %q or %q",
+				src.Name, operatorNS, RolloutManagerImagePullSecretPropagateLabel, src.Type, corev1.SecretTypeDockerConfigJson, corev1.SecretTypeDockercfg))
 		}
 	}
 
-	sort.Slice(refs, func(i, j int) bool { return refs[i].Name < refs[j].Name })
+	existing := &corev1.Secret{}
+	err := r.Get(ctx, client.ObjectKey{Name: RolloutManagerImagePullSecretName, Namespace: cr.Namespace}, existing)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, fmt.Errorf("failed to get secret %s in namespace %s: %w", RolloutManagerImagePullSecretName, cr.Namespace, err)
+	}
+	found := err == nil
+
+	if found && !metav1.IsControlledBy(existing, &cr) {
+		log.Info("secret with the image pull secret copy name already exists and is not managed by this RolloutManager, skipping",
+			"secret", RolloutManagerImagePullSecretName, "namespace", cr.Namespace)
+		return nil, nil
+	}
+
+	// Secret type is immutable, so a copy with a different type (or no source at all) is deleted.
+	if found && (src == nil || existing.Type != src.Type) {
+		log.Info("Deleting image pull secret copy", "Namespace", existing.Namespace, "Name", existing.Name)
+		if err := r.Delete(ctx, existing); err != nil && !apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("failed to delete copied secret %s: %w", existing.Name, err)
+		}
+		found = false
+	}
+
+	if src == nil {
+		return nil, nil
+	}
+
+	refs := []corev1.LocalObjectReference{{Name: RolloutManagerImagePullSecretName}}
+
+	if !found {
+		dst := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      RolloutManagerImagePullSecretName,
+				Namespace: cr.Namespace,
+				Labels: map[string]string{
+					RolloutManagerImagePullSecretCopiedLabel: src.Name,
+				},
+			},
+			Type: src.Type,
+			Data: src.Data,
+		}
+		if err := controllerutil.SetControllerReference(&cr, dst, r.Scheme); err != nil {
+			return nil, fmt.Errorf("failed to set owner on copied secret %s: %w", dst.Name, err)
+		}
+		log.Info("Creating a new Secret instance", "Namespace", dst.Namespace, "Name", dst.Name)
+		if err := r.Create(ctx, dst); err != nil {
+			return nil, fmt.Errorf("failed to create copied secret %s: %w", dst.Name, err)
+		}
+		return refs, nil
+	}
+
+	if !reflect.DeepEqual(existing.Data, src.Data) || existing.Labels[RolloutManagerImagePullSecretCopiedLabel] != src.Name {
+		existing.Data = src.Data
+		if existing.Labels == nil {
+			existing.Labels = map[string]string{}
+		}
+		existing.Labels[RolloutManagerImagePullSecretCopiedLabel] = src.Name
+		log.Info("Updating image pull secret copy", "Namespace", existing.Namespace, "Name", existing.Name)
+		if err := r.Update(ctx, existing); err != nil {
+			return nil, fmt.Errorf("failed to update copied secret %s: %w", existing.Name, err)
+		}
+	}
 	return refs, nil
+}
+
+// failImagePullSecretPropagation removes the propagated copy and its ServiceAccount entry, then returns
+// cause so the reconcile fails and the misconfiguration surfaces in the RolloutManager status.
+func (r *RolloutManagerReconciler) failImagePullSecretPropagation(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager, cause error) error {
+	return errors.Join(cause,
+		r.removeImagePullSecretFromServiceAccount(ctx, cr),
+		r.deleteImagePullSecretCopy(ctx, cr))
+}
+
+// removeImagePullSecretFromServiceAccount drops the operator-managed entry from the Rollouts ServiceAccount,
+// leaving all other entries in place.
+func (r *RolloutManagerReconciler) removeImagePullSecretFromServiceAccount(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager) error {
+	sa := &corev1.ServiceAccount{}
+	if err := r.Get(ctx, client.ObjectKey{Name: DefaultArgoRolloutsResourceName, Namespace: cr.Namespace}, sa); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to get ServiceAccount %s: %w", DefaultArgoRolloutsResourceName, err)
+	}
+	merged := mergeImagePullSecrets(sa.ImagePullSecrets, nil)
+	if reflect.DeepEqual(merged, sa.ImagePullSecrets) {
+		return nil
+	}
+	sa.ImagePullSecrets = merged
+	log.Info("Removing image pull secret from ServiceAccount", "Namespace", sa.Namespace, "Name", sa.Name)
+	if err := r.Update(ctx, sa); err != nil {
+		return fmt.Errorf("failed to update ServiceAccount %s: %w", sa.Name, err)
+	}
+	return nil
+}
+
+// deleteImagePullSecretCopy deletes the propagated copy in cr.Namespace if it is owned by cr.
+func (r *RolloutManagerReconciler) deleteImagePullSecretCopy(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager) error {
+	existing := &corev1.Secret{}
+	if err := r.Get(ctx, client.ObjectKey{Name: RolloutManagerImagePullSecretName, Namespace: cr.Namespace}, existing); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to get secret %s in namespace %s: %w", RolloutManagerImagePullSecretName, cr.Namespace, err)
+	}
+	if !metav1.IsControlledBy(existing, &cr) {
+		return nil
+	}
+	log.Info("Deleting image pull secret copy", "Namespace", existing.Namespace, "Name", existing.Name)
+	if err := r.Delete(ctx, existing); err != nil && !apierrors.IsNotFound(err) {
+		return fmt.Errorf("failed to delete copied secret %s: %w", existing.Name, err)
+	}
+	return nil
 }

@@ -54,5 +54,13 @@ const (
 	// RolloutManagerImagePullSecretCopiedLabel marks a Secret as a copy of a propagated image pull secret.
 	// The value is the source secret name.
 	RolloutManagerImagePullSecretCopiedLabel = "operator.argoproj.io/image-pull-secret-source"
-	OpenshiftConfigAPICRDName                = "config.openshift.io/v1"
+
+	// RolloutManagerImagePullSecretName is the fixed name of the propagated pull secret copy in each
+	// RolloutManager namespace. It is the only imagePullSecrets entry the operator owns on the ServiceAccount.
+	RolloutManagerImagePullSecretName = "argo-rollouts-image-pull-source"
+
+	// RolloutManagerImagePullSecretAnnotation is set on the Rollouts pod template while the ServiceAccount
+	// references the propagated pull secret. Kubernetes copies ServiceAccount imagePullSecrets into a pod only at
+	// creation, so adding/removing this annotation rolls the pods to pick up the change.
+	RolloutManagerImagePullSecretAnnotation = "operator.argoproj.io/image-pull-secret"
 )

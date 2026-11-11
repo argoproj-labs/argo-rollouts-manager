@@ -591,6 +591,19 @@ var _ = Describe("generateDesiredRolloutsDeployment tests", func() {
 				},
 			}))
 		})
+
+		It("should set the image pull secret pod template annotation only while the SA references the propagated secret", func() {
+			sa.ImagePullSecrets = []corev1.LocalObjectReference{{Name: "platform-dockercfg"}}
+			deployment, err := generateDesiredRolloutsDeployment(cr, sa)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(deployment.Spec.Template.Annotations).ToNot(HaveKey(RolloutManagerImagePullSecretAnnotation))
+
+			sa.ImagePullSecrets = append(sa.ImagePullSecrets, corev1.LocalObjectReference{Name: RolloutManagerImagePullSecretName})
+			deployment, err = generateDesiredRolloutsDeployment(cr, sa)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(deployment.Spec.Template.Annotations).To(HaveKeyWithValue(RolloutManagerImagePullSecretAnnotation, RolloutManagerImagePullSecretName))
+			Expect(deployment.Spec.Template.Annotations["annotation"]).To(Equal("value"))
+		})
 	})
 })
 

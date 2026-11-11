@@ -4,7 +4,6 @@ import (
 	"context"
 
 	rolloutsmanagerv1alpha1 "github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -52,15 +51,11 @@ func (r *RolloutManagerReconciler) reconcileRolloutsManager(ctx context.Context,
 		return wrapCondition(createCondition(err.Error())), err
 	}
 
-	var pullSecretRefs []corev1.LocalObjectReference
-	if !r.IsOpenShiftCluster && r.OperatorNamespace != "" {
-		log.Info("reconciling RolloutsManager ImagePullSecret")
-		var psErr error
-		pullSecretRefs, psErr = r.reconcileRolloutsManagerImagePullSecret(ctx, cr)
-		if psErr != nil {
-			log.Error(psErr, "failed to reconcile Rollout's ImagePullSecret.")
-			return wrapCondition(createCondition(psErr.Error())), psErr
-		}
+	log.Info("reconciling RolloutsManager ImagePullSecret")
+	pullSecretRefs, err := r.reconcileRolloutsManagerImagePullSecret(ctx, cr)
+	if err != nil {
+		log.Error(err, "failed to reconcile Rollout's ImagePullSecret.")
+		return wrapCondition(createCondition(err.Error())), err
 	}
 
 	log.Info("reconciling Rollouts ServiceAccount")

@@ -795,6 +795,7 @@ func makeTestReconciler(obj ...client.Object) *RolloutManagerReconciler {
 		Client:                       cl,
 		Scheme:                       s,
 		OpenShiftRoutePluginLocation: "file://non-empty-test-url", // Set a non-real, non-empty value for unit tests: override this to test a specific value
+		OperatorNamespace:            "argo-rollouts-operator",
 	}
 }
 
@@ -817,6 +818,7 @@ func makeTestReconcilerWithCustomLabels(resourceLabels map[string]string, obj ..
 		Scheme:                       s,
 		ResourceLabels:               resourceLabels,
 		OpenShiftRoutePluginLocation: "file://non-empty-test-url", // Set a non-real, non-empty value for unit tests: override this to test a specific value
+		OperatorNamespace:            "argo-rollouts-operator",
 	}
 }
 

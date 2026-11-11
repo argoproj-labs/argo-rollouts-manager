@@ -12,6 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	crdv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -965,7 +966,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 		It("Verify whether RolloutManager creating ServiceMonitor", func() {
 			smCRD := &crdv1.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "servicemonitors.monitoring.coreos.com",
+					Name: serviceMonitorsCRDName,
 				},
 			}
 			Expect(r.Client.Create(ctx, smCRD)).To(Succeed())
@@ -999,7 +1000,7 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 
 			smCRD := &crdv1.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "servicemonitors.monitoring.coreos.com",
+					Name: serviceMonitorsCRDName,
 				},
 			}
 			Expect(r.Client.Create(ctx, smCRD)).To(Succeed())
@@ -1266,6 +1267,180 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 
 			By("Verify ClusterRoleBinding is deleted")
 			Expect(r.Client.Get(ctx, client.ObjectKeyFromObject(clusterRole), clusterRole)).ToNot(Succeed())
+		})
+	})
+	Context("Image pull secret propagation tests", func() {
+		var (
+			ctx context.Context
+			a   v1alpha1.RolloutManager
+			r   *RolloutManagerReconciler
+		)
+
+		foreign := corev1.LocalObjectReference{Name: "platform-dockercfg"}
+		managed := corev1.LocalObjectReference{Name: RolloutManagerImagePullSecretName}
+
+		makeSource := func(name string, secretType corev1.SecretType, data string) *corev1.Secret {
+			key := corev1.DockerConfigJsonKey
+			if secretType == corev1.SecretTypeDockercfg {
+				key = corev1.DockerConfigKey
+			}
+			return &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: r.OperatorNamespace,
+					Labels:    map[string]string{RolloutManagerImagePullSecretPropagateLabel: "true"},
+				},
+				Type: secretType,
+				Data: map[string][]byte{key: []byte(data)},
+			}
+		}
+
+		reconcileBoth := func() *corev1.ServiceAccount {
+			refs, err := r.reconcileRolloutsManagerImagePullSecret(ctx, a)
+			Expect(err).ToNot(HaveOccurred())
+			sa, err := r.reconcileRolloutsServiceAccount(ctx, a, refs)
+			Expect(err).ToNot(HaveOccurred())
+			return sa
+		}
+
+		getCopy := func(ns string) (*corev1.Secret, error) {
+			s := &corev1.Secret{}
+			return s, r.Client.Get(ctx, client.ObjectKey{Name: RolloutManagerImagePullSecretName, Namespace: ns}, s)
+		}
+
+		BeforeEach(func() {
+			ctx = context.Background()
+			a = *makeTestRolloutManager()
+			r = makeTestReconciler(&a)
+			Expect(createNamespace(r, a.Namespace)).To(Succeed())
+			Expect(createNamespace(r, r.OperatorNamespace)).To(Succeed())
+
+			By("creating the SA with a platform/user injected pull secret")
+			Expect(r.Client.Create(ctx, &corev1.ServiceAccount{
+				ObjectMeta:       metav1.ObjectMeta{Name: DefaultArgoRolloutsResourceName, Namespace: a.Namespace},
+				ImagePullSecrets: []corev1.LocalObjectReference{foreign},
+			})).To(Succeed())
+		})
+
+		It("should copy the source under the fixed name, append it to the SA, and remove it again without touching foreign entries", func() {
+			src := makeSource("my-pull-secret", corev1.SecretTypeDockerConfigJson, "v1")
+			Expect(r.Client.Create(ctx, src)).To(Succeed())
+
+			sa := reconcileBoth()
+			Expect(sa.ImagePullSecrets).To(Equal([]corev1.LocalObjectReference{foreign, managed}))
+
+			cp, err := getCopy(a.Namespace)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cp.Data).To(Equal(src.Data))
+			Expect(cp.Labels[RolloutManagerImagePullSecretCopiedLabel]).To(Equal("my-pull-secret"))
+
+			By("reconciling again is a no-op")
+			Expect(reconcileBoth().ImagePullSecrets).To(Equal([]corev1.LocalObjectReference{foreign, managed}))
+
+			By("removing the propagate label")
+			src.Labels = nil
+			Expect(r.Client.Update(ctx, src)).To(Succeed())
+
+			Expect(reconcileBoth().ImagePullSecrets).To(Equal([]corev1.LocalObjectReference{foreign}))
+			_, err = getCopy(a.Namespace)
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+		})
+
+		It("should update the copy when the source data changes and recreate it when the type changes", func() {
+			src := makeSource("my-pull-secret", corev1.SecretTypeDockerConfigJson, "v1")
+			Expect(r.Client.Create(ctx, src)).To(Succeed())
+			reconcileBoth()
+
+			src.Data[corev1.DockerConfigJsonKey] = []byte("v2")
+			Expect(r.Client.Update(ctx, src)).To(Succeed())
+			reconcileBoth()
+			cp, err := getCopy(a.Namespace)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cp.Data[corev1.DockerConfigJsonKey]).To(Equal([]byte("v2")))
+
+			By("replacing the source with one of a different type")
+			Expect(r.Client.Delete(ctx, src)).To(Succeed())
+			Expect(r.Client.Create(ctx, makeSource("other-secret", corev1.SecretTypeDockercfg, "v3"))).To(Succeed())
+			Expect(reconcileBoth().ImagePullSecrets).To(Equal([]corev1.LocalObjectReference{foreign, managed}))
+			cp, err = getCopy(a.Namespace)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cp.Type).To(Equal(corev1.SecretTypeDockercfg))
+			Expect(cp.Labels[RolloutManagerImagePullSecretCopiedLabel]).To(Equal("other-secret"))
+		})
+
+		It("should remove the propagated copy and SA entry, and return an error, when multiple sources are labeled", func() {
+			Expect(r.Client.Create(ctx, makeSource("a", corev1.SecretTypeDockerConfigJson, "v1"))).To(Succeed())
+			Expect(reconcileBoth().ImagePullSecrets).To(Equal([]corev1.LocalObjectReference{foreign, managed}))
+
+			By("labeling a second source")
+			Expect(r.Client.Create(ctx, makeSource("b", corev1.SecretTypeDockerConfigJson, "v1"))).To(Succeed())
+
+			refs, err := r.reconcileRolloutsManagerImagePullSecret(ctx, a)
+			Expect(err).To(MatchError(ContainSubstring("found 2 secrets labeled")))
+			Expect(refs).To(BeEmpty())
+
+			_, err = getCopy(a.Namespace)
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+
+			sa := &corev1.ServiceAccount{}
+			Expect(r.Client.Get(ctx, client.ObjectKey{Name: DefaultArgoRolloutsResourceName, Namespace: a.Namespace}, sa)).To(Succeed())
+			Expect(sa.ImagePullSecrets).To(Equal([]corev1.LocalObjectReference{foreign}))
+		})
+
+		It("should remove the propagated copy and SA entry, and return an error, when the labeled source is not an image pull secret", func() {
+			src := makeSource("my-pull-secret", corev1.SecretTypeDockerConfigJson, "v1")
+			Expect(r.Client.Create(ctx, src)).To(Succeed())
+			Expect(reconcileBoth().ImagePullSecrets).To(Equal([]corev1.LocalObjectReference{foreign, managed}))
+
+			By("replacing the source with an Opaque secret")
+			Expect(r.Client.Delete(ctx, src)).To(Succeed())
+			Expect(r.Client.Create(ctx, makeSource("opaque-secret", corev1.SecretTypeOpaque, "v1"))).To(Succeed())
+
+			refs, err := r.reconcileRolloutsManagerImagePullSecret(ctx, a)
+			Expect(err).To(MatchError(ContainSubstring(`has type "Opaque"`)))
+			Expect(refs).To(BeEmpty())
+
+			_, err = getCopy(a.Namespace)
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+
+			sa := &corev1.ServiceAccount{}
+			Expect(r.Client.Get(ctx, client.ObjectKey{Name: DefaultArgoRolloutsResourceName, Namespace: a.Namespace}, sa)).To(Succeed())
+			Expect(sa.ImagePullSecrets).To(Equal([]corev1.LocalObjectReference{foreign}))
+		})
+
+		It("should not copy annotations from the source", func() {
+			src := makeSource("my-pull-secret", corev1.SecretTypeDockerConfigJson, "v1")
+			src.Annotations = map[string]string{"kubectl.kubernetes.io/last-applied-configuration": "{}"}
+			Expect(r.Client.Create(ctx, src)).To(Succeed())
+			reconcileBoth()
+
+			cp, err := getCopy(a.Namespace)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cp.Annotations).To(BeEmpty())
+		})
+
+		It("should leave an unmanaged secret with the fixed name untouched", func() {
+			Expect(r.Client.Create(ctx, &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: RolloutManagerImagePullSecretName, Namespace: a.Namespace},
+				Data:       map[string][]byte{"key": []byte("original")},
+			})).To(Succeed())
+			Expect(r.Client.Create(ctx, makeSource("my-pull-secret", corev1.SecretTypeDockerConfigJson, "v1"))).To(Succeed())
+
+			refs, err := r.reconcileRolloutsManagerImagePullSecret(ctx, a)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(refs).To(BeEmpty())
+			cp, err := getCopy(a.Namespace)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cp.Data["key"]).To(Equal([]byte("original")))
+		})
+
+		It("should copy the source even when the RolloutManager is in the operator namespace", func() {
+			r.OperatorNamespace = a.Namespace
+			Expect(r.Client.Create(ctx, makeSource("my-pull-secret", corev1.SecretTypeDockerConfigJson, "v1"))).To(Succeed())
+
+			Expect(reconcileBoth().ImagePullSecrets).To(Equal([]corev1.LocalObjectReference{foreign, managed}))
+			_, err := getCopy(a.Namespace)
+			Expect(err).ToNot(HaveOccurred())
 		})
 	})
 })
