@@ -1442,6 +1442,21 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 			_, err := getCopy(a.Namespace)
 			Expect(err).ToNot(HaveOccurred())
 		})
+
+		It("should reference the source directly when it already has the fixed name in the RolloutManager namespace", func() {
+			r.OperatorNamespace = a.Namespace
+			src := makeSource(RolloutManagerImagePullSecretName, corev1.SecretTypeDockerConfigJson, "v1")
+			Expect(r.Client.Create(ctx, src)).To(Succeed())
+
+			Expect(reconcileBoth().ImagePullSecrets).To(Equal([]corev1.LocalObjectReference{foreign, managed}))
+
+			By("verifying the source is left untouched")
+			got, err := getCopy(a.Namespace)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(got.OwnerReferences).To(BeEmpty())
+			Expect(got.Data).To(Equal(src.Data))
+			Expect(got.Labels).ToNot(HaveKey(RolloutManagerImagePullSecretCopiedLabel))
+		})
 	})
 })
 
