@@ -72,7 +72,10 @@ if [ -z "$SKIP_RUN_STEP" ]; then
   
   # Set namespaces used for cluster-scoped e2e tests
   export CLUSTER_SCOPED_ARGO_ROLLOUTS_NAMESPACES="argo-rollouts"
-  
+
+  # Required when running the operator out-of-cluster (no service account namespace file).
+  export OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-argo-rollouts}"
+
   go run ./cmd/main.go 2>&1 | tee /tmp/e2e-operator-run.log &
 
   set -e
