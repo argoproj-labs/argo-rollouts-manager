@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/argoproj-labs/argo-rollouts-manager/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
@@ -1408,6 +1409,27 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 			Expect(sa.ImagePullSecrets).To(Equal([]corev1.LocalObjectReference{foreign}))
 		})
 
+		It("should remove the propagated copy and SA entry, and return an error, when the labeled source name exceeds the label value limit", func() {
+			src := makeSource("my-pull-secret", corev1.SecretTypeDockerConfigJson, "v1")
+			Expect(r.Client.Create(ctx, src)).To(Succeed())
+			Expect(reconcileBoth().ImagePullSecrets).To(Equal([]corev1.LocalObjectReference{foreign, managed}))
+
+			By("replacing the source with one whose name is 64 characters long")
+			Expect(r.Client.Delete(ctx, src)).To(Succeed())
+			Expect(r.Client.Create(ctx, makeSource(strings.Repeat("a", 64), corev1.SecretTypeDockerConfigJson, "v1"))).To(Succeed())
+
+			refs, err := r.reconcileRolloutsManagerImagePullSecret(ctx, a)
+			Expect(err).To(MatchError(ContainSubstring("has a name longer than 63 characters")))
+			Expect(refs).To(BeEmpty())
+
+			_, err = getCopy(a.Namespace)
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+
+			sa := &corev1.ServiceAccount{}
+			Expect(r.Client.Get(ctx, client.ObjectKey{Name: DefaultArgoRolloutsResourceName, Namespace: a.Namespace}, sa)).To(Succeed())
+			Expect(sa.ImagePullSecrets).To(Equal([]corev1.LocalObjectReference{foreign}))
+		})
+
 		It("should not copy annotations from the source", func() {
 			src := makeSource("my-pull-secret", corev1.SecretTypeDockerConfigJson, "v1")
 			src.Annotations = map[string]string{"kubectl.kubernetes.io/last-applied-configuration": "{}"}
@@ -1419,15 +1441,21 @@ var _ = Describe("Resource creation and cleanup tests", func() {
 			Expect(cp.Annotations).To(BeEmpty())
 		})
 
-		It("should leave an unmanaged secret with the fixed name untouched", func() {
+		It("should leave an unmanaged secret with the fixed name untouched and return an error", func() {
 			Expect(r.Client.Create(ctx, &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{Name: RolloutManagerImagePullSecretName, Namespace: a.Namespace},
 				Data:       map[string][]byte{"key": []byte("original")},
 			})).To(Succeed())
-			Expect(r.Client.Create(ctx, makeSource("my-pull-secret", corev1.SecretTypeDockerConfigJson, "v1"))).To(Succeed())
 
+			By("not erroring while there is no labeled source")
 			refs, err := r.reconcileRolloutsManagerImagePullSecret(ctx, a)
 			Expect(err).ToNot(HaveOccurred())
+			Expect(refs).To(BeEmpty())
+
+			By("erroring once a labeled source exists")
+			Expect(r.Client.Create(ctx, makeSource("my-pull-secret", corev1.SecretTypeDockerConfigJson, "v1"))).To(Succeed())
+			refs, err = r.reconcileRolloutsManagerImagePullSecret(ctx, a)
+			Expect(err).To(MatchError(ContainSubstring("already exists and is not managed by this RolloutManager")))
 			Expect(refs).To(BeEmpty())
 			cp, err := getCopy(a.Namespace)
 			Expect(err).ToNot(HaveOccurred())

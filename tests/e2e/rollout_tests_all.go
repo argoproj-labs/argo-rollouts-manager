@@ -1306,7 +1306,20 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 					},
 				}
 				Expect(k8sClient.Create(ctx, &rolloutManager)).To(Succeed())
-				Eventually(rolloutManager, "60s", "1s").Should(rolloutManagerFixture.HavePhase(rolloutsmanagerv1alpha1.PhaseAvailable))
+
+				By("verifying the RolloutManager reports the conflict")
+				Eventually(func() string {
+					rm := &rolloutsmanagerv1alpha1.RolloutManager{}
+					if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(&rolloutManager), rm); err != nil {
+						return ""
+					}
+					for _, c := range rm.Status.Conditions {
+						if c.Type == rolloutsmanagerv1alpha1.RolloutManagerConditionType {
+							return c.Message
+						}
+					}
+					return ""
+				}, "60s", "1s").Should(ContainSubstring("already exists and is not managed by this RolloutManager"))
 
 				By("verifying the pre-existing secret is not overwritten")
 				existing := &corev1.Secret{}

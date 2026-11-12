@@ -16,6 +16,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -1500,6 +1501,14 @@ func (r *RolloutManagerReconciler) reconcileRolloutsManagerImagePullSecret(ctx c
 			return nil, r.failImagePullSecretPropagation(ctx, cr, fmt.Errorf("secret %s in namespace %s labeled %s=true has type %q; must be %q or %q",
 				src.Name, operatorNS, RolloutManagerImagePullSecretPropagateLabel, src.Type, corev1.SecretTypeDockerConfigJson, corev1.SecretTypeDockercfg))
 		}
+		// The source name is stored as a label value on the copy, which Kubernetes caps at 63 characters.
+		if len(src.Name) > validation.LabelValueMaxLength {
+			log.Error(nil, "RolloutManager reconcile is blocked: name of the secret with the image pull secret propagation label is too long",
+				"RolloutManager", cr.Name, "Namespace", cr.Namespace,
+				"secret", src.Name, "operatorNamespace", operatorNS, "maxLength", validation.LabelValueMaxLength)
+			return nil, r.failImagePullSecretPropagation(ctx, cr, fmt.Errorf("secret %s in namespace %s labeled %s=true has a name longer than %d characters",
+				src.Name, operatorNS, RolloutManagerImagePullSecretPropagateLabel, validation.LabelValueMaxLength))
+		}
 	}
 
 	existing := &corev1.Secret{}
@@ -1514,9 +1523,13 @@ func (r *RolloutManagerReconciler) reconcileRolloutsManagerImagePullSecret(ctx c
 		if src != nil && src.Namespace == cr.Namespace && src.Name == RolloutManagerImagePullSecretName {
 			return []corev1.LocalObjectReference{{Name: RolloutManagerImagePullSecretName}}, nil
 		}
-		log.Info("secret with the image pull secret copy name already exists and is not managed by this RolloutManager, skipping",
-			"secret", RolloutManagerImagePullSecretName, "namespace", cr.Namespace)
-		return nil, nil
+		if src == nil {
+			return nil, nil
+		}
+		log.Error(nil, "RolloutManager reconcile is blocked: secret with the image pull secret copy name already exists and is not managed by this RolloutManager",
+			"RolloutManager", cr.Name, "Namespace", cr.Namespace, "secret", RolloutManagerImagePullSecretName)
+		return nil, r.failImagePullSecretPropagation(ctx, cr, fmt.Errorf("secret %s in namespace %s already exists and is not managed by this RolloutManager; rename or delete it to enable image pull secret propagation",
+			RolloutManagerImagePullSecretName, cr.Namespace))
 	}
 
 	// Secret type is immutable, so a copy with a different type (or no source at all) is deleted.
