@@ -1015,7 +1015,7 @@ func RunRolloutsTests(namespaceScopedParam bool) {
 			)
 
 			// Marks the source secrets these tests create in the operator namespace, so cleanup never touches other secrets.
-			const e2eTestSecretLabel = "argo-rollouts-manager-e2e/image-pull-secret-test"
+			const e2eTestSecretLabel = "argo-rollouts-manager-e2e/image-pull-secret-test" // #nosec G101
 
 			BeforeEach(func() {
 				// OPERATOR_NAMESPACE controls where the controller looks for labeled pull secrets.

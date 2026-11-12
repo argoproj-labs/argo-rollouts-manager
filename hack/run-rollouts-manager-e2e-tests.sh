@@ -222,7 +222,7 @@ if [ -f "/tmp/e2e-operator-run.log" ]; then
   # Grep the log for unexpected errors
   # - Ignore errors that are expected to occur
 
-  UNEXPECTED_ERRORS_FOUND_TEXT=`cat /tmp/e2e-operator-run.log | grep "ERROR" | grep -v "because it is being terminated" | grep -v "the object has been modified; please apply your changes to the latest version and try again" | grep -v "unable to fetch" | grep -v "StorageError" | grep -v "client rate limiter Wait returned an error: context canceled" | grep -v "failed to reconcile Rollout's ClusterRoleBinding" | grep -v "clusterrolebindings.rbac.authorization.k8s.io.*argo-rollouts.*already.*exists" | grep -v "servicemonitors.monitoring.coreos.com.*argo-rollouts.*already.*exists" | grep -v "networkpolicies.networking.k8s.io.*argo-rollouts-network-policy.*already.*exists"`
+  UNEXPECTED_ERRORS_FOUND_TEXT=`cat /tmp/e2e-operator-run.log | grep "ERROR" | grep -v "because it is being terminated" | grep -v "the object has been modified; please apply your changes to the latest version and try again" | grep -v "unable to fetch" | grep -v "StorageError" | grep -v "client rate limiter Wait returned an error: context canceled" | grep -v "failed to reconcile Rollout's ClusterRoleBinding" | grep -v "clusterrolebindings.rbac.authorization.k8s.io.*argo-rollouts.*already.*exists" | grep -v "servicemonitors.monitoring.coreos.com.*argo-rollouts.*already.*exists" | grep -v "networkpolicies.networking.k8s.io.*argo-rollouts-network-policy.*already.*exists" | grep -v "multiple secrets have the image pull secret propagation label" | grep -v "secrets labeled operator.argoproj.io/propagate-image-pull-secret=true in namespace .*only one is supported"`
 
   if [ "$UNEXPECTED_ERRORS_FOUND_TEXT" != "" ]; then
   
