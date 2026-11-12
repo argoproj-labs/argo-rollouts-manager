@@ -57,7 +57,7 @@ const (
 
 	// RolloutManagerImagePullSecretName is the fixed name of the propagated pull secret copy in each
 	// RolloutManager namespace. It is the only imagePullSecrets entry the operator owns on the ServiceAccount.
-	RolloutManagerImagePullSecretName = "argo-rollouts-image-pull-source"
+	RolloutManagerImagePullSecretName = "argo-rollouts-image-pull-source" // #nosec G101
 
 	// RolloutManagerImagePullSecretAnnotation is set on the Rollouts pod template while the ServiceAccount
 	// references the propagated pull secret. Kubernetes copies ServiceAccount imagePullSecrets into a pod only at
