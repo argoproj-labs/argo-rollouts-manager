@@ -111,7 +111,7 @@ func generateDesiredRolloutsDeployment(cr rolloutsmanagerv1alpha1.RolloutManager
 		RunAsNonRoot: &runAsNonRoot,
 	}
 
-	desiredPodSpec.ServiceAccountName = sa.ObjectMeta.Name
+	desiredPodSpec.ServiceAccountName = sa.Name
 
 	rolloutsCont, err := rolloutsContainer(cr)
 	if err != nil {
@@ -185,7 +185,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(ctx context.Conte
 
 			log.Info("deleting and recreating Deployment, as the .spec.selector field of the Deployment has changed. Since this field is immutable, the Deployment needs to be recreated.")
 
-			if err := r.Client.Delete(ctx, &desiredDeployment); err != nil {
+			if err := r.Delete(ctx, &desiredDeployment); err != nil {
 				return fmt.Errorf("unable to delete Rollouts Deployment after .spec.selector change: %w", err)
 			}
 
@@ -214,7 +214,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsDeployment(ctx context.Conte
 		actualDeployment.Spec.Template.Spec.Tolerations = desiredDeployment.Spec.Template.Spec.Tolerations
 		actualDeployment.Spec.Template.Spec.SecurityContext = desiredDeployment.Spec.Template.Spec.SecurityContext
 		actualDeployment.Spec.Template.Spec.Volumes = desiredDeployment.Spec.Template.Spec.Volumes
-		return r.Client.Update(ctx, actualDeployment)
+		return r.Update(ctx, actualDeployment)
 	}
 	return nil
 }
@@ -224,7 +224,7 @@ func (r *RolloutManagerReconciler) createNewRolloutsDeployment(ctx context.Conte
 		return err
 	}
 	log.Info(fmt.Sprintf("Creating Deployment %s", DefaultArgoRolloutsResourceName))
-	return r.Client.Create(ctx, &desiredDeployment)
+	return r.Create(ctx, &desiredDeployment)
 }
 
 // identifyDeploymentDifference is a simple comparison of the contents of two deployments, returning "" if they are the same, otherwise returning the name of the field that changed.
@@ -407,10 +407,10 @@ func normalizeDeployment(inputParam appsv1.Deployment, cr rolloutsmanagerv1alpha
 
 	res := appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        input.ObjectMeta.Name,
-			Namespace:   input.ObjectMeta.Namespace,
-			Labels:      input.ObjectMeta.Labels,
-			Annotations: input.ObjectMeta.Annotations,
+			Name:        input.Name,
+			Namespace:   input.Namespace,
+			Labels:      input.Labels,
+			Annotations: input.Annotations,
 		},
 	}
 
@@ -490,7 +490,7 @@ func normalizeDeployment(inputParam appsv1.Deployment, cr rolloutsmanagerv1alpha
 		return appsv1.Deployment{}, fmt.Errorf("incorrect liveness probe")
 	}
 
-	if inputLivenessProbe.ProbeHandler.HTTPGet == nil {
+	if inputLivenessProbe.HTTPGet == nil {
 		return appsv1.Deployment{}, fmt.Errorf("incorrect http get in liveness probe")
 
 	}
@@ -567,8 +567,8 @@ func normalizeDeployment(inputParam appsv1.Deployment, cr rolloutsmanagerv1alpha
 			FailureThreshold: inputLivenessProbe.FailureThreshold,
 			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
-					Path: inputLivenessProbe.ProbeHandler.HTTPGet.Path,
-					Port: inputLivenessProbe.ProbeHandler.HTTPGet.Port,
+					Path: inputLivenessProbe.HTTPGet.Path,
+					Port: inputLivenessProbe.HTTPGet.Port,
 				},
 			},
 			InitialDelaySeconds: inputLivenessProbe.InitialDelaySeconds,
@@ -703,7 +703,7 @@ func getImagePullPolicy(cr rolloutsmanagerv1alpha1.RolloutManager) (corev1.PullP
 		case string(corev1.PullNever):
 			return corev1.PullNever, nil
 		default:
-			return "", fmt.Errorf("Invalid IMAGE_PULL_POLICY environment variable value: %s", envVal)
+			return "", fmt.Errorf("invalid IMAGE_PULL_POLICY environment variable value: %s", envVal)
 		}
 	}
 

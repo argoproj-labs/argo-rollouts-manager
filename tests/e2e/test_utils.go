@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2" //nolint:staticcheck // Keep the Ginkgo DSL consistent with the e2e tests (ST1001).
+	. "github.com/onsi/gomega"    //nolint:staticcheck // Keep the Gomega DSL consistent with the e2e tests (ST1001).
 
 	"github.com/argoproj-labs/argo-rollouts-manager/tests/e2e/fixture"
 	"github.com/argoproj-labs/argo-rollouts-manager/tests/e2e/fixture/k8s"

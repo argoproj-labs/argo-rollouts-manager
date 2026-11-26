@@ -201,7 +201,7 @@ var _ = Describe("Deployment Test", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			By("assigning a fake UID to the original deployment, so we can detected when it is deleted/recreated")
-			existingDeployment.ObjectMeta.UID = "original-deployment"
+			existingDeployment.UID = "original-deployment"
 
 			Expect(r.Client.Create(ctx, existingDeployment)).To(Succeed())
 
@@ -571,7 +571,7 @@ var _ = Describe("generateDesiredRolloutsDeployment tests", func() {
 		It("should set the service account name", func() {
 			deployment, err := generateDesiredRolloutsDeployment(cr, sa)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(deployment.Spec.Template.Spec.ServiceAccountName).To(Equal(sa.ObjectMeta.Name))
+			Expect(deployment.Spec.Template.Spec.ServiceAccountName).To(Equal(sa.Name))
 		})
 
 		It("should add the correct volumes", func() {
@@ -660,7 +660,7 @@ var _ = Describe("normalizeDeployment tests to verify that an error is returned"
 		}, "incorrect liveness probe"),
 
 		Entry("liveness probe http get is nil", func() {
-			deployment.Spec.Template.Spec.Containers[0].LivenessProbe.ProbeHandler.HTTPGet = nil
+			deployment.Spec.Template.Spec.Containers[0].LivenessProbe.HTTPGet = nil
 		}, "incorrect http get in liveness probe"),
 
 		Entry("input ports is nil", func() {
@@ -728,11 +728,11 @@ var _ = Describe("getRolloutsContainerImage tests", func() {
 
 	BeforeEach(func() {
 		a = *makeTestRolloutManager()
-		os.Unsetenv("ARGO_ROLLOUTS_IMAGE") // Ensure env variable is not set unless needed
+		Expect(os.Unsetenv("ARGO_ROLLOUTS_IMAGE")).To(Succeed()) // Ensure env variable is not set unless needed
 	})
 
 	AfterEach(func() {
-		os.Unsetenv("ARGO_ROLLOUTS_IMAGE") // Ensure env variable is not set unless needed
+		Expect(os.Unsetenv("ARGO_ROLLOUTS_IMAGE")).To(Succeed()) // Ensure env variable is not set unless needed
 	})
 
 	When("the spec Image and Version are empty", func() {
@@ -779,7 +779,7 @@ var _ = Describe("getRolloutsContainerImage tests", func() {
 		It("returns the environment variable image", func() {
 			a.Spec.Image = ""
 			a.Spec.Version = ""
-			os.Setenv("ARGO_ROLLOUTS_IMAGE", "quay.io/argoproj/argo-rollouts-custom:latest@sha256:841328df1b9f8c4087adbdcfec6cc99ac8308805dea83f6d415d6fb8d40227c1")
+			Expect(os.Setenv("ARGO_ROLLOUTS_IMAGE", "quay.io/argoproj/argo-rollouts-custom:latest@sha256:841328df1b9f8c4087adbdcfec6cc99ac8308805dea83f6d415d6fb8d40227c1")).To(Succeed())
 
 			img, err := getRolloutsContainerImage(a)
 			Expect(err).ToNot(HaveOccurred())
@@ -791,7 +791,7 @@ var _ = Describe("getRolloutsContainerImage tests", func() {
 		It("returns an error", func() {
 			a.Spec.Image = ""
 			a.Spec.Version = "custom-tag"
-			os.Setenv("ARGO_ROLLOUTS_IMAGE", "quay.io/argoproj/argo-rollouts-custom:latest@sha256:invalidsha256")
+			Expect(os.Setenv("ARGO_ROLLOUTS_IMAGE", "quay.io/argoproj/argo-rollouts-custom:latest@sha256:invalidsha256")).To(Succeed())
 
 			_, err := getRolloutsContainerImage(a)
 			Expect(err).To(HaveOccurred())
@@ -802,7 +802,7 @@ var _ = Describe("getRolloutsContainerImage tests", func() {
 		It("does not return an error since env var does not need to be parsed", func() {
 			a.Spec.Image = "custom-image"
 			a.Spec.Version = "custom-tag"
-			os.Setenv("ARGO_ROLLOUTS_IMAGE", "quay.io/argoproj/argo-rollouts-custom:latest@sha256:invalidsha256")
+			Expect(os.Setenv("ARGO_ROLLOUTS_IMAGE", "quay.io/argoproj/argo-rollouts-custom:latest@sha256:invalidsha256")).To(Succeed())
 
 			img, err := getRolloutsContainerImage(a)
 			Expect(err).ToNot(HaveOccurred())
@@ -814,7 +814,7 @@ var _ = Describe("getRolloutsContainerImage tests", func() {
 		It("returns the custom image and tag ignoring the environment variable", func() {
 			a.Spec.Image = "custom-image"
 			a.Spec.Version = "custom-tag"
-			os.Setenv("ARGO_ROLLOUTS_IMAGE", "quay.io/argoproj/argo-rollouts-custom:latest")
+			Expect(os.Setenv("ARGO_ROLLOUTS_IMAGE", "quay.io/argoproj/argo-rollouts-custom:latest")).To(Succeed())
 			img, err := getRolloutsContainerImage(a)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -826,7 +826,7 @@ var _ = Describe("getRolloutsContainerImage tests", func() {
 		It("returns the env var image with tag from spec", func() {
 			a.Spec.Image = ""
 			a.Spec.Version = "custom-tag"
-			os.Setenv("ARGO_ROLLOUTS_IMAGE", "quay.io/argoproj/argo-rollouts-custom:latest")
+			Expect(os.Setenv("ARGO_ROLLOUTS_IMAGE", "quay.io/argoproj/argo-rollouts-custom:latest")).To(Succeed())
 
 			img, err := getRolloutsContainerImage(a)
 			Expect(err).ToNot(HaveOccurred())
@@ -838,7 +838,7 @@ var _ = Describe("getRolloutsContainerImage tests", func() {
 		It("returns the env var image with tag from spec", func() {
 			a.Spec.Image = ""
 			a.Spec.Version = "custom-tag"
-			os.Setenv("ARGO_ROLLOUTS_IMAGE", "quay.io/argoproj/argo-rollouts-custom:latest@sha256:841328df1b9f8c4087adbdcfec6cc99ac8308805dea83f6d415d6fb8d40227c1")
+			Expect(os.Setenv("ARGO_ROLLOUTS_IMAGE", "quay.io/argoproj/argo-rollouts-custom:latest@sha256:841328df1b9f8c4087adbdcfec6cc99ac8308805dea83f6d415d6fb8d40227c1")).To(Succeed())
 
 			img, err := getRolloutsContainerImage(a)
 			Expect(err).ToNot(HaveOccurred())

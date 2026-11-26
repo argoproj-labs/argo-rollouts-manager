@@ -44,7 +44,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsServiceAccount(ctx context.C
 		expectedServiceAccount.ImagePullSecrets = imagePullSecrets
 
 		log.Info(fmt.Sprintf("Creating ServiceAccount %s", expectedServiceAccount.Name))
-		return expectedServiceAccount, r.Client.Create(ctx, expectedServiceAccount)
+		return expectedServiceAccount, r.Create(ctx, expectedServiceAccount)
 	}
 
 	updateNeeded := false
@@ -71,7 +71,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsServiceAccount(ctx context.C
 
 	if updateNeeded {
 		// Update if the Role already exists and needs to be modified
-		return liveServiceAccount, r.Client.Update(ctx, liveServiceAccount)
+		return liveServiceAccount, r.Update(ctx, liveServiceAccount)
 	}
 
 	return liveServiceAccount, nil
@@ -83,7 +83,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRole(ctx context.Context, cr
 	// Delete existing ClusterRole
 	liveClusterRole := &rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: DefaultArgoRolloutsResourceName}}
 	if err := fetchObject(ctx, r.Client, "", liveClusterRole.Name, liveClusterRole); err == nil {
-		if err := r.Client.Delete(ctx, liveClusterRole); err != nil {
+		if err := r.Delete(ctx, liveClusterRole); err != nil {
 			return nil, fmt.Errorf("failed to delete existing ClusterRole %s: %w", liveClusterRole.Name, err)
 		}
 	}
@@ -110,7 +110,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRole(ctx context.Context, cr
 
 		log.Info(fmt.Sprintf("Creating Role %s", expectedRole.Name))
 		expectedRole.Rules = expectedPolicyRules
-		return expectedRole, r.Client.Create(ctx, expectedRole)
+		return expectedRole, r.Create(ctx, expectedRole)
 	}
 
 	updateNeeded := false
@@ -136,7 +136,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRole(ctx context.Context, cr
 
 	if updateNeeded {
 		// Update if the Role already exists and needs to be modified
-		return liveRole, r.Client.Update(ctx, liveRole)
+		return liveRole, r.Update(ctx, liveRole)
 	}
 
 	return liveRole, nil
@@ -148,7 +148,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsClusterRole(ctx context.Cont
 	// Delete existing Role
 	liveRole := &rbacv1.Role{ObjectMeta: metav1.ObjectMeta{Name: DefaultArgoRolloutsResourceName, Namespace: cr.Namespace}}
 	if err := fetchObject(ctx, r.Client, cr.Namespace, liveRole.Name, liveRole); err == nil {
-		if err := r.Client.Delete(ctx, liveRole); err != nil {
+		if err := r.Delete(ctx, liveRole); err != nil {
 			return nil, fmt.Errorf("failed to delete existing Role %s for Namespace %s: %w", liveRole.Name, liveRole.Namespace, err)
 		}
 	}
@@ -166,7 +166,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsClusterRole(ctx context.Cont
 		}
 		log.Info(fmt.Sprintf("Creating ClusterRole %s", liveClusterRole.Name))
 		expectedClusterRole.Rules = expectedPolicyRules
-		return expectedClusterRole, r.Client.Create(ctx, expectedClusterRole)
+		return expectedClusterRole, r.Create(ctx, expectedClusterRole)
 	}
 
 	updateNeeded := false
@@ -190,7 +190,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsClusterRole(ctx context.Cont
 
 	if updateNeeded {
 		// Update if the ClusterRole already exists and needs to be modified
-		return liveClusterRole, r.Client.Update(ctx, liveClusterRole)
+		return liveClusterRole, r.Update(ctx, liveClusterRole)
 	}
 	return liveClusterRole, nil
 }
@@ -201,7 +201,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRoleBinding(ctx context.Cont
 	// Delete existing ClusterRoleBinding
 	liveClusterRoleBinding := &rbacv1.ClusterRoleBinding{ObjectMeta: metav1.ObjectMeta{Name: DefaultArgoRolloutsResourceName}}
 	if err := fetchObject(ctx, r.Client, "", liveClusterRoleBinding.Name, liveClusterRoleBinding); err == nil {
-		if err := r.Client.Delete(ctx, liveClusterRoleBinding); err != nil {
+		if err := r.Delete(ctx, liveClusterRoleBinding); err != nil {
 			return fmt.Errorf("failed to delete existing ClusterRoleBinding %s: %w", liveClusterRoleBinding.Name, err)
 		}
 	}
@@ -248,7 +248,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRoleBinding(ctx context.Cont
 		}
 
 		log.Info(fmt.Sprintf("Creating RoleBinding %s", expectedRoleBinding.Name))
-		return r.Client.Create(ctx, expectedRoleBinding)
+		return r.Create(ctx, expectedRoleBinding)
 	}
 
 	updateNeeded := false
@@ -273,7 +273,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsRoleBinding(ctx context.Cont
 
 	if updateNeeded {
 		// Update if the RoleBinding already exists and needs to be modified
-		if err := r.Client.Update(ctx, liveRoleBinding); err != nil {
+		if err := r.Update(ctx, liveRoleBinding); err != nil {
 			return err
 		}
 	}
@@ -287,7 +287,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsClusterRoleBinding(ctx conte
 	// Delete existing RoleBinding
 	liveRoleBinding := &rbacv1.RoleBinding{ObjectMeta: metav1.ObjectMeta{Name: DefaultArgoRolloutsResourceName, Namespace: cr.Namespace}}
 	if err := fetchObject(ctx, r.Client, cr.Namespace, liveRoleBinding.Name, liveRoleBinding); err == nil {
-		if err := r.Client.Delete(ctx, liveRoleBinding); err != nil {
+		if err := r.Delete(ctx, liveRoleBinding); err != nil {
 			return fmt.Errorf("failed to delete existing RoleBinding %s for Namespace %s: %w", liveRoleBinding.Name, liveRoleBinding.Namespace, err)
 		}
 	}
@@ -329,7 +329,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsClusterRoleBinding(ctx conte
 		}
 
 		log.Info(fmt.Sprintf("Creating ClusterRoleBinding %s", expectedClusterRoleBinding.Name))
-		return r.Client.Create(ctx, expectedClusterRoleBinding)
+		return r.Create(ctx, expectedClusterRoleBinding)
 	}
 
 	updateNeeded := false
@@ -352,7 +352,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsClusterRoleBinding(ctx conte
 
 	if updateNeeded {
 		// Update if the ClusterRoleBinding already exists and needs to be modified
-		if err := r.Client.Update(ctx, liveClusterRoleBinding); err != nil {
+		if err := r.Update(ctx, liveClusterRoleBinding); err != nil {
 			return err
 		}
 	}
@@ -368,7 +368,7 @@ func (r *RolloutManagerReconciler) removeClusterScopedResourcesIfApplicable(ctx 
 			Name: DefaultArgoRolloutsResourceName,
 		},
 	}
-	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(clusterRole), clusterRole); err != nil {
+	if err := r.Get(ctx, client.ObjectKeyFromObject(clusterRole), clusterRole); err != nil {
 		if !apierrors.IsNotFound(err) {
 			log.Error(err, "error on retrieving rollouts ClusterRole")
 			return err
@@ -377,7 +377,7 @@ func (r *RolloutManagerReconciler) removeClusterScopedResourcesIfApplicable(ctx 
 	} else {
 		// ClusterRole does exist, so delete it.
 		log.Info("deleting Rollouts ClusterRole for RolloutManager that no longer exists")
-		if err := r.Client.Delete(ctx, clusterRole); err != nil {
+		if err := r.Delete(ctx, clusterRole); err != nil {
 			if !apierrors.IsNotFound(err) {
 				return err
 			}
@@ -397,7 +397,7 @@ func (r *RolloutManagerReconciler) removeClusterScopedResourcesIfApplicable(ctx 
 			},
 		}
 
-		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(clusterRole), clusterRole); err != nil {
+		if err := r.Get(ctx, client.ObjectKeyFromObject(clusterRole), clusterRole); err != nil {
 			if !apierrors.IsNotFound(err) {
 				log.Error(err, "error on retrieving ClusterRole", "name", roleName)
 				return err
@@ -406,7 +406,7 @@ func (r *RolloutManagerReconciler) removeClusterScopedResourcesIfApplicable(ctx 
 		} else {
 			// ClusterRole '*aggregate*' does exist, so delete it.
 			log.Info("deleting ClusterRole", "name", roleName)
-			if err := r.Client.Delete(ctx, clusterRole); err != nil {
+			if err := r.Delete(ctx, clusterRole); err != nil {
 				if !apierrors.IsNotFound(err) {
 					return err
 				}
@@ -419,7 +419,7 @@ func (r *RolloutManagerReconciler) removeClusterScopedResourcesIfApplicable(ctx 
 			Name: DefaultArgoRolloutsResourceName,
 		},
 	}
-	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(clusterRoleBinding), clusterRoleBinding); err != nil {
+	if err := r.Get(ctx, client.ObjectKeyFromObject(clusterRoleBinding), clusterRoleBinding); err != nil {
 		if !apierrors.IsNotFound(err) {
 			log.Error(err, "error on retrieving rollouts ClusterRoleBinding")
 			return err
@@ -428,7 +428,7 @@ func (r *RolloutManagerReconciler) removeClusterScopedResourcesIfApplicable(ctx 
 	} else {
 		// ClusterRoleBinding does exist, so delete it.
 		log.Info("deleting Rollouts ClusterRoleBinding for RolloutManager that no longer exists")
-		if err := r.Client.Delete(ctx, clusterRoleBinding); err != nil {
+		if err := r.Delete(ctx, clusterRoleBinding); err != nil {
 			if !apierrors.IsNotFound(err) {
 				return err
 			}
@@ -441,7 +441,7 @@ func (r *RolloutManagerReconciler) removeClusterScopedResourcesIfApplicable(ctx 
 // Reconciles aggregate-to-admin ClusterRole.
 func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToAdminClusterRole(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager) error {
 
-	var aggregationType string = "aggregate-to-admin"
+	var aggregationType = "aggregate-to-admin"
 	name := fmt.Sprintf("%s-%s", DefaultArgoRolloutsResourceName, aggregationType)
 
 	expectedPolicyRules := GetAggregateToAdminPolicyRules()
@@ -462,7 +462,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToAdminClusterRole(
 
 		log.Info(fmt.Sprintf("Creating aggregated ClusterRole %s", liveClusterRole.Name))
 		expectedClusterRole.Rules = expectedPolicyRules
-		return r.Client.Create(ctx, expectedClusterRole)
+		return r.Create(ctx, expectedClusterRole)
 	}
 
 	updateNeeded := false
@@ -485,7 +485,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToAdminClusterRole(
 
 	if updateNeeded {
 		// Update if the aggregated ClusterRole already exists and needs to be modified
-		return r.Client.Update(ctx, liveClusterRole)
+		return r.Update(ctx, liveClusterRole)
 	}
 	return nil
 }
@@ -493,7 +493,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToAdminClusterRole(
 // Reconciles aggregate-to-edit ClusterRole.
 func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToEditClusterRole(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager) error {
 
-	var aggregationType string = "aggregate-to-edit"
+	var aggregationType = "aggregate-to-edit"
 	name := fmt.Sprintf("%s-%s", DefaultArgoRolloutsResourceName, aggregationType)
 
 	expectedPolicyRules := GetAggregateToEditPolicyRules()
@@ -514,7 +514,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToEditClusterRole(c
 
 		log.Info(fmt.Sprintf("Creating aggregated ClusterRole %s", expectedClusterRole.Name))
 		expectedClusterRole.Rules = expectedPolicyRules
-		return r.Client.Create(ctx, expectedClusterRole)
+		return r.Create(ctx, expectedClusterRole)
 	}
 
 	updateNeeded := false
@@ -537,7 +537,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToEditClusterRole(c
 
 	if updateNeeded {
 		// Update if the aggregated ClusterRole already exists and needs to be modified
-		return r.Client.Update(ctx, liveClusterRole)
+		return r.Update(ctx, liveClusterRole)
 	}
 	return nil
 }
@@ -545,7 +545,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToEditClusterRole(c
 // Reconciles aggregate-to-view ClusterRole.
 func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToViewClusterRole(ctx context.Context, cr rolloutsmanagerv1alpha1.RolloutManager) error {
 
-	var aggregationType string = "aggregate-to-view"
+	var aggregationType = "aggregate-to-view"
 	name := fmt.Sprintf("%s-%s", DefaultArgoRolloutsResourceName, aggregationType)
 
 	expectedPolicyRules := GetAggregateToViewPolicyRules()
@@ -566,7 +566,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToViewClusterRole(c
 
 		log.Info(fmt.Sprintf("Creating aggregated ClusterRole %s", expectedClusterRole.Name))
 		expectedClusterRole.Rules = expectedPolicyRules
-		return r.Client.Create(ctx, expectedClusterRole)
+		return r.Create(ctx, expectedClusterRole)
 	}
 
 	updateNeeded := false
@@ -590,7 +590,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsAggregateToViewClusterRole(c
 
 	if updateNeeded {
 		// Update if the aggregated ClusterRole already exists and needs to be modified
-		return r.Client.Update(ctx, liveClusterRole)
+		return r.Update(ctx, liveClusterRole)
 	}
 
 	return nil
@@ -651,7 +651,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsServiceAndMonitor(ctx
 				},
 			}
 
-			if err := r.Client.Update(ctx, existingServiceMonitor); err != nil {
+			if err := r.Update(ctx, existingServiceMonitor); err != nil {
 				log.Error(err, "Error updating existing ServiceMonitor instance",
 					"Namespace", existingServiceMonitor.Namespace, "Name", existingServiceMonitor.Name)
 				return err
@@ -677,7 +677,7 @@ func (r *RolloutManagerReconciler) deleteRolloutsNetworkPolicies(ctx context.Con
 		return err
 	}
 	log.Info(fmt.Sprintf("Deleting NetworkPolicy %s because networkPolicy is disabled", existing.Name))
-	if err := r.Client.Delete(ctx, existing); err != nil {
+	if err := r.Delete(ctx, existing); err != nil {
 		return err
 	}
 	return nil
@@ -745,7 +745,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsNetworkPolicy(ctx context.Co
 			return fmt.Errorf("failed to set controller reference on rollouts network policy: %w", err)
 		}
 		log.Info(fmt.Sprintf("Creating NetworkPolicy %s", desired.Name))
-		if err := r.Client.Create(ctx, desired); err != nil {
+		if err := r.Create(ctx, desired); err != nil {
 			log.Error(err, "Failed to create network policy", "name", desired.Name, "namespace", cr.Namespace)
 			return fmt.Errorf("failed to create network policy %s in namespace %s: %w", desired.Name, cr.Namespace, err)
 		}
@@ -788,7 +788,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsNetworkPolicy(ctx context.Co
 	}
 	if updateNeeded {
 		log.Info(fmt.Sprintf("NetworkPolicy %s does not match the expected state, updating %s", existing.Name, explanation))
-		if err := r.Client.Update(ctx, existing); err != nil {
+		if err := r.Update(ctx, existing); err != nil {
 			log.Error(err, "Failed to update network policy", "name", existing.Name, "namespace", cr.Namespace)
 			return fmt.Errorf("failed to update network policy %s in namespace %s: %w", existing.Name, cr.Namespace, err)
 		}
@@ -807,8 +807,8 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.C
 	}
 	setRolloutsLabelsAndAnnotationsToObject(&expectedSvc.ObjectMeta, cr)
 	// overwrite the annotations for Rollouts Metrics Service
-	expectedSvc.ObjectMeta.Labels["app.kubernetes.io/name"] = DefaultArgoRolloutsMetricsServiceName
-	expectedSvc.ObjectMeta.Labels["app.kubernetes.io/component"] = "server"
+	expectedSvc.Labels["app.kubernetes.io/name"] = DefaultArgoRolloutsMetricsServiceName
+	expectedSvc.Labels["app.kubernetes.io/component"] = "server"
 
 	expectedSvc.Spec.Ports = []corev1.ServicePort{
 		{
@@ -834,7 +834,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.C
 		}
 
 		log.Info(fmt.Sprintf("Creating Service %s", expectedSvc.Name))
-		if err := r.Client.Create(ctx, expectedSvc); err != nil {
+		if err := r.Create(ctx, expectedSvc); err != nil {
 			log.Error(err, "Error creating Service", "Name", expectedSvc.Name)
 			return nil, err
 		}
@@ -863,7 +863,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsMetricsService(ctx context.C
 
 	if updateNeeded {
 		// Update if the Service already exists and needs to be modified
-		if err := r.Client.Update(ctx, liveService); err != nil {
+		if err := r.Update(ctx, liveService); err != nil {
 			log.Error(err, "Error updating Ports of metrics Service", "Name", liveService.Name)
 			return liveService, err
 		}
@@ -907,7 +907,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsSecrets(ctx context.Context,
 		}
 
 		log.Info(fmt.Sprintf("Creating Secret %s", expectedSecret.Name))
-		return r.Client.Create(ctx, expectedSecret)
+		return r.Create(ctx, expectedSecret)
 
 	}
 
@@ -918,7 +918,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsSecrets(ctx context.Context,
 		controller := metav1.GetControllerOf(liveSecret)
 		if controller != nil && controller.Name == cr.Name {
 			log.Info(fmt.Sprintf("SkipNotificationSecretDeployment has been set to true, deleting secret %s", liveSecret.Name))
-			return r.Client.Delete(ctx, liveSecret)
+			return r.Delete(ctx, liveSecret)
 		}
 
 		// Otherwise, the secret exists, but the controller didn't create it, so just return (don't touch it)
@@ -942,7 +942,7 @@ func (r *RolloutManagerReconciler) reconcileRolloutsSecrets(ctx context.Context,
 
 	if updateNeeded {
 		// Update if the Secret already exists and needs to be modified
-		return r.Client.Update(ctx, liveSecret)
+		return r.Update(ctx, liveSecret)
 	}
 
 	// secret found, do nothing
@@ -1420,7 +1420,7 @@ func (r *RolloutManagerReconciler) createServiceMonitorIfAbsent(ctx context.Cont
 		return err
 	}
 
-	err := r.Client.Create(ctx, serviceMonitor)
+	err := r.Create(ctx, serviceMonitor)
 	if err != nil {
 		log.Error(err, "Error creating a new ServiceMonitor instance",
 			"Namespace", serviceMonitor.Namespace, "Name", serviceMonitor.Name)
